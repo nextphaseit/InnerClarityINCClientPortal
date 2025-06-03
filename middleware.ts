@@ -3,47 +3,46 @@ import type { NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
 
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ req: request })
+  // Get the pathname
+  const path = request.nextUrl.pathname
+
+  // Public paths that don't require authentication
+  const isPublicPath = path === "/" || path === "/auth/signin" || path === "/auth/error"
+
+  // Check if the user is authenticated
+  const token = await getToken({
+    req: request,
+    secret: "TEMPORARY-SECRET-FOR-DEVELOPMENT", // Must match the secret in auth.ts
+  })
+
   const isAuth = !!token
-  const isAuthPage = request.nextUrl.pathname.startsWith("/auth")
-  const isAdminPage = request.nextUrl.pathname.startsWith("/admin")
-  const isClientPage =
-    request.nextUrl.pathname.startsWith("/dashboard") ||
-    request.nextUrl.pathname.startsWith("/appointments") ||
-    request.nextUrl.pathname.startsWith("/messages") ||
-    request.nextUrl.pathname.startsWith("/documents") ||
-    request.nextUrl.pathname.startsWith("/billing") ||
-    request.nextUrl.pathname.startsWith("/forms")
 
-  if (isAuthPage) {
-    if (isAuth) {
-      // Redirect authenticated users away from auth pages
-      if (token?.role === "admin") {
-        return NextResponse.redirect(new URL("/admin", request.url))
-      } else {
-        return NextResponse.redirect(new URL("/dashboard", request.url))
-      }
-    }
-    return NextResponse.next()
+  // Redirect logic
+  if (isPublicPath && isAuth) {
+    // If user is on a public path and is authenticated, redirect to appropriate dashboard
+    return NextResponse.redirect(new URL(token.role === "admin" ? "/admin" : "/dashboard", request.url))
   }
 
-  if (!isAuth && (isAdminPage || isClientPage)) {
-    // Redirect unauthenticated users to sign in
-    let from = request.nextUrl.pathname
-    if (request.nextUrl.search) {
-      from += request.nextUrl.search
-    }
-
-    return NextResponse.redirect(new URL(`/auth/signin?from=${encodeURIComponent(from)}`, request.url))
+  if (!isPublicPath && !isAuth) {
+    // If user is on a protected path and is not authenticated, redirect to signin
+    const callbackUrl = encodeURIComponent(path)
+    return NextResponse.redirect(new URL(`/auth/signin?callbackUrl=${callbackUrl}`, request.url))
   }
 
-  if (isAdminPage && token?.role !== "admin") {
-    // Redirect non-admin users away from admin pages
+  // Role-based access control
+  if (path.startsWith("/admin") && token?.role !== "admin") {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
-  if (isClientPage && token?.role === "admin") {
-    // Redirect admin users away from client pages
+  if (
+    (path.startsWith("/dashboard") ||
+      path.startsWith("/appointments") ||
+      path.startsWith("/messages") ||
+      path.startsWith("/documents") ||
+      path.startsWith("/billing") ||
+      path.startsWith("/forms")) &&
+    token?.role === "admin"
+  ) {
     return NextResponse.redirect(new URL("/admin", request.url))
   }
 
@@ -52,13 +51,13 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/admin/:path*",
-    "/appointments/:path*",
-    "/messages/:path*",
-    "/documents/:path*",
-    "/billing/:path*",
-    "/forms/:path*",
-    "/auth/:path*",
+    /*
+     * Match all paths except for:
+     * 1. /api routes
+     * 2. /_next (Next.js internals)
+     * 3. /images (static files)
+     * 4. /favicon.ico (favicon file)
+     */
+    "/((?!api|_next|images|favicon.ico).*)",
   ],
 }

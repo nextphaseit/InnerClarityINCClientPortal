@@ -1,45 +1,45 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { signIn, getSession } from "next-auth/react"
+import type React from "react"
+
+import { useState } from "react"
+import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Shield, Lock, Eye } from "lucide-react"
 
 export default function SignInPage() {
-  const [loading, setLoading] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
-  const authError = searchParams.get("error")
 
-  useEffect(() => {
-    if (authError) {
-      setError("Authentication failed. Please try again.")
-    }
-  }, [authError])
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
 
-  const handleSignIn = async (provider: string) => {
     try {
-      setLoading(provider)
-      setError(null)
-
-      const result = await signIn(provider, {
+      const result = await signIn("credentials", {
         redirect: false,
+        email,
+        password,
         callbackUrl,
       })
 
       if (result?.error) {
-        setError("Authentication failed. Please try again.")
+        setError("Invalid email or password. Please try again.")
       } else if (result?.ok) {
-        // Get the session to determine user role and redirect accordingly
-        const session = await getSession()
-        if (session?.user?.role === "admin") {
+        // For demo purposes, redirect based on email
+        if (email.includes("admin@innerclarity.com")) {
           router.push("/admin")
         } else {
           router.push("/dashboard")
@@ -48,8 +48,14 @@ export default function SignInPage() {
     } catch (err) {
       setError("An unexpected error occurred. Please try again.")
     } finally {
-      setLoading(null)
+      setLoading(false)
     }
+  }
+
+  // For demo purposes
+  const handleDemoLogin = (type: "admin" | "client") => {
+    setEmail(type === "admin" ? "admin@innerclarity.com" : "client@example.com")
+    setPassword("password123")
   }
 
   return (
@@ -80,45 +86,40 @@ export default function SignInPage() {
             </Alert>
           )}
 
-          <div className="space-y-4">
-            <Button
-              onClick={() => handleSignIn("auth0")}
-              disabled={loading !== null}
-              className="w-full h-12 text-base"
-              size="lg"
-            >
-              {loading === "auth0" ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <Shield className="mr-2 h-5 w-5" />
-              )}
-              Sign in with Auth0
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator className="w-full" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or</span>
-              </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="your.email@example.com"
+              />
             </div>
-
-            <Button
-              onClick={() => handleSignIn("azure-ad")}
-              disabled={loading !== null}
-              variant="outline"
-              className="w-full h-12 text-base"
-              size="lg"
-            >
-              {loading === "azure-ad" ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
               ) : (
-                <Lock className="mr-2 h-5 w-5" />
+                "Sign in"
               )}
-              Sign in with Microsoft
             </Button>
-          </div>
+          </form>
 
           <div className="space-y-4 pt-4 border-t">
             <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
@@ -142,6 +143,18 @@ export default function SignInPage() {
             </div>
           </div>
         </CardContent>
+
+        <CardFooter className="flex flex-col space-y-2">
+          <p className="text-sm text-center text-muted-foreground mb-2">Demo Accounts:</p>
+          <div className="flex gap-2 w-full">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleDemoLogin("admin")}>
+              Admin Demo
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleDemoLogin("client")}>
+              Client Demo
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
     </div>
   )
