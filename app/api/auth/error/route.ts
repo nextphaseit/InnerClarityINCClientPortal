@@ -1,60 +1,58 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    // Extract error from query params
     const { searchParams } = new URL(request.url)
     const error = searchParams.get("error")
 
-    // Create a structured error response
-    const errorResponse = {
-      status: "error",
-      code: error || "unknown_error",
-      message: getErrorMessage(error),
-      timestamp: new Date().toISOString(),
-    }
+    // Log the error for debugging
+    console.log("Auth error:", error)
 
-    // Return as JSON with appropriate status code
-    return NextResponse.json(errorResponse, { status: 400 })
+    // Return a simple JSON response
+    return NextResponse.json(
+      {
+        error: error || "unknown_error",
+        message: getErrorMessage(error),
+        timestamp: new Date().toISOString(),
+      },
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    )
   } catch (err) {
     console.error("Auth error route failed:", err)
 
-    // Return a fallback error response
     return NextResponse.json(
       {
-        status: "error",
-        code: "internal_error",
-        message: "An unexpected error occurred processing the authentication error",
+        error: "internal_error",
+        message: "An unexpected error occurred",
         timestamp: new Date().toISOString(),
       },
-      { status: 500 },
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
     )
   }
 }
 
-// Helper function to get human-readable error messages
 function getErrorMessage(error: string | null): string {
-  switch (error) {
-    case "Configuration":
-      return "There is a problem with the server configuration."
-    case "AccessDenied":
-      return "Access denied. You do not have permission to sign in."
-    case "Verification":
-      return "The verification token has expired or has already been used."
-    case "CredentialsSignin":
-      return "Invalid email or password. Please check your credentials and try again."
-    case "OAuthSignin":
-      return "Error occurred during OAuth sign in."
-    case "OAuthCallback":
-      return "Error occurred during OAuth callback."
-    case "OAuthCreateAccount":
-      return "Could not create OAuth account."
-    case "EmailSignin":
-      return "Unable to send sign-in email. Please try again later."
-    case "SessionRequired":
-      return "Please sign in to access this page."
-    case "Default":
-    default:
-      return "An unexpected authentication error occurred. Please try again."
+  const errorMessages: Record<string, string> = {
+    Configuration: "Server configuration error",
+    AccessDenied: "Access denied",
+    Verification: "Verification token expired",
+    CredentialsSignin: "Invalid credentials",
+    OAuthSignin: "OAuth sign in error",
+    OAuthCallback: "OAuth callback error",
+    OAuthCreateAccount: "Could not create OAuth account",
+    EmailSignin: "Email sign in error",
+    SessionRequired: "Session required",
   }
+
+  return errorMessages[error || ""] || "Authentication error occurred"
 }
