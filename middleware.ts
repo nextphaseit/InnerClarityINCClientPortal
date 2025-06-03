@@ -20,15 +20,15 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/images") ||
     path === "/favicon.ico"
 
-  // Get the user's session
+  // Get the user's session token
   const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: process.env.NEXTAUTH_SECRET || "TEMPORARY-SECRET-FOR-DEVELOPMENT",
   })
 
   const isAuth = !!token
 
-  // Redirect logic for authenticated users on public pages
+  // Redirect authenticated users away from auth pages
   if (isPublicPath && isAuth && (path === "/" || path === "/auth/signin" || path === "/register")) {
     const redirectUrl = token.role === "admin" ? "/admin" : "/dashboard"
     return NextResponse.redirect(new URL(redirectUrl, request.url))
@@ -44,22 +44,18 @@ export async function middleware(request: NextRequest) {
   if (isAuth) {
     // Admin routes - only admins can access
     if (path.startsWith("/admin") && token.role !== "admin") {
-      return NextResponse.redirect(new URL("/dashboard", request.url))
+      return NextResponse.redirect(new URL("/auth/signin", request.url))
     }
 
-    // Patient routes - redirect admins to admin dashboard
+    // Patient routes - only patients can access
     if (
       (path.startsWith("/dashboard") ||
         path.startsWith("/appointments") ||
         path.startsWith("/messages") ||
-        path.startsWith("/documents") ||
-        path.startsWith("/billing") ||
-        path.startsWith("/forms") ||
-        path.startsWith("/profile") ||
-        path.startsWith("/settings")) &&
-      token.role === "admin"
+        path.startsWith("/billing")) &&
+      token.role !== "patient"
     ) {
-      return NextResponse.redirect(new URL("/admin", request.url))
+      return NextResponse.redirect(new URL("/auth/signin", request.url))
     }
   }
 

@@ -1,36 +1,53 @@
 import { type NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 
-// Mock user database - replace with real database in production
+// Mock user database - in production, replace with real database
 const users: Array<{
   id: string
-  fullName: string
+  name: string
   email: string
-  password: string
-  dateOfBirth?: string
+  passwordHash: string
   role: "patient" | "admin"
   tenantId?: string
-  createdAt: string
-  emailVerified: boolean
-}> = []
+  dateRegistered: string
+}> = [
+  {
+    id: "admin-1",
+    name: "Dr. Sarah Johnson",
+    email: "admin@innerclarity.org",
+    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "password123"
+    role: "admin",
+    tenantId: "inner-clarity",
+    dateRegistered: "2024-01-01T00:00:00Z",
+  },
+  {
+    id: "patient-1",
+    name: "Jayda Smith",
+    email: "jayda@innerclarity.org",
+    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "password123"
+    role: "patient",
+    tenantId: "inner-clarity",
+    dateRegistered: "2024-01-15T00:00:00Z",
+  },
+]
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { fullName, email, password, dateOfBirth } = body
+    const { name, email, password, tenantId } = body
 
-    // Validation
-    if (!fullName || !email || !password) {
-      return NextResponse.json({ error: "Full name, email, and password are required" }, { status: 400 })
+    // Validate required fields
+    if (!name || !email || !password) {
+      return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 })
     }
 
-    // Email validation
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 })
     }
 
-    // Password validation
+    // Validate password strength
     if (password.length < 8) {
       return NextResponse.json({ error: "Password must be at least 8 characters long" }, { status: 400 })
     }
@@ -52,51 +69,43 @@ export async function POST(request: NextRequest) {
     // Check if user already exists
     const existingUser = users.find((user) => user.email.toLowerCase() === email.toLowerCase())
     if (existingUser) {
-      return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 })
+      return NextResponse.json({ error: "User with this email already exists" }, { status: 409 })
     }
 
-    // Hash password
+    // Hash password securely
     const saltRounds = 12
-    const hashedPassword = await bcrypt.hash(password, saltRounds)
+    const passwordHash = await bcrypt.hash(password, saltRounds)
 
     // Create new user
     const newUser = {
       id: `patient-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      fullName: fullName.trim(),
+      name: name.trim(),
       email: email.toLowerCase().trim(),
-      password: hashedPassword,
-      dateOfBirth: dateOfBirth || undefined,
+      passwordHash,
       role: "patient" as const,
-      createdAt: new Date().toISOString(),
-      emailVerified: false, // In production, implement email verification
+      tenantId: tenantId || "inner-clarity",
+      dateRegistered: new Date().toISOString(),
     }
 
-    // Store user (in production, save to database)
+    // Store user in mock database
     users.push(newUser)
 
-    // Log registration for audit purposes
+    // Log registration (without sensitive data)
     console.log("New user registered:", {
       id: newUser.id,
       email: newUser.email,
-      fullName: newUser.fullName,
-      timestamp: newUser.createdAt,
+      name: newUser.name,
+      role: newUser.role,
+      tenantId: newUser.tenantId,
+      timestamp: newUser.dateRegistered,
     })
 
-    // Return success (don't include password in response)
-    const { password: _, ...userResponse } = newUser
-
-    return NextResponse.json(
-      {
-        message: "Account created successfully",
-        user: userResponse,
-      },
-      { status: 201 },
-    )
+    return NextResponse.json({ message: "Account created successfully" }, { status: 200 })
   } catch (error) {
     console.error("Registration error:", error)
-    return NextResponse.json({ error: "Internal server error during registration" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-// Export users for use in auth (in production, this would be database queries)
+// Export users for NextAuth
 export { users }

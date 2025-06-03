@@ -1,6 +1,62 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST(request: Request) {
+// Mock clients data with tenant information
+const mockClients = [
+  {
+    id: "client-1",
+    name: "Jayda Smith",
+    email: "jayda@innerclarity.org",
+    dateRegistered: "2024-01-15",
+    tenantId: "inner-clarity",
+    status: "Active",
+  },
+  {
+    id: "client-2",
+    name: "Michael Johnson",
+    email: "michael.j@innerclarity.org",
+    dateRegistered: "2024-01-20",
+    tenantId: "inner-clarity",
+    status: "Active",
+  },
+  {
+    id: "client-3",
+    name: "Sarah Wilson",
+    email: "sarah.w@innerclarity.org",
+    dateRegistered: "2024-02-01",
+    tenantId: "inner-clarity",
+    status: "Active",
+  },
+  {
+    id: "client-4",
+    name: "David Brown",
+    email: "david.b@otherorg.com",
+    dateRegistered: "2024-01-10",
+    tenantId: "other-org",
+    status: "Active",
+  },
+]
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const tenantId = searchParams.get("tenantId")
+
+    // Return empty array if tenantId is missing
+    if (!tenantId) {
+      return NextResponse.json([])
+    }
+
+    // Filter clients by tenantId
+    const filteredClients = mockClients.filter((client) => client.tenantId === tenantId)
+
+    return NextResponse.json(filteredClients, { status: 200 })
+  } catch (error) {
+    console.error("Error fetching clients:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
@@ -28,8 +84,8 @@ export async function POST(request: Request) {
       phone: phone.trim(),
       notes: notes?.trim() || "",
       status: "active",
-      createdAt: new Date().toISOString(),
-      provider: "Unassigned",
+      dateRegistered: new Date().toISOString().split("T")[0],
+      tenantId: "inner-clarity", // In production, get from session
     }
 
     // Log the received data (in production, save to database)
@@ -44,33 +100,4 @@ export async function POST(request: Request) {
     console.error("Error creating client:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
-}
-
-export async function GET() {
-  // Return mock clients data for testing
-  const mockClients = [
-    {
-      id: "client-1",
-      name: "John Smith",
-      email: "john.smith@email.com",
-      phone: "(555) 123-4567",
-      status: "active",
-      provider: "Dr. Sarah Johnson",
-      createdAt: "2024-01-01T00:00:00Z",
-    },
-    {
-      id: "client-2",
-      name: "Jane Doe",
-      email: "jane.doe@email.com",
-      phone: "(555) 234-5678",
-      status: "active",
-      provider: "Dr. Michael Chen",
-      createdAt: "2024-01-02T00:00:00Z",
-    },
-  ]
-
-  return NextResponse.json({
-    success: true,
-    clients: mockClients,
-  })
 }
