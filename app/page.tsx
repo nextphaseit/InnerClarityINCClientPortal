@@ -27,7 +27,7 @@ export default function HomePage() {
           <div className="mb-8">
             <Image
               src="/images/inner-clarity-logo.png"
-              alt="Inner Clarity"
+              alt="Inner Clarity Inc."
               width={120}
               height={120}
               className="h-30 w-auto mx-auto mb-6"
@@ -185,16 +185,16 @@ export default function HomePage() {
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <Image
                 src="/images/inner-clarity-logo.png"
-                alt="Inner Clarity"
+                alt="Inner Clarity Inc."
                 width={32}
                 height={32}
                 className="h-8 w-auto"
               />
-              <span className="text-lg font-bold">Inner Clarity</span>
+              <span className="text-lg font-bold">Inner Clarity Inc.</span>
             </div>
 
             <div className="text-center md:text-right">
-              <p className="text-gray-400 mb-2">© 2024 Inner Clarity. All rights reserved.</p>
+              <p className="text-gray-400 mb-2">© 2024 Inner Clarity Inc. All rights reserved.</p>
               <p className="text-sm text-gray-500">HIPAA Compliant Mental Health Platform</p>
             </div>
           </div>
