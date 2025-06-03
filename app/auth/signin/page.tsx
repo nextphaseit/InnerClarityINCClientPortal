@@ -1,179 +1,251 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useSearchParams } from 'next/navigation'
-import { signIn } from 'next-auth/react'
-import Link from 'next/link'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm } from 'react-hook-form'
-import * as z from 'zod'
+import type React from "react"
 
-import { cn } from '@/lib/utils'
-import { buttonVariants } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Shield } from 'lucide-react'
-
-const signinSchema = z.object({
-  email: z.string().email({
-    message: 'Please enter a valid email address.',
-  }),
-  password: z.string().min(8, {
-    message: 'Password must be at least 8 characters.',
-  }),
-})
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { signIn } from "next-auth/react"
+import Image from "next/image"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Eye, EyeOff, Mail, Lock, Shield } from "lucide-react"
 
 export default function SignInPage() {
-  const [isPending, startTransition] = useState(false)
-  const [error, setError] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/'
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("patient")
 
-  const [successMessage, setSuccessMessage] = useState('')
+  // Get callbackUrl from query parameters
+  const callbackUrl = searchParams?.get("callbackUrl") || "/dashboard"
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const message = urlParams.get('message')
-    if (message) {
-      setSuccessMessage(message)
+    // Check for error message in URL
+    const errorMessage = searchParams?.get("error")
+    if (errorMessage) {
+      switch (errorMessage) {
+        case "AccessDenied":
+          setError("You don't have permission to access that page.")
+          break
+        case "MicrosoftLoginRequired":
+          setError("Admin access requires Microsoft login.")
+          break
+        case "CredentialsSignin":
+          setError("Invalid email or password.")
+          break
+        default:
+          setError("An error occurred during sign in.")
+      }
     }
-  }, [])
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<z.infer<typeof signinSchema>>({
-    resolver: zodResolver(signinSchema),
-  })
+    // Check for success message in URL
+    const successMessage = searchParams?.get("message")
+    if (successMessage) {
+      setMessage(successMessage)
+    }
+  }, [searchParams])
 
-  async function onSubmit(data: z.infer<typeof signinSchema>) {
-    setError('')
-    startTransition(async () => {
-      const result = await signIn('credentials', {
-        ...data,
+  const handleCredentialsLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!email || !password) {
+      setError("Email and password are required")
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
         redirect: false,
-        callbackUrl,
       })
 
       if (result?.error) {
-        setError('Invalid credentials.')
+        setError(result.error)
         return
       }
 
-      return router.push(callbackUrl)
-    })
+      // Redirect based on user role (handled by middleware)
+      router.push(callbackUrl)
+    } catch (error) {
+      setError("An unexpected error occurred")
+      console.error("Sign in error:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAuth0Login = async () => {
+    setLoading(true)
+    await signIn("auth0", { callbackUrl })
+  }
+
+  const handleMicrosoftLogin = async () => {
+    setLoading(true)
+    await signIn("azure-ad", { callbackUrl })
   }
 
   return (
-    <div className="container relative hidden h-[800px] flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex">
-        <div className="absolute inset-0 bg-zinc-900" />
-        <div className="relative z-20 flex items-center text-lg font-medium">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="mr-2 h-6 w-6"
-          >
-            <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
-          </svg>
-          Clarity UI
-        </div>
-        <div className="relative z-20 mt-auto">
-          <blockquote className="space-y-2">
-            <p className="text-lg">
-              &ldquo;This library has saved me countless hours of work and
-              helped me deliver stunning designs to my clients faster than ever
-              before.&rdquo;
-            </p>
-            <footer className="text-sm">Sofia Davis, Design Lead at Acme Corp</footer>
-          </blockquote>
-        </div>
-      </div>
-      <div className="lg:p-8">
-        <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-          <div className="flex flex-col space-y-2 text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Welcome back!
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Enter your email and password to sign in
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/images/inner-clarity-logo.png"
+              alt="Inner Clarity"
+              width={120}
+              height={40}
+              className="h-10 w-auto"
+            />
           </div>
-          {successMessage && (
-            <Alert className="mb-6 border-clarity-green-200 bg-clarity-green-50 text-clarity-green-800">
-              <Shield className="h-4 w-4" />
-              <AlertDescription>{successMessage}</AlertDescription>
-            </Alert>
-          )}
+          <CardTitle className="text-2xl font-bold text-gray-900">Welcome Back</CardTitle>
+          <CardDescription className="text-gray-600">Sign in to access your secure portal</CardDescription>
+        </CardHeader>
+
+        <CardContent>
           {error && (
-            <Alert variant="destructive">
-              <Shield className="h-4 w-4" />
+            <Alert variant="destructive" className="mb-4">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                placeholder="m@example.com"
-                type="email"
-                autoCapitalize="none"
-                autoComplete="email"
-                disabled={isPending}
-                {...register('email')}
-              />
-              {errors?.email && (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                placeholder="Password"
-                type="password"
-                disabled={isPending}
-                {...register('password')}
-              />
-              {errors?.password && (
-                <p className="text-sm text-red-500">{errors.password.message}</p>
-              )}
-            </div>
-            <button className={cn(buttonVariants())} disabled={isPending}>
-              Sign In
-            </button>
-          </form>
-          <div className="mt-4 text-center">
-            <Link
-              href="/forgot-password"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
-            >
-              Forgot password?
-            </Link>
-          </div>
-          <div className="mt-4 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Don't have an account?{' '}
-              <Link
-                href="/register"
-                className="font-medium text-clarity-blue-600 hover:text-clarity-blue-500"
+
+          {message && (
+            <Alert className="mb-4 bg-green-50 border-green-200">
+              <AlertDescription className="text-green-800">{message}</AlertDescription>
+            </Alert>
+          )}
+
+          <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="patient">Patient Portal</TabsTrigger>
+              <TabsTrigger value="admin">Admin Portal</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="patient" className="space-y-4">
+              <Button
+                onClick={handleAuth0Login}
+                className="w-full bg-clarity-blue-600 hover:bg-clarity-blue-700"
+                disabled={loading}
               >
-                Register here
+                {loading ? "Signing in..." : "Sign in with Auth0"}
+              </Button>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or</span>
+                </div>
+              </div>
+
+              <form onSubmit={handleCredentialsLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <Link
+                      href="/auth/forgot-password"
+                      className="text-xs text-clarity-blue-600 hover:text-clarity-blue-700"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Signing in..." : "Sign in"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="admin" className="space-y-4">
+              <Button
+                onClick={handleMicrosoftLogin}
+                className="w-full bg-[#0078d4] hover:bg-[#006cbe]"
+                disabled={loading}
+              >
+                {loading ? "Signing in..." : "Sign in with Microsoft"}
+              </Button>
+
+              <div className="text-center text-sm text-gray-600 mt-2">
+                <p>Admin access is restricted to authorized personnel only.</p>
+                <p className="mt-1">You must use your @innerclarityinc.com or @nextphaseit.org email.</p>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{" "}
+              <Link href="/register" className="text-clarity-blue-600 hover:text-clarity-blue-700 font-medium">
+                Create account
               </Link>
             </p>
           </div>
-        </div>
-      </div>
+
+          {/* HIPAA Notice */}
+          <div className="mt-6 p-3 bg-clarity-blue-50 rounded-lg border border-clarity-blue-200">
+            <div className="flex items-start space-x-2">
+              <Shield className="h-4 w-4 text-clarity-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-medium text-clarity-blue-800">HIPAA Secure Login</p>
+                <p className="text-xs text-clarity-blue-700 mt-1">
+                  Your personal health information is protected by HIPAA regulations. All data is encrypted and stored
+                  securely.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

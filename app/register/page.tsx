@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, User, Mail, Lock, Calendar, Shield } from "lucide-react"
+
+interface FormData {
+  fullName: string
+  email: string
+  password: string
+  confirmPassword: string
+  dateOfBirth: string
+}
+
+interface FormErrors {
+  fullName?: string
+  email?: string
+  password?: string
+  confirmPassword?: string
+  dateOfBirth?: string
+  general?: string
+}
 
 interface PasswordValidation {
   minLength: boolean
@@ -23,17 +40,18 @@ interface PasswordValidation {
 
 export default function RegisterPage() {
   const router = useRouter()
-  const [formData, setFormData] = useState({
+  const searchParams = useSearchParams()
+  const [formData, setFormData] = useState<FormData>({
     fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
     dateOfBirth: "",
   })
+  const [errors, setErrors] = useState<FormErrors>({})
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
   const [passwordValidation, setPasswordValidation] = useState<PasswordValidation>({
     minLength: false,
     hasUppercase: false,
@@ -41,6 +59,14 @@ export default function RegisterPage() {
     hasNumber: false,
     hasSpecialChar: false,
   })
+
+  // Check for message in URL (e.g., from redirect)
+  useEffect(() => {
+    const message = searchParams?.get("message")
+    if (message) {
+      setErrors({ general: message })
+    }
+  }, [searchParams])
 
   const validatePassword = (password: string): PasswordValidation => {
     return {
@@ -56,36 +82,100 @@ export default function RegisterPage() {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
 
+    // Clear specific field error when user starts typing
+    if (errors[name as keyof FormErrors]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }))
+    }
+
+    // Validate password as user types
     if (name === "password") {
       setPasswordValidation(validatePassword(value))
+
+      // Check password confirmation match if it exists
+      if (formData.confirmPassword && value !== formData.confirmPassword) {
+        setErrors((prev) => ({ ...prev, confirmPassword: "Passwords do not match" }))
+      } else if (formData.confirmPassword) {
+        setErrors((prev) => ({ ...prev, confirmPassword: undefined }))
+      }
+    }
+
+    // Check password match when typing in confirm password field
+    if (name === "confirmPassword" && formData.password) {
+      if (value !== formData.password) {
+        setErrors((prev) => ({ ...prev, confirmPassword: "Passwords do not match" }))
+      } else {
+        setErrors((prev) => ({ ...prev, confirmPassword: undefined }))
+      }
     }
   }
 
-  const isPasswordValid = Object.values(passwordValidation).every(Boolean)
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {}
+    let isValid = true
+
+    // Validate full name
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = "Full name is required"
+      isValid = false
+    }
+
+    // Validate email
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required"
+      isValid = false
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = "Please enter a valid email address"
+        isValid = false
+      }
+    }
+
+    // Validate password
+    if (!formData.password) {
+      newErrors.password = "Password is required"
+      isValid = false
+    } else {
+      const validation = validatePassword(formData.password)
+      if (!Object.values(validation).every(Boolean)) {
+        newErrors.password = "Password does not meet all requirements"
+        isValid = false
+      }
+    }
+
+    // Validate password confirmation
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password"
+      isValid = false
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match"
+      isValid = false
+    }
+
+    setErrors(newErrors)
+    return isValid
+  }
+
+  const isFormValid = (): boolean => {
+    return (
+      !!formData.fullName.trim() &&
+      !!formData.email.trim() &&
+      !!formData.password &&
+      !!formData.confirmPassword &&
+      formData.password === formData.confirmPassword &&
+      Object.values(passwordValidation).every(Boolean) &&
+      Object.keys(errors).length === 0
+    )
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
 
-    // Validation
-    if (!formData.fullName || !formData.email || !formData.password) {
-      setError("Please fill in all required fields")
-      return
-    }
+    // Clear general error
+    setErrors((prev) => ({ ...prev, general: undefined }))
 
-    if (!isPasswordValid) {
-      setError("Password does not meet security requirements")
-      return
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
-      setError("Please enter a valid email address")
+    // Validate form
+    if (!validateForm()) {
       return
     }
 
@@ -98,7 +188,7 @@ export default function RegisterPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          fullName: formData.fullName,
+          name: formData.fullName,
           email: formData.email,
           password: formData.password,
           dateOfBirth: formData.dateOfBirth || null,
@@ -115,10 +205,16 @@ export default function RegisterPage() {
       router.push("/auth/signin?message=Registration successful! Please sign in.")
     } catch (error) {
       console.error("Registration error:", error)
-      setError(error instanceof Error ? error.message : "Registration failed")
+      setErrors({
+        general: error instanceof Error ? error.message : "Registration failed. Please try again.",
+      })
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleAuth0Login = () => {
+    router.push("/api/auth/signin?provider=auth0")
   }
 
   return (
@@ -141,15 +237,17 @@ export default function RegisterPage() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+          {errors.general && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{errors.general}</AlertDescription>
+            </Alert>
+          )}
 
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name *</Label>
+              <Label htmlFor="fullName" className="flex items-center">
+                Full Name <span className="text-red-500 ml-1">*</span>
+              </Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -159,14 +257,23 @@ export default function RegisterPage() {
                   placeholder="Enter your full name"
                   value={formData.fullName}
                   onChange={handleInputChange}
-                  className="pl-10"
+                  className={`pl-10 ${errors.fullName ? "border-red-500 focus:ring-red-500" : ""}`}
+                  aria-invalid={!!errors.fullName}
+                  aria-describedby={errors.fullName ? "fullName-error" : undefined}
                   required
                 />
               </div>
+              {errors.fullName && (
+                <p id="fullName-error" className="text-sm text-red-500 mt-1">
+                  {errors.fullName}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address *</Label>
+              <Label htmlFor="email" className="flex items-center">
+                Email Address <span className="text-red-500 ml-1">*</span>
+              </Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -176,10 +283,17 @@ export default function RegisterPage() {
                   placeholder="Enter your email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="pl-10"
+                  className={`pl-10 ${errors.email ? "border-red-500 focus:ring-red-500" : ""}`}
+                  aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? "email-error" : undefined}
                   required
                 />
               </div>
+              {errors.email && (
+                <p id="email-error" className="text-sm text-red-500 mt-1">
+                  {errors.email}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -198,7 +312,9 @@ export default function RegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
+              <Label htmlFor="password" className="flex items-center">
+                Password <span className="text-red-500 ml-1">*</span>
+              </Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -208,17 +324,25 @@ export default function RegisterPage() {
                   placeholder="Create a secure password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="pl-10 pr-10"
+                  className={`pl-10 pr-10 ${errors.password ? "border-red-500 focus:ring-red-500" : ""}`}
+                  aria-invalid={!!errors.password}
+                  aria-describedby={errors.password ? "password-error" : undefined}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {errors.password && (
+                <p id="password-error" className="text-sm text-red-500 mt-1">
+                  {errors.password}
+                </p>
+              )}
 
               {/* Password Requirements */}
               {formData.password && (
@@ -261,7 +385,9 @@ export default function RegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password *</Label>
+              <Label htmlFor="confirmPassword" className="flex items-center">
+                Confirm Password <span className="text-red-500 ml-1">*</span>
+              </Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -271,28 +397,46 @@ export default function RegisterPage() {
                   placeholder="Confirm your password"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className="pl-10 pr-10"
+                  className={`pl-10 pr-10 ${errors.confirmPassword ? "border-red-500 focus:ring-red-500" : ""}`}
+                  aria-invalid={!!errors.confirmPassword}
+                  aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                 >
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                <p className="text-xs text-red-600">Passwords do not match</p>
+              {errors.confirmPassword && (
+                <p id="confirmPassword-error" className="text-sm text-red-500 mt-1">
+                  {errors.confirmPassword}
+                </p>
               )}
             </div>
 
             <Button
               type="submit"
               className="w-full bg-clarity-blue-600 hover:bg-clarity-blue-700"
-              disabled={loading || !isPasswordValid}
+              disabled={loading || !isFormValid()}
             >
               {loading ? "Creating Account..." : "Create Account"}
+            </Button>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or</span>
+              </div>
+            </div>
+
+            <Button type="button" variant="outline" className="w-full" onClick={handleAuth0Login}>
+              Sign up with Auth0
             </Button>
           </form>
 

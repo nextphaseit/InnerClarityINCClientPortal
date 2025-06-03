@@ -23,15 +23,19 @@ export async function middleware(request: NextRequest) {
   // Get the user's session token
   const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET || "TEMPORARY-SECRET-FOR-DEVELOPMENT",
+    secret: process.env.NEXTAUTH_SECRET,
   })
 
   const isAuth = !!token
 
   // Redirect authenticated users away from auth pages
   if (isPublicPath && isAuth && (path === "/" || path === "/auth/signin" || path === "/register")) {
-    const redirectUrl = token.role === "admin" ? "/admin" : "/dashboard"
-    return NextResponse.redirect(new URL(redirectUrl, request.url))
+    // Role-based redirects
+    if (token.role === "admin") {
+      return NextResponse.redirect(new URL("/admin", request.url))
+    } else {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
   }
 
   // Redirect unauthenticated users to signin
@@ -44,7 +48,12 @@ export async function middleware(request: NextRequest) {
   if (isAuth) {
     // Admin routes - only admins can access
     if (path.startsWith("/admin") && token.role !== "admin") {
-      return NextResponse.redirect(new URL("/auth/signin", request.url))
+      return NextResponse.redirect(new URL("/auth/signin?error=AccessDenied", request.url))
+    }
+
+    // Admin routes - only Microsoft-authenticated admins can access
+    if (path.startsWith("/admin") && token.role === "admin" && token.authProvider !== "azure-ad") {
+      return NextResponse.redirect(new URL("/auth/signin?error=MicrosoftLoginRequired", request.url))
     }
 
     // Patient routes - only patients can access
@@ -55,7 +64,7 @@ export async function middleware(request: NextRequest) {
         path.startsWith("/billing")) &&
       token.role !== "patient"
     ) {
-      return NextResponse.redirect(new URL("/auth/signin", request.url))
+      return NextResponse.redirect(new URL("/auth/signin?error=AccessDenied", request.url))
     }
   }
 
