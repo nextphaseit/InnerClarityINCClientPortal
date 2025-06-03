@@ -1,12 +1,12 @@
 "use client"
 
-import { useSession } from "next-auth/react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
+import { useAuth } from "@/components/auth-provider"
 import {
   Calendar,
   MessageSquare,
@@ -21,25 +21,20 @@ import {
 import Link from "next/link"
 
 export default function ClientDashboard() {
-  const { data: session, status } = useSession()
+  const { user, loading } = useAuth()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (status === "loading") return
-
-    if (!session) {
+    if (!loading && !user) {
       router.push("/auth/signin")
       return
     }
 
-    if (session.user?.role === "admin") {
+    if (user?.role === "admin") {
       router.push("/admin")
       return
     }
-
-    setLoading(false)
-  }, [session, status, router])
+  }, [user, loading, router])
 
   if (loading) {
     return (
@@ -47,6 +42,10 @@ export default function ClientDashboard() {
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-clarity-blue-500"></div>
       </div>
     )
+  }
+
+  if (!user) {
+    return null
   }
 
   // Mock data - in a real app, this would come from your API
@@ -70,9 +69,7 @@ export default function ClientDashboard() {
 
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Welcome back, {session?.user?.name?.split(" ")[0]}
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome back, {user.name.split(" ")[0]}</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
             Here's what's happening with your mental health journey today.
           </p>

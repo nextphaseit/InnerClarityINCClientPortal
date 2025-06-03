@@ -1,9 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
-import { signIn } from "next-auth/react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -12,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Shield, Lock, Eye } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
 
 export default function SignInPage() {
   const [loading, setLoading] = useState(false)
@@ -21,6 +20,18 @@ export default function SignInPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
+  const { signIn, user } = useAuth()
+
+  useEffect(() => {
+    if (user) {
+      // Redirect if already signed in
+      if (user.role === "admin") {
+        router.push("/admin")
+      } else {
+        router.push("/dashboard")
+      }
+    }
+  }, [user, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,22 +39,12 @@ export default function SignInPage() {
     setError(null)
 
     try {
-      const result = await signIn("credentials", {
-        redirect: false,
-        email,
-        password,
-        callbackUrl,
-      })
+      const success = await signIn(email, password)
 
-      if (result?.error) {
+      if (success) {
+        // Redirect will happen via useEffect when user state updates
+      } else {
         setError("Invalid email or password. Please try again.")
-      } else if (result?.ok) {
-        // For demo purposes, redirect based on email
-        if (email.includes("admin@innerclarity.com")) {
-          router.push("/admin")
-        } else {
-          router.push("/dashboard")
-        }
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.")
@@ -154,6 +155,7 @@ export default function SignInPage() {
               Client Demo
             </Button>
           </div>
+          <p className="text-xs text-center text-muted-foreground mt-2">Password: password123</p>
         </CardFooter>
       </Card>
     </div>

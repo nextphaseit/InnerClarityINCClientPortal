@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { useSession, signOut } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useAuth } from "@/components/auth-provider"
 import {
   User,
   Settings,
@@ -31,8 +32,14 @@ import {
 } from "lucide-react"
 
 export function Navigation() {
-  const { data: session } = useSession()
+  const { user, signOut } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push("/")
+  }
 
   const clientNavItems = [
     { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
@@ -52,7 +59,7 @@ export function Navigation() {
     { href: "/admin/audit", label: "Audit Logs", icon: Shield },
   ]
 
-  const navItems = session?.user?.role === "admin" ? adminNavItems : clientNavItems
+  const navItems = user?.role === "admin" ? adminNavItems : clientNavItems
 
   return (
     <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
@@ -73,7 +80,7 @@ export function Navigation() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-4">
-            {session && (
+            {user && (
               <>
                 {navItems.map((item) => {
                   const Icon = item.icon
@@ -93,24 +100,22 @@ export function Navigation() {
 
             <ThemeToggle />
 
-            {session ? (
+            {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={session.user?.image || ""} alt={session.user?.name || ""} />
-                      <AvatarFallback>{session.user?.name?.charAt(0) || "U"}</AvatarFallback>
+                      <AvatarImage src="/placeholder.svg" alt={user.name} />
+                      <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
-                      <p className="font-medium">{session.user?.name}</p>
-                      <p className="w-[200px] truncate text-sm text-muted-foreground">{session.user?.email}</p>
-                      <p className="text-xs text-clarity-blue-600 dark:text-clarity-blue-400 capitalize">
-                        {session.user?.role}
-                      </p>
+                      <p className="font-medium">{user.name}</p>
+                      <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
+                      <p className="text-xs text-clarity-blue-600 dark:text-clarity-blue-400 capitalize">{user.role}</p>
                     </div>
                   </div>
                   <DropdownMenuSeparator />
@@ -127,7 +132,7 @@ export function Navigation() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="cursor-pointer" onSelect={() => signOut({ callbackUrl: "/" })}>
+                  <DropdownMenuItem className="cursor-pointer" onSelect={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign out
                   </DropdownMenuItem>
@@ -154,7 +159,7 @@ export function Navigation() {
       {mobileMenuOpen && (
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-            {session &&
+            {user &&
               navItems.map((item) => {
                 const Icon = item.icon
                 return (
@@ -170,16 +175,16 @@ export function Navigation() {
                 )
               })}
 
-            {session ? (
+            {user ? (
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                 <div className="flex items-center px-3 py-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={session.user?.image || ""} alt={session.user?.name || ""} />
-                    <AvatarFallback>{session.user?.name?.charAt(0) || "U"}</AvatarFallback>
+                    <AvatarImage src="/placeholder.svg" alt={user.name} />
+                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="ml-3">
-                    <div className="text-base font-medium text-gray-800 dark:text-gray-200">{session.user?.name}</div>
-                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{session.user?.email}</div>
+                    <div className="text-base font-medium text-gray-800 dark:text-gray-200">{user.name}</div>
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{user.email}</div>
                   </div>
                 </div>
                 <div className="mt-3 space-y-1">
@@ -200,7 +205,7 @@ export function Navigation() {
                   <button
                     onClick={() => {
                       setMobileMenuOpen(false)
-                      signOut({ callbackUrl: "/" })
+                      handleSignOut()
                     }}
                     className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:text-clarity-blue-600 dark:hover:text-clarity-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
