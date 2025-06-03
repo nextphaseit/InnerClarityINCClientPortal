@@ -3,43 +3,39 @@ import type { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 
-// Import users from registration route
+// Mock user database - replace with real database in production
 const users = [
   {
-    id: "admin-1",
-    name: "Dr. Sarah Johnson",
+    id: "1",
     email: "admin@innerclarity.org",
-    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "password123"
-    role: "admin",
+    name: "Admin User",
+    passwordHash: "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/VcSAg/9qm", // password123
+    role: "admin" as const,
     tenantId: "inner-clarity",
-    dateRegistered: "2024-01-01T00:00:00Z",
   },
   {
-    id: "patient-1",
-    name: "Jayda Smith",
-    email: "jayda@innerclarity.org",
-    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "password123"
-    role: "patient",
+    id: "2",
+    email: "patient@innerclarity.org",
+    name: "Patient User",
+    passwordHash: "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/VcSAg/9qm", // password123
+    role: "patient" as const,
     tenantId: "inner-clarity",
-    dateRegistered: "2024-01-15T00:00:00Z",
   },
   {
-    id: "demo-admin",
-    name: "Demo Admin",
+    id: "3",
     email: "demo.admin@innerclarity.org",
-    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "demo123"
-    role: "admin",
+    name: "Demo Admin",
+    passwordHash: "$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // demo123
+    role: "admin" as const,
     tenantId: "inner-clarity",
-    dateRegistered: "2024-01-01T00:00:00Z",
   },
   {
-    id: "demo-patient",
-    name: "Demo Patient",
+    id: "4",
     email: "demo.patient@innerclarity.org",
-    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "demo123"
-    role: "patient",
+    name: "Demo Patient",
+    passwordHash: "$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // demo123
+    role: "patient" as const,
     tenantId: "inner-clarity",
-    dateRegistered: "2024-01-15T00:00:00Z",
   },
 ]
 
@@ -52,31 +48,35 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password are required")
-        }
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            console.log("Missing credentials")
+            return null
+          }
 
-        // Find user by email
-        const user = users.find((u) => u.email.toLowerCase() === credentials.email.toLowerCase())
+          const user = users.find((u) => u.email === credentials.email)
+          if (!user) {
+            console.log("User not found:", credentials.email)
+            return null
+          }
 
-        if (!user) {
-          throw new Error("No account found with this email address")
-        }
+          const isValidPassword = await bcrypt.compare(credentials.password, user.passwordHash)
+          if (!isValidPassword) {
+            console.log("Invalid password for user:", credentials.email)
+            return null
+          }
 
-        // Verify password
-        const isValidPassword = await bcrypt.compare(credentials.password, user.passwordHash)
-
-        if (!isValidPassword) {
-          throw new Error("Invalid password")
-        }
-
-        // Return user object (exclude password)
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          tenantId: user.tenantId,
+          console.log("User authenticated successfully:", user.email)
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            tenantId: user.tenantId,
+          }
+        } catch (error) {
+          console.error("Auth error:", error)
+          return null
         }
       },
     }),
@@ -87,34 +87,56 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
-        token.role = user.role
-        token.id = user.id
-        token.tenantId = user.tenantId
+      try {
+        if (user) {
+          token.role = user.role
+          token.tenantId = user.tenantId
+        }
+        return token
+      } catch (error) {
+        console.error("JWT callback error:", error)
+        return token
       }
-      return token
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.role = token.role as string
-        session.user.id = token.id as string
-        session.user.tenantId = token.tenantId as string
+      try {
+        if (token && session.user) {
+          session.user.id = token.sub || ""
+          session.user.role = token.role as "admin" | "patient"
+          session.user.tenantId = token.tenantId as string
+        }
+        return session
+      } catch (error) {
+        console.error("Session callback error:", error)
+        return session
       }
-      return session
     },
     async redirect({ url, baseUrl }) {
-      // Handle role-based redirects after login
-      if (url.includes("/auth/signin")) {
+      try {
+        // Handle relative URLs
+        if (url.startsWith("/")) {
+          return `${baseUrl}${url}`
+        }
+        // Handle same origin URLs
+        if (new URL(url).origin === baseUrl) {
+          return url
+        }
+        // Default to base URL
+        return baseUrl
+      } catch (error) {
+        console.error("Redirect callback error:", error)
         return baseUrl
       }
-      return url.startsWith(baseUrl) ? url : baseUrl
     },
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 24 * 60 * 60, // 24 hours
   },
-  secret: process.env.NEXTAUTH_SECRET || "TEMPORARY-SECRET-FOR-DEVELOPMENT",
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
   debug: process.env.NODE_ENV === "development",
 }
 

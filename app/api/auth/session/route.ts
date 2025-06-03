@@ -7,7 +7,15 @@ export async function GET() {
     const session = await getServerSession(authOptions)
 
     if (!session || !session.user) {
-      return NextResponse.json({ user: null }, { status: 200 })
+      return NextResponse.json(
+        { user: null },
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      )
     }
 
     return NextResponse.json(
@@ -20,7 +28,12 @@ export async function GET() {
           tenantId: session.user.tenantId,
         },
       },
-      { status: 200 },
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
     )
   } catch (error) {
     console.error("Session API error:", error)
@@ -29,7 +42,12 @@ export async function GET() {
         user: null,
         error: "Session check failed",
       },
-      { status: 200 },
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
     )
   }
 }

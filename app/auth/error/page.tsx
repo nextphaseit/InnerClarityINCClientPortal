@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -8,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertTriangle, ArrowLeft } from "lucide-react"
 
-export default function AuthErrorPage() {
+function AuthErrorContent() {
   const searchParams = useSearchParams()
   const error = searchParams.get("error")
 
@@ -22,6 +23,24 @@ export default function AuthErrorPage() {
         return "The verification token has expired or has already been used."
       case "Default":
         return "An error occurred during authentication."
+      case "CredentialsSignin":
+        return "Invalid email or password. Please check your credentials and try again."
+      case "EmailSignin":
+        return "Unable to send email. Please try again later."
+      case "OAuthSignin":
+        return "Error occurred during OAuth sign in."
+      case "OAuthCallback":
+        return "Error occurred during OAuth callback."
+      case "OAuthCreateAccount":
+        return "Could not create OAuth account."
+      case "EmailCreateAccount":
+        return "Could not create email account."
+      case "Callback":
+        return "Error occurred during callback."
+      case "OAuthAccountNotLinked":
+        return "OAuth account is not linked to an existing account."
+      case "SessionRequired":
+        return "Please sign in to access this page."
       default:
         return "An unexpected error occurred. Please try again."
     }
@@ -67,9 +86,24 @@ export default function AuthErrorPage() {
 
           <div className="text-center text-sm text-muted-foreground">
             <p>If you continue to experience issues, please contact support.</p>
+            {error && <p className="mt-2 text-xs text-gray-500">Error code: {error}</p>}
           </div>
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-clarity-blue-600"></div>
+        </div>
+      }
+    >
+      <AuthErrorContent />
+    </Suspense>
   )
 }
