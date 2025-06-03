@@ -16,6 +16,7 @@ export default function AdminAuditPage() {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedFilter, setSelectedFilter] = useState("all")
+  const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) {
@@ -132,6 +133,33 @@ export default function AdminAuditPage() {
     errors: auditLogs.filter((log) => log.status === "error").length,
   }
 
+  const handleExportLogs = async () => {
+    setIsExporting(true)
+
+    try {
+      const response = await fetch("/api/audit/export")
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = "audit-logs.csv"
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        console.log("Audit logs exported successfully")
+      } else {
+        console.error("Failed to export audit logs")
+      }
+    } catch (error) {
+      console.error("Error exporting audit logs:", error)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
@@ -144,9 +172,15 @@ export default function AdminAuditPage() {
               Monitor system access and maintain HIPAA compliance.
             </p>
           </div>
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={handleExportLogs}
+            disabled={isExporting}
+            aria-label="Export audit logs as CSV file"
+            className="bg-clarity-blue-600 hover:bg-clarity-blue-700 text-white"
+          >
             <Download className="mr-2 h-4 w-4" />
-            Export Logs
+            {isExporting ? "Exporting..." : "Export Logs"}
           </Button>
         </div>
 

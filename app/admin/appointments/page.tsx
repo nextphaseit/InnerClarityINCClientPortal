@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,11 +11,21 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { Calendar, Clock, Plus, Filter, Users, Video, MapPin, Shield } from "lucide-react"
 import { formatDate } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
 
 export default function AdminAppointmentsPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
+
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [newAppointment, setNewAppointment] = useState({
+    patientName: "",
+    provider: "",
+    datetime: "",
+    status: "Upcoming",
+  })
 
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) {
@@ -96,6 +108,34 @@ export default function AdminAppointmentsPage() {
     virtual: appointments.filter((apt) => apt.location === "Virtual").length,
   }
 
+  const handleScheduleAppointment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
+      const response = await fetch("/api/appointments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newAppointment),
+      })
+
+      if (response.ok) {
+        console.log("Appointment scheduled successfully")
+        setNewAppointment({ patientName: "", provider: "", datetime: "", status: "Upcoming" })
+        setIsScheduleModalOpen(false)
+        // Refresh appointments list here if needed
+      } else {
+        console.error("Failed to schedule appointment")
+      }
+    } catch (error) {
+      console.error("Error scheduling appointment:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
@@ -106,7 +146,7 @@ export default function AdminAppointmentsPage() {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Appointment Management</h1>
             <p className="mt-2 text-gray-600 dark:text-gray-400">Manage and schedule appointments for all providers.</p>
           </div>
-          <Button>
+          <Button onClick={() => setIsScheduleModalOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Schedule Appointment
           </Button>
@@ -252,6 +292,69 @@ export default function AdminAppointmentsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Schedule Appointment Modal */}
+        {isScheduleModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+              <h2 className="text-xl font-bold mb-4">Schedule New Appointment</h2>
+              <form onSubmit={handleScheduleAppointment} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Patient Name *</label>
+                  <Input
+                    required
+                    value={newAppointment.patientName}
+                    onChange={(e) => setNewAppointment({ ...newAppointment, patientName: e.target.value })}
+                    placeholder="Patient name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Provider *</label>
+                  <select
+                    required
+                    className="w-full px-3 py-2 border rounded-md"
+                    value={newAppointment.provider}
+                    onChange={(e) => setNewAppointment({ ...newAppointment, provider: e.target.value })}
+                  >
+                    <option value="">Select Provider</option>
+                    <option value="Dr. Sarah Johnson">Dr. Sarah Johnson</option>
+                    <option value="Dr. Michael Chen">Dr. Michael Chen</option>
+                    <option value="Dr. Emily Rodriguez">Dr. Emily Rodriguez</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Date & Time *</label>
+                  <Input
+                    type="datetime-local"
+                    required
+                    value={newAppointment.datetime}
+                    onChange={(e) => setNewAppointment({ ...newAppointment, datetime: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Status</label>
+                  <select
+                    className="w-full px-3 py-2 border rounded-md"
+                    value={newAppointment.status}
+                    onChange={(e) => setNewAppointment({ ...newAppointment, status: e.target.value })}
+                  >
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+                </div>
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsScheduleModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Scheduling..." : "Schedule Appointment"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

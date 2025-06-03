@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +18,14 @@ export default function AdminClientsPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
+  const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [newClient, setNewClient] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    notes: "",
+  })
 
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) {
@@ -83,6 +93,35 @@ export default function AdminClientsPage() {
     }
   }
 
+  const handleAddClient = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
+      const response = await fetch("/api/clients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newClient),
+      })
+
+      if (response.ok) {
+        // Show success toast (you can implement toast later)
+        console.log("Client created successfully")
+        setNewClient({ name: "", email: "", phone: "", notes: "" })
+        setIsAddClientModalOpen(false)
+        // Refresh the clients list here if needed
+      } else {
+        console.error("Failed to create client")
+      }
+    } catch (error) {
+      console.error("Error creating client:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
@@ -93,7 +132,7 @@ export default function AdminClientsPage() {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Client Management</h1>
             <p className="mt-2 text-gray-600 dark:text-gray-400">Manage client information and track their progress.</p>
           </div>
-          <Button>
+          <Button onClick={() => setIsAddClientModalOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Client
           </Button>
@@ -201,6 +240,63 @@ export default function AdminClientsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Add Client Modal */}
+        {isAddClientModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+              <h2 className="text-xl font-bold mb-4">Add New Client</h2>
+              <form onSubmit={handleAddClient} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Name *</label>
+                  <Input
+                    required
+                    value={newClient.name}
+                    onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+                    placeholder="Client name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email *</label>
+                  <Input
+                    type="email"
+                    required
+                    value={newClient.email}
+                    onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+                    placeholder="client@email.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Phone *</label>
+                  <Input
+                    required
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Notes</label>
+                  <textarea
+                    className="w-full px-3 py-2 border rounded-md"
+                    rows={3}
+                    value={newClient.notes}
+                    onChange={(e) => setNewClient({ ...newClient, notes: e.target.value })}
+                    placeholder="Additional notes..."
+                  />
+                </div>
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsAddClientModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Creating..." : "Create Client"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

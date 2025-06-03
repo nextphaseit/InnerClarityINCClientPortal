@@ -56,30 +56,47 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     // Validate required fields
-    if (!body.date || !body.time || !body.provider || !body.type) {
-      return NextResponse.json({ success: false, error: "Missing required appointment information" }, { status: 400 })
+    const { patientName, provider, datetime, status } = body
+
+    if (!patientName || !provider || !datetime) {
+      return NextResponse.json(
+        { success: false, error: "Missing required fields: patientName, provider, and datetime are required" },
+        { status: 400 },
+      )
+    }
+
+    // Validate datetime format
+    const appointmentDate = new Date(datetime)
+    if (isNaN(appointmentDate.getTime())) {
+      return NextResponse.json({ success: false, error: "Invalid datetime format" }, { status: 400 })
+    }
+
+    // Check if appointment is in the past
+    if (appointmentDate < new Date()) {
+      return NextResponse.json({ success: false, error: "Cannot schedule appointments in the past" }, { status: 400 })
     }
 
     // Create a new appointment (in a real app, this would be saved to a database)
     const newAppointment = {
       id: `apt-${Date.now()}`,
-      date: body.date,
-      time: body.time,
-      provider: body.provider,
-      status: "Upcoming",
-      type: body.type,
+      patientName: patientName.trim(),
+      provider: provider.trim(),
+      datetime: datetime,
+      status: status || "Upcoming",
+      type: "Scheduled Appointment",
+      createdAt: new Date().toISOString(),
     }
 
-    // In a real app, you would save this to a database
-    // For this mock API, we'll just return success
+    // Log the appointment (in production, save to database)
+    console.log("New appointment scheduled:", newAppointment)
 
     return NextResponse.json({
       success: true,
-      message: "Appointment booked successfully",
+      message: "Appointment scheduled successfully",
       data: newAppointment,
     })
   } catch (error) {
     console.error("Error in appointments POST API:", error)
-    return NextResponse.json({ success: false, error: "Failed to book appointment" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Failed to schedule appointment" }, { status: 500 })
   }
 }

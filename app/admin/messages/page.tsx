@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +19,15 @@ export default function AdminMessagesPage() {
   const router = useRouter()
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState("")
+
+  const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false)
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+  const [isSubmittingNew, setIsSubmittingNew] = useState(false)
+  const [newMessageForm, setNewMessageForm] = useState({
+    to: "",
+    subject: "",
+    body: "",
+  })
 
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) {
@@ -102,6 +113,69 @@ export default function AdminMessagesPage() {
   const selectedConv = conversations.find((conv) => conv.id === selectedConversation)
   const totalUnread = conversations.reduce((sum, conv) => sum + conv.unread, 0)
 
+  const handleNewMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmittingNew(true)
+
+    try {
+      const response = await fetch("/api/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newMessageForm),
+      })
+
+      if (response.ok) {
+        console.log("Message sent successfully")
+        setNewMessageForm({ to: "", subject: "", body: "" })
+        setIsNewMessageModalOpen(false)
+        // Refresh messages list here if needed
+      } else {
+        console.error("Failed to send message")
+      }
+    } catch (error) {
+      console.error("Error sending message:", error)
+    } finally {
+      setIsSubmittingNew(false)
+    }
+  }
+
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedConv || !newMessage.trim()) return
+
+    setIsSubmittingReply(true)
+
+    try {
+      const response = await fetch("/api/messages/reply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: selectedConv.client,
+          subject: `Re: ${selectedConv.messages[0]?.content || "Message"}`,
+          body: newMessage,
+          originalMessageId: selectedConv.id,
+        }),
+      })
+
+      if (response.ok) {
+        console.log("Reply sent successfully")
+        setNewMessage("")
+        // Add the reply to the conversation locally
+        // Refresh messages here if needed
+      } else {
+        console.error("Failed to send reply")
+      }
+    } catch (error) {
+      console.error("Error sending reply:", error)
+    } finally {
+      setIsSubmittingReply(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
@@ -117,7 +191,7 @@ export default function AdminMessagesPage() {
               <Users className="mr-1 h-3 w-3" />
               {totalUnread} unread
             </Badge>
-            <Button>
+            <Button onClick={() => setIsNewMessageModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               New Message
             </Button>
@@ -227,9 +301,9 @@ export default function AdminMessagesPage() {
                         rows={3}
                       />
                       <div className="flex justify-end">
-                        <Button>
+                        <Button onClick={handleSendReply} disabled={isSubmittingReply}>
                           <Send className="mr-2 h-4 w-4" />
-                          Send Reply
+                          {isSubmittingReply ? "Sending..." : "Send Reply"}
                         </Button>
                       </div>
                     </div>
@@ -265,6 +339,54 @@ export default function AdminMessagesPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* New Message Modal */}
+        {isNewMessageModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+              <h2 className="text-xl font-bold mb-4">New Message</h2>
+              <form onSubmit={handleNewMessage} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">To *</label>
+                  <Input
+                    required
+                    value={newMessageForm.to}
+                    onChange={(e) => setNewMessageForm({ ...newMessageForm, to: e.target.value })}
+                    placeholder="Recipient name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Subject *</label>
+                  <Input
+                    required
+                    value={newMessageForm.subject}
+                    onChange={(e) => setNewMessageForm({ ...newMessageForm, subject: e.target.value })}
+                    placeholder="Message subject"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Message *</label>
+                  <textarea
+                    required
+                    className="w-full px-3 py-2 border rounded-md"
+                    rows={4}
+                    value={newMessageForm.body}
+                    onChange={(e) => setNewMessageForm({ ...newMessageForm, body: e.target.value })}
+                    placeholder="Type your message..."
+                  />
+                </div>
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsNewMessageModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSubmittingNew}>
+                    {isSubmittingNew ? "Sending..." : "Send Message"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
