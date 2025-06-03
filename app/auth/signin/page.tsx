@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Shield, Lock, Eye } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
+import { validateEmail } from "@/lib/utils"
 
 export default function SignInPage() {
   const [loading, setLoading] = useState(false)
@@ -38,6 +39,19 @@ export default function SignInPage() {
     setLoading(true)
     setError(null)
 
+    // Client-side validation
+    if (!email || !password) {
+      setError("Please fill in all fields")
+      setLoading(false)
+      return
+    }
+
+    if (!validateEmail(email)) {
+      setError("Please enter a valid email address")
+      setLoading(false)
+      return
+    }
+
     try {
       const success = await signIn(email, password)
 
@@ -47,16 +61,36 @@ export default function SignInPage() {
         setError("Invalid email or password. Please try again.")
       }
     } catch (err) {
+      console.error("Sign in error:", err)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setLoading(false)
     }
   }
 
-  // For demo purposes
-  const handleDemoLogin = (type: "admin" | "client") => {
-    setEmail(type === "admin" ? "admin@innerclarity.com" : "client@example.com")
-    setPassword("password123")
+  // Demo login handlers
+  const handleDemoLogin = async (type: "admin" | "client") => {
+    setLoading(true)
+    setError(null)
+
+    const demoCredentials = {
+      admin: { email: "admin@innerclarity.com", password: "password123" },
+      client: { email: "client@example.com", password: "password123" },
+    }
+
+    try {
+      const { email: demoEmail, password: demoPassword } = demoCredentials[type]
+      const success = await signIn(demoEmail, demoPassword)
+
+      if (!success) {
+        setError("Demo login failed. Please try again.")
+      }
+    } catch (err) {
+      console.error("Demo login error:", err)
+      setError("Demo login failed. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -70,6 +104,7 @@ export default function SignInPage() {
               width={80}
               height={80}
               className="h-20 w-auto"
+              priority
             />
           </div>
           <div>
@@ -97,6 +132,8 @@ export default function SignInPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="your.email@example.com"
+                disabled={loading}
+                autoComplete="email"
               />
             </div>
             <div className="space-y-2">
@@ -108,6 +145,8 @@ export default function SignInPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="••••••••"
+                disabled={loading}
+                autoComplete="current-password"
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
@@ -148,14 +187,28 @@ export default function SignInPage() {
         <CardFooter className="flex flex-col space-y-2">
           <p className="text-sm text-center text-muted-foreground mb-2">Demo Accounts:</p>
           <div className="flex gap-2 w-full">
-            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleDemoLogin("admin")}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => handleDemoLogin("admin")}
+              disabled={loading}
+            >
               Admin Demo
             </Button>
-            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleDemoLogin("client")}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => handleDemoLogin("client")}
+              disabled={loading}
+            >
               Client Demo
             </Button>
           </div>
-          <p className="text-xs text-center text-muted-foreground mt-2">Password: password123</p>
+          <p className="text-xs text-center text-muted-foreground mt-2">
+            Use demo accounts or email/password: password123
+          </p>
         </CardFooter>
       </Card>
     </div>

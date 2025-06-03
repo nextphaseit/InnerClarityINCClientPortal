@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     await createSession(user)
 
     return NextResponse.json({
+      success: true,
       user: {
         id: user.id,
         email: user.email,
