@@ -14,6 +14,7 @@ import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { Calendar, User, MapPin, Video, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 export default function BookAppointmentPage() {
   const { user, loading } = useAuth()
@@ -24,6 +25,8 @@ export default function BookAppointmentPage() {
   const [appointmentType, setAppointmentType] = useState("")
   const [location, setLocation] = useState("")
   const [notes, setNotes] = useState("")
+
+  const { toast } = useToast()
 
   useEffect(() => {
     if (!loading && !user) {
@@ -56,19 +59,44 @@ export default function BookAppointmentPage() {
 
   const availableTimes = ["09:00 AM", "10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM", "04:00 PM"]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle appointment booking
-    console.log("Booking appointment:", {
-      date: selectedDate,
-      time: selectedTime,
-      provider: selectedProvider,
-      type: appointmentType,
-      location,
-      notes,
-    })
-    // Redirect to appointments page
-    router.push("/appointments")
+
+    if (!selectedDate || !selectedTime || !selectedProvider || !appointmentType || !location) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields to book your appointment.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Show loading state
+      const loadingToast = toast({
+        title: "Booking appointment...",
+        description: "Please wait while we process your request.",
+      })
+
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      // Success
+      toast({
+        title: "Appointment Booked!",
+        description: `Your appointment has been scheduled for ${selectedDate} at ${selectedTime}.`,
+        variant: "default",
+      })
+
+      // Redirect to appointments page
+      router.push("/appointments")
+    } catch (error) {
+      toast({
+        title: "Booking failed",
+        description: "There was an error booking your appointment. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (

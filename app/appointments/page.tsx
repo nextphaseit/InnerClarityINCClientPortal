@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/components/auth-provider"
 import { Calendar, Clock, User, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface Appointment {
   id: string
@@ -80,6 +81,10 @@ export default function MyAppointmentsPage() {
 
   const formatTime = (timeString: string) => {
     return timeString
+  }
+
+  const handleReschedule = (appointmentId: string) => {
+    router.push(`/appointments/book?reschedule=${appointmentId}`)
   }
 
   if (authLoading) {
@@ -200,6 +205,18 @@ export default function MyAppointmentsPage() {
                           <td className="py-4 px-6">
                             <Badge className={getStatusColor(appointment.status)}>{appointment.status}</Badge>
                           </td>
+                          <td className="py-4 px-6">
+                            {appointment.status === "Upcoming" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleReschedule(appointment.id)}
+                                className="text-clarity-blue-600 border-clarity-blue-200 hover:bg-clarity-blue-50"
+                              >
+                                Reschedule
+                              </Button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -230,6 +247,18 @@ export default function MyAppointmentsPage() {
                         </div>
                         {appointment.type && (
                           <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">{appointment.type}</div>
+                        )}
+                        {appointment.status === "Upcoming" && (
+                          <div className="mt-3 flex justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReschedule(appointment.id)}
+                              className="text-clarity-blue-600 border-clarity-blue-200 hover:bg-clarity-blue-50"
+                            >
+                              Reschedule
+                            </Button>
+                          </div>
                         )}
                       </CardContent>
                     </Card>

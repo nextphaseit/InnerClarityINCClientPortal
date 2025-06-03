@@ -142,11 +142,25 @@ export default function DocumentsPage() {
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-4">Supported formats: PDF, JPG, PNG (Max 10MB)</p>
               <div className="flex justify-center space-x-4">
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Choose Files
-                </Button>
-                <Input type="file" className="hidden" multiple accept=".pdf,.jpg,.jpeg,.png" />
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <Button as="span">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Choose Files
+                  </Button>
+                </label>
+                <Input
+                  id="file-upload"
+                  type="file"
+                  className="hidden"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      console.log("Files selected:", e.target.files)
+                      // Handle file upload logic here
+                    }
+                  }}
+                />
               </div>
             </div>
           </CardContent>

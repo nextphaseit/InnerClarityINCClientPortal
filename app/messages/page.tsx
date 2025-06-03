@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useAuth } from "@/components/auth-provider"
-import { MessageSquare, Send, Plus, Loader2, Mail, Calendar, User, Shield } from "lucide-react"
+import { MessageSquare, Send, Plus, Loader2, Mail, Calendar, User, Shield, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface Message {
@@ -36,6 +36,7 @@ export default function MessageCenterPage() {
   const [isMessageOpen, setIsMessageOpen] = useState(false)
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false)
   const [sending, setSending] = useState(false)
+  const [messageSent, setMessageSent] = useState(false)
 
   // New message form state
   const [newMessage, setNewMessage] = useState({
@@ -105,7 +106,7 @@ export default function MessageCenterPage() {
       }
 
       toast({
-        title: "Success",
+        title: "Message Sent",
         description: "Your message has been sent successfully.",
       })
 
@@ -113,8 +114,14 @@ export default function MessageCenterPage() {
       setNewMessage({ subject: "", body: "" })
       setIsNewMessageOpen(false)
 
-      // Refresh messages
+      // Show confirmation and refresh messages
+      setMessageSent(true)
       fetchMessages()
+
+      // Reset confirmation after 5 seconds
+      setTimeout(() => {
+        setMessageSent(false)
+      }, 5000)
     } catch (err) {
       toast({
         title: "Error",
@@ -257,6 +264,18 @@ export default function MessageCenterPage() {
             </DialogContent>
           </Dialog>
         </div>
+
+        {messageSent && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center dark:bg-green-900/20 dark:border-green-800">
+            <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+            <p className="text-green-800 dark:text-green-200">
+              Your message has been sent successfully. We'll respond as soon as possible.
+            </p>
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setMessageSent(false)}>
+              Dismiss
+            </Button>
+          </div>
+        )}
 
         {/* Main Content */}
         <Card className="shadow-lg rounded-xl border-0">

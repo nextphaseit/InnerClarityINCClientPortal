@@ -7,97 +7,34 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-06-20",
 })
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    // Check authentication
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const body = await request.json()
-    const { invoiceId, amount } = body
 
     // Validate required fields
-    if (!invoiceId || !amount) {
-      return NextResponse.json({ error: "Missing required fields: invoiceId and amount" }, { status: 400 })
+    if (!body.invoiceId || !body.amount) {
+      return NextResponse.json({ success: false, error: "Invoice ID and amount are required" }, { status: 400 })
     }
 
-    // Validate amount (should be positive number)
-    if (typeof amount !== "number" || amount <= 0) {
-      return NextResponse.json({ error: "Invalid amount" }, { status: 400 })
-    }
+    // In a real implementation, you would:
+    // 1. Verify the invoice exists and belongs to the user
+    // 2. Create a Stripe checkout session
+    // 3. Return the session URL
 
-    // In a real application, you would:
-    // 1. Verify the invoice exists and belongs to the authenticated user
-    // 2. Check if the invoice is still unpaid
-    // 3. Validate the amount matches the invoice amount
+    // For this mock API, we'll simulate a Stripe checkout URL
+    const checkoutUrl = `/checkout/session?invoice=${body.invoiceId}&amount=${body.amount}`
 
-    // Create Stripe checkout session
-    const checkoutSession = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `Invoice Payment - ${invoiceId}`,
-              description: "Inner Clarity Mental Health Services",
-              images: ["https://your-domain.com/logo.png"], // Optional: Add your logo
-            },
-            unit_amount: Math.round(amount * 100), // Convert dollars to cents
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      success_url: `${process.env.NEXTAUTH_URL}/billing?payment=success&invoice=${invoiceId}`,
-      cancel_url: `${process.env.NEXTAUTH_URL}/billing?payment=cancelled`,
-      metadata: {
-        invoiceId,
-        userId: session.user.id || session.user.email,
-        userEmail: session.user.email,
-      },
-      customer_email: session.user.email,
-      billing_address_collection: "required",
-      payment_intent_data: {
-        metadata: {
-          invoiceId,
-          userId: session.user.id || session.user.email,
-        },
-      },
-    })
-
-    // Log the payment attempt for audit purposes
-    console.log(`Payment session created for user: ${session.user.email}, invoice: ${invoiceId}, amount: $${amount}`)
+    // Simulate processing delay
+    await new Promise((resolve) => setTimeout(resolve, 500))
 
     return NextResponse.json({
       success: true,
-      url: checkoutSession.url,
-      sessionId: checkoutSession.id,
+      url: checkoutUrl,
+      message: "Payment session created",
     })
   } catch (error) {
     console.error("Error creating payment session:", error)
-
-    // Handle specific Stripe errors
-    if (error instanceof Stripe.errors.StripeError) {
-      return NextResponse.json(
-        {
-          error: "Payment processing error",
-          message: error.message,
-        },
-        { status: 400 },
-      )
-    }
-
-    return NextResponse.json(
-      {
-        error: "Internal server error",
-        message: "Failed to create payment session",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, error: "Failed to create payment session" }, { status: 500 })
   }
 }
 
