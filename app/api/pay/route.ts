@@ -1,77 +1,81 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import Stripe from "stripe"
 
+// Initialize Stripe with secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-06-20",
 })
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Parse the request body
     const body = await request.json()
+    const { invoiceId, amount } = body
 
     // Validate required fields
-    if (!body.invoiceId || !body.amount) {
-      return NextResponse.json({ success: false, error: "Invoice ID and amount are required" }, { status: 400 })
+    if (!invoiceId || !amount) {
+      return NextResponse.json({ error: "Missing required fields: invoiceId and amount" }, { status: 400 })
     }
 
-    // In a real implementation, you would:
-    // 1. Verify the invoice exists and belongs to the user
-    // 2. Create a Stripe checkout session
-    // 3. Return the session URL
+    // Validate amount is a positive number
+    if (typeof amount !== "number" || amount <= 0) {
+      return NextResponse.json({ error: "Amount must be a positive number" }, { status: 400 })
+    }
 
-    // For this mock API, we'll simulate a Stripe checkout URL
-    const checkoutUrl = `/checkout/session?invoice=${body.invoiceId}&amount=${body.amount}`
+    // Convert amount from dollars to cents (rounded)
+    const unitAmountCents = Math.round(amount * 100)
 
-    // Simulate processing delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Invoice ${invoiceId}`,
+              description: "Inner Clarity Mental Health Services",
+            },
+            unit_amount: unitAmountCents,
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: `${process.env.NEXTAUTH_URL}/billing?success=true&invoice=${invoiceId}`,
+      cancel_url: `${process.env.NEXTAUTH_URL}/billing?canceled=true`,
+      metadata: {
+        invoiceId: invoiceId.toString(),
+        originalAmount: amount.toString(),
+      },
+    })
 
+    // Return the session URL for redirect
     return NextResponse.json({
-      success: true,
-      url: checkoutUrl,
-      message: "Payment session created",
+      url: session.url,
     })
   } catch (error) {
-    console.error("Error creating payment session:", error)
-    return NextResponse.json({ success: false, error: "Failed to create payment session" }, { status: 500 })
+    console.error("Stripe error:", error)
+
+    // Handle Stripe-specific errors
+    if (error instanceof Stripe.errors.StripeError) {
+      return NextResponse.json({ error: "Failed to create payment session", details: error.message }, { status: 500 })
+    }
+
+    // Handle other errors
+    return NextResponse.json({ error: "Failed to create payment session" }, { status: 500 })
   }
 }
 
-// Handle payment success webhook (optional - for updating invoice status)
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
+// Handle other HTTP methods
+export async function GET() {
+  return NextResponse.json({ error: "Method not allowed. Use POST." }, { status: 405 })
+}
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+export async function PUT() {
+  return NextResponse.json({ error: "Method not allowed. Use POST." }, { status: 405 })
+}
 
-    const body = await request.json()
-    const { invoiceId, paymentIntentId } = body
-
-    // In a real application, you would:
-    // 1. Verify the payment was successful with Stripe
-    // 2. Update the invoice status to "paid"
-    // 3. Record the payment date
-    // 4. Send confirmation email to the client
-    // 5. Log the payment for audit purposes
-
-    console.log(`Payment confirmed for invoice: ${invoiceId}, payment intent: ${paymentIntentId}`)
-
-    return NextResponse.json({
-      success: true,
-      message: "Payment confirmed and invoice updated",
-    })
-  } catch (error) {
-    console.error("Error confirming payment:", error)
-
-    return NextResponse.json(
-      {
-        error: "Internal server error",
-        message: "Failed to confirm payment",
-      },
-      { status: 500 },
-    )
-  }
+export async function DELETE() {
+  return NextResponse.json({ error: "Method not allowed. Use POST." }, { status: 405 })
 }
