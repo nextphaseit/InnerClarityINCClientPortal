@@ -32,7 +32,9 @@ export default function HomePage() {
               height={120}
               className="h-30 w-auto mx-auto mb-6"
             />
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-8">Find Your Inner Peace</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-8">
+              Where Healing Begins, Peace Follows
+            </h2>
           </div>
 
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
