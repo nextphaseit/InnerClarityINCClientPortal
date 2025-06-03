@@ -6,17 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
-import {
-  Users,
-  Calendar,
-  MessageSquare,
-  FileText,
-  Shield,
-  TrendingUp,
-  AlertTriangle,
-  Clock,
-  CheckCircle,
-} from "lucide-react"
+import { Users, Calendar, MessageSquare, FileText, Shield, TrendingUp, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
 import Link from "next/link"
 
 // Add this import instead
@@ -57,6 +47,12 @@ export default function AdminDashboard() {
     unreadMessages: 5,
     newUploads: 3,
     auditAlerts: 2,
+  }
+
+  // Add this after the existing stats
+  const tenantInfo = {
+    name: user?.tenantId === 'inner-clarity' ? 'Inner Clarity' : 'Health Corp',
+    id: user?.tenantId || 'unknown'
   }
 
   const upcomingAppointments = [
@@ -113,8 +109,17 @@ export default function AdminDashboard() {
 
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Overview of your practice and client management.</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">
+                Overview of your practice and client management - {tenantInfo.name}
+              </p>
+            </div>
+            <Badge variant="outline" className="text-clarity-blue-600">
+              Tenant: {tenantInfo.id}
+            </Badge>
+          </div>
         </div>
 
         {/* Quick Stats */}

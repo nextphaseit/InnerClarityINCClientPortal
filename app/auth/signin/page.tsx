@@ -1,216 +1,179 @@
-"use client"
+'use client'
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Shield, Lock, Eye } from "lucide-react"
-import { useAuth } from "@/components/auth-provider"
-import { validateEmail } from "@/lib/utils"
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { signIn } from 'next-auth/react'
+import Link from 'next/link'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import * as z from 'zod'
+
+import { cn } from '@/lib/utils'
+import { buttonVariants } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Shield } from 'lucide-react'
+
+const signinSchema = z.object({
+  email: z.string().email({
+    message: 'Please enter a valid email address.',
+  }),
+  password: z.string().min(8, {
+    message: 'Password must be at least 8 characters.',
+  }),
+})
 
 export default function SignInPage() {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [isPending, startTransition] = useState(false)
+  const [error, setError] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
-  const { signIn, user } = useAuth()
+  const callbackUrl = searchParams.get('callbackUrl') || '/'
+
+  const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
-    if (user) {
-      // Redirect if already signed in
-      if (user.role === "admin") {
-        router.push("/admin")
-      } else {
-        router.push("/dashboard")
+    const urlParams = new URLSearchParams(window.location.search)
+    const message = urlParams.get('message')
+    if (message) {
+      setSuccessMessage(message)
+    }
+  }, [])
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<z.infer<typeof signinSchema>>({
+    resolver: zodResolver(signinSchema),
+  })
+
+  async function onSubmit(data: z.infer<typeof signinSchema>) {
+    setError('')
+    startTransition(async () => {
+      const result = await signIn('credentials', {
+        ...data,
+        redirect: false,
+        callbackUrl,
+      })
+
+      if (result?.error) {
+        setError('Invalid credentials.')
+        return
       }
-    }
-  }, [user, router])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    // Client-side validation
-    if (!email || !password) {
-      setError("Please fill in all fields")
-      setLoading(false)
-      return
-    }
-
-    if (!validateEmail(email)) {
-      setError("Please enter a valid email address")
-      setLoading(false)
-      return
-    }
-
-    try {
-      const success = await signIn(email, password)
-
-      if (success) {
-        // Redirect will happen via useEffect when user state updates
-      } else {
-        setError("Invalid email or password. Please try again.")
-      }
-    } catch (err) {
-      console.error("Sign in error:", err)
-      setError("An unexpected error occurred. Please try again.")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Demo login handlers
-  const handleDemoLogin = async (type: "admin" | "client") => {
-    setLoading(true)
-    setError(null)
-
-    const demoCredentials = {
-      admin: { email: "admin@innerclarity.com", password: "password123" },
-      client: { email: "client@example.com", password: "password123" },
-    }
-
-    try {
-      const { email: demoEmail, password: demoPassword } = demoCredentials[type]
-      const success = await signIn(demoEmail, demoPassword)
-
-      if (!success) {
-        setError("Demo login failed. Please try again.")
-      }
-    } catch (err) {
-      console.error("Demo login error:", err)
-      setError("Demo login failed. Please try again.")
-    } finally {
-      setLoading(false)
-    }
+      return router.push(callbackUrl)
+    })
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4 text-center">
-          <div className="flex justify-center">
-            <Image
-              src="/images/inner-clarity-logo.png"
-              alt="Inner Clarity"
-              width={80}
-              height={80}
-              className="h-20 w-auto"
-              priority
-            />
+    <div className="container relative hidden h-[800px] flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
+      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex">
+        <div className="absolute inset-0 bg-zinc-900" />
+        <div className="relative z-20 flex items-center text-lg font-medium">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mr-2 h-6 w-6"
+          >
+            <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
+          </svg>
+          Clarity UI
+        </div>
+        <div className="relative z-20 mt-auto">
+          <blockquote className="space-y-2">
+            <p className="text-lg">
+              &ldquo;This library has saved me countless hours of work and
+              helped me deliver stunning designs to my clients faster than ever
+              before.&rdquo;
+            </p>
+            <footer className="text-sm">Sofia Davis, Design Lead at Acme Corp</footer>
+          </blockquote>
+        </div>
+      </div>
+      <div className="lg:p-8">
+        <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+          <div className="flex flex-col space-y-2 text-center">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Welcome back!
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Enter your email and password to sign in
+            </p>
           </div>
-          <div>
-            <CardTitle className="text-2xl font-bold">Welcome to Inner Clarity</CardTitle>
-            <CardDescription className="text-base mt-2">
-              Secure mental health portal for clients and providers
-            </CardDescription>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
+          {successMessage && (
+            <Alert className="mb-6 border-clarity-green-200 bg-clarity-green-50 text-clarity-green-800">
+              <Shield className="h-4 w-4" />
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
+          )}
           {error && (
             <Alert variant="destructive">
+              <Shield className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                placeholder="m@example.com"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="your.email@example.com"
-                disabled={loading}
+                autoCapitalize="none"
                 autoComplete="email"
+                disabled={isPending}
+                {...register('email')}
               />
+              {errors?.email && (
+                <p className="text-sm text-red-500">{errors.email.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                placeholder="Password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                disabled={loading}
-                autoComplete="current-password"
+                disabled={isPending}
+                {...register('password')}
               />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign in"
+              {errors?.password && (
+                <p className="text-sm text-red-500">{errors.password.message}</p>
               )}
-            </Button>
+            </div>
+            <button className={cn(buttonVariants())} disabled={isPending}>
+              Sign In
+            </button>
           </form>
-
-          <div className="space-y-4 pt-4 border-t">
-            <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-              <Shield className="h-4 w-4" />
-              <span>HIPAA Compliant & Secure</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="space-y-1">
-                <Lock className="h-6 w-6 mx-auto text-clarity-blue-500" />
-                <p className="text-xs text-muted-foreground">End-to-End Encryption</p>
-              </div>
-              <div className="space-y-1">
-                <Shield className="h-6 w-6 mx-auto text-clarity-green-500" />
-                <p className="text-xs text-muted-foreground">HIPAA Compliant</p>
-              </div>
-              <div className="space-y-1">
-                <Eye className="h-6 w-6 mx-auto text-clarity-blue-500" />
-                <p className="text-xs text-muted-foreground">Audit Trail</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-
-        <CardFooter className="flex flex-col space-y-2">
-          <p className="text-sm text-center text-muted-foreground mb-2">Demo Accounts:</p>
-          <div className="flex gap-2 w-full">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={() => handleDemoLogin("admin")}
-              disabled={loading}
+          <div className="mt-4 text-center">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
             >
-              Admin Demo
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={() => handleDemoLogin("client")}
-              disabled={loading}
-            >
-              Client Demo
-            </Button>
+              Forgot password?
+            </Link>
           </div>
-          <p className="text-xs text-center text-muted-foreground mt-2">
-            Use demo accounts or email/password: password123
-          </p>
-        </CardFooter>
-      </Card>
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Don't have an account?{' '}
+              <Link
+                href="/register"
+                className="font-medium text-clarity-blue-600 hover:text-clarity-blue-500"
+              >
+                Register here
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

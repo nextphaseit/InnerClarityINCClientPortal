@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { jwtVerify } from "jose"
-
-const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || "your-secret-key-here-make-it-long-and-secure")
+import { getToken } from "next-auth/jwt"
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
@@ -10,67 +8,64 @@ export async function middleware(request: NextRequest) {
   // Public paths that don't require authentication
   const isPublicPath =
     path === "/" ||
+    path === "/register" ||
     path === "/auth/signin" ||
     path === "/auth/error" ||
     path === "/not-found" ||
     path.startsWith("/api/auth") ||
+    path.startsWith("/api/register") ||
     path.startsWith("/api/health") ||
     path.startsWith("/api/stripe/webhook") ||
     path.startsWith("/_next") ||
     path.startsWith("/images") ||
     path === "/favicon.ico"
 
-  // Check if the user is authenticated
-  let user = null
-  try {
-    const token = request.cookies.get("session")?.value
-    if (token) {
-      const { payload } = await jwtVerify(token, secret)
-      user = payload
-    }
-  } catch (error) {
-    // Invalid token, user is not authenticated
-    console.error("Token verification failed:", error)
-  }
+  // Get the user's session
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  })
 
-  const isAuth = !!user
+  const isAuth = !!token
 
-  // Redirect logic
-  if (isPublicPath && isAuth && (path === "/" || path === "/auth/signin")) {
-    // If user is on public auth pages and is authenticated, redirect to appropriate dashboard
-    const redirectUrl = user.role === "admin" ? "/admin" : "/dashboard"
+  // Redirect logic for authenticated users on public pages
+  if (isPublicPath && isAuth && (path === "/" || path === "/auth/signin" || path === "/register")) {
+    const redirectUrl = token.role === "admin" ? "/admin" : "/dashboard"
     return NextResponse.redirect(new URL(redirectUrl, request.url))
   }
 
+  // Redirect unauthenticated users to signin
   if (!isPublicPath && !isAuth) {
-    // If user is on a protected path and is not authenticated, redirect to signin
     const callbackUrl = encodeURIComponent(path)
     return NextResponse.redirect(new URL(`/auth/signin?callbackUrl=${callbackUrl}`, request.url))
   }
 
   // Role-based access control
-  if (path.startsWith("/admin") && user?.role !== "admin") {
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+  if (isAuth) {
+    // Admin routes - only admins can access
+    if (path.startsWith("/admin") && token.role !== "admin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+
+    // Patient routes - redirect admins to admin dashboard
+    if (
+      (path.startsWith("/dashboard") ||
+        path.startsWith("/appointments") ||
+        path.startsWith("/messages") ||
+        path.startsWith("/documents") ||
+        path.startsWith("/billing") ||
+        path.startsWith("/forms") ||
+        path.startsWith("/profile") ||
+        path.startsWith("/settings")) &&
+      token.role === "admin"
+    ) {
+      return NextResponse.redirect(new URL("/admin", request.url))
+    }
   }
 
-  if (
-    (path.startsWith("/dashboard") ||
-      path.startsWith("/appointments") ||
-      path.startsWith("/messages") ||
-      path.startsWith("/documents") ||
-      path.startsWith("/billing") ||
-      path.startsWith("/forms") ||
-      path.startsWith("/profile") ||
-      path.startsWith("/settings")) &&
-    user?.role === "admin"
-  ) {
-    return NextResponse.redirect(new URL("/admin", request.url))
-  }
-
-  // Add security headers
+  // Add security headers for HIPAA compliance
   const response = NextResponse.next()
 
-  // HIPAA compliance headers
   response.headers.set("X-Frame-Options", "DENY")
   response.headers.set("X-Content-Type-Options", "nosniff")
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -80,18 +75,14 @@ export async function middleware(request: NextRequest) {
     response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
   }
 
+  // Add tenant information to headers for API routes
+  if (path.startsWith("/api") && token?.tenantId) {
+    response.headers.set("X-Tenant-ID", token.tenantId)
+  }
+
   return response
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all paths except for:
-     * 1. /api routes (except /api/auth)
-     * 2. /_next (Next.js internals)
-     * 3. /images (static files)
-     * 4. /favicon.ico (favicon file)
-     */
-    "/((?!api(?!/auth|/health|/stripe/webhook)|_next|images|favicon.ico).*)",
-  ],
+  matcher: ["/((?!api(?!/auth|/register|/health|/stripe/webhook)|_next|images|favicon.ico).*)"],
 }
