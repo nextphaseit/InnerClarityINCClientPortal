@@ -11,11 +11,13 @@ import { AlertTriangle, Home, ArrowLeft } from "lucide-react"
 
 function ErrorContent() {
   const searchParams = useSearchParams()
-  const [errorMessage, setErrorMessage] = useState<string>("")
+  const [errorMessage, setErrorMessage] = useState<string>("An unexpected error occurred")
+  const [errorCode, setErrorCode] = useState<string | null>(null)
 
   useEffect(() => {
     try {
-      const error = searchParams.get("error")
+      const error = searchParams?.get("error")
+      setErrorCode(error)
 
       switch (error) {
         case "CredentialsSignin":
@@ -23,10 +25,14 @@ function ErrorContent() {
           break
         case "OAuthSignin":
         case "OAuthCallback":
+          setErrorMessage("There was a problem with the authentication service. Please try again.")
+          break
         case "OAuthCreateAccount":
         case "EmailCreateAccount":
+          setErrorMessage("There was a problem creating your account. Please try again.")
+          break
         case "Callback":
-          setErrorMessage("There was a problem with the authentication service. Please try again.")
+          setErrorMessage("There was a problem during the authentication callback. Please try again.")
           break
         case "OAuthAccountNotLinked":
           setErrorMessage(
@@ -41,6 +47,12 @@ function ErrorContent() {
           break
         case "AccessDenied":
           setErrorMessage("Access denied. You don't have permission to access this resource.")
+          break
+        case "Verification":
+          setErrorMessage("The verification link has expired or has already been used.")
+          break
+        case "Configuration":
+          setErrorMessage("There is a server configuration issue. Please contact support.")
           break
         default:
           setErrorMessage("An unexpected error occurred during authentication. Please try again.")
@@ -73,7 +85,7 @@ function ErrorContent() {
         <CardContent className="space-y-6">
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{errorMessage || "An unexpected error occurred during authentication."}</AlertDescription>
+            <AlertDescription>{errorMessage}</AlertDescription>
           </Alert>
 
           <div className="space-y-3">
@@ -100,6 +112,12 @@ function ErrorContent() {
               </Link>
             </p>
           </div>
+
+          {errorCode && (
+            <div className="text-center text-xs text-muted-foreground">
+              <p>Error code: {errorCode}</p>
+            </div>
+          )}
 
           <div className="border-t pt-4">
             <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground">
