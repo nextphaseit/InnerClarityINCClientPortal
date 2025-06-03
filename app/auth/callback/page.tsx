@@ -1,19 +1,19 @@
 "use client"
 
 import { useEffect } from "react"
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { useAuth } from "@/components/auth-provider"
 
 export default function CallbackPage() {
-  const { data: session, status } = useSession()
+  const { user, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (status === "loading") return
+    if (loading) return
 
-    if (session) {
-      if (session.user?.role === "admin") {
+    if (user) {
+      if (user.role === "admin") {
         router.push("/admin")
       } else {
         router.push("/dashboard")
@@ -21,7 +21,7 @@ export default function CallbackPage() {
     } else {
       router.push("/auth/signin")
     }
-  }, [session, status, router])
+  }, [user, loading, router])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800">
