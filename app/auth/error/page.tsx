@@ -1,50 +1,55 @@
 "use client"
 
-import { Suspense } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertTriangle, ArrowLeft } from "lucide-react"
+import { AlertTriangle, Home, ArrowLeft } from "lucide-react"
 
-function AuthErrorContent() {
+function ErrorContent() {
   const searchParams = useSearchParams()
-  const error = searchParams.get("error")
+  const [errorMessage, setErrorMessage] = useState<string>("")
 
-  const getErrorMessage = (error: string | null) => {
-    switch (error) {
-      case "Configuration":
-        return "There is a problem with the server configuration."
-      case "AccessDenied":
-        return "Access denied. You do not have permission to sign in."
-      case "Verification":
-        return "The verification token has expired or has already been used."
-      case "Default":
-        return "An error occurred during authentication."
-      case "CredentialsSignin":
-        return "Invalid email or password. Please check your credentials and try again."
-      case "EmailSignin":
-        return "Unable to send email. Please try again later."
-      case "OAuthSignin":
-        return "Error occurred during OAuth sign in."
-      case "OAuthCallback":
-        return "Error occurred during OAuth callback."
-      case "OAuthCreateAccount":
-        return "Could not create OAuth account."
-      case "EmailCreateAccount":
-        return "Could not create email account."
-      case "Callback":
-        return "Error occurred during callback."
-      case "OAuthAccountNotLinked":
-        return "OAuth account is not linked to an existing account."
-      case "SessionRequired":
-        return "Please sign in to access this page."
-      default:
-        return "An unexpected error occurred. Please try again."
+  useEffect(() => {
+    try {
+      const error = searchParams.get("error")
+
+      switch (error) {
+        case "CredentialsSignin":
+          setErrorMessage("Invalid email or password. Please check your credentials and try again.")
+          break
+        case "OAuthSignin":
+        case "OAuthCallback":
+        case "OAuthCreateAccount":
+        case "EmailCreateAccount":
+        case "Callback":
+          setErrorMessage("There was a problem with the authentication service. Please try again.")
+          break
+        case "OAuthAccountNotLinked":
+          setErrorMessage(
+            "This email is already associated with another account. Please sign in with your original method.",
+          )
+          break
+        case "EmailSignin":
+          setErrorMessage("Unable to send sign-in email. Please check your email address.")
+          break
+        case "SessionRequired":
+          setErrorMessage("You must be signed in to access this page.")
+          break
+        case "AccessDenied":
+          setErrorMessage("Access denied. You don't have permission to access this resource.")
+          break
+        default:
+          setErrorMessage("An unexpected error occurred during authentication. Please try again.")
+      }
+    } catch (err) {
+      console.error("Error parsing search params:", err)
+      setErrorMessage("An unexpected error occurred. Please try again.")
     }
-  }
+  }, [searchParams])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800 px-4">
@@ -60,7 +65,7 @@ function AuthErrorContent() {
             />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold">Authentication Error</CardTitle>
+            <CardTitle className="text-2xl font-bold text-red-600">Authentication Error</CardTitle>
             <CardDescription className="text-base mt-2">There was a problem signing you in</CardDescription>
           </div>
         </CardHeader>
@@ -68,26 +73,55 @@ function AuthErrorContent() {
         <CardContent className="space-y-6">
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{getErrorMessage(error)}</AlertDescription>
+            <AlertDescription>{errorMessage || "An unexpected error occurred during authentication."}</AlertDescription>
           </Alert>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <Button asChild className="w-full">
-              <Link href="/auth/signin">Try Again</Link>
+              <Link href="/auth/signin">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Try Again
+              </Link>
             </Button>
 
             <Button asChild variant="outline" className="w-full">
               <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Home
+                <Home className="mr-2 h-4 w-4" />
+                Go Home
               </Link>
             </Button>
           </div>
 
-          <div className="text-center text-sm text-muted-foreground">
-            <p>If you continue to experience issues, please contact support.</p>
-            {error && <p className="mt-2 text-xs text-gray-500">Error code: {error}</p>}
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              Need help?{" "}
+              <Link href="/contact" className="text-clarity-blue-600 hover:underline">
+                Contact Support
+              </Link>
+            </p>
           </div>
+
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground">
+              <span>🔒</span>
+              <span>HIPAA Secure Authentication</span>
+            </div>
+            <p className="text-xs text-center text-muted-foreground mt-1">
+              Your security and privacy are our top priority
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800 px-4">
+      <Card className="w-full max-w-md">
+        <CardContent className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-clarity-blue-600"></div>
         </CardContent>
       </Card>
     </div>
@@ -96,14 +130,8 @@ function AuthErrorContent() {
 
 export default function AuthErrorPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-clarity-blue-600"></div>
-        </div>
-      }
-    >
-      <AuthErrorContent />
+    <Suspense fallback={<LoadingFallback />}>
+      <ErrorContent />
     </Suspense>
   )
 }

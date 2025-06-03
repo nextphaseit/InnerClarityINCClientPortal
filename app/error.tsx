@@ -20,6 +20,18 @@ export default function Error({
     console.error("Application error:", error)
   }, [error])
 
+  // Get a safe error message
+  const getErrorMessage = (error: Error) => {
+    try {
+      if (error.message) {
+        return error.message
+      }
+      return "An unexpected error occurred"
+    } catch {
+      return "An unexpected error occurred"
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800 px-4">
       <Card className="w-full max-w-md">
@@ -44,7 +56,7 @@ export default function Error({
         <CardContent className="space-y-6">
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error.message || "An unexpected error occurred"}</AlertDescription>
+            <AlertDescription>{getErrorMessage(error)}</AlertDescription>
           </Alert>
 
           <div className="space-y-3">
@@ -64,9 +76,17 @@ export default function Error({
           {process.env.NODE_ENV === "development" && (
             <details className="text-xs text-muted-foreground">
               <summary className="cursor-pointer">Error Details (Development)</summary>
-              <pre className="mt-2 whitespace-pre-wrap break-all">{error.stack}</pre>
+              <pre className="mt-2 whitespace-pre-wrap break-all text-xs">{error.stack || error.toString()}</pre>
             </details>
           )}
+
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground">
+              <span>🔒</span>
+              <span>HIPAA Secure Portal</span>
+            </div>
+            <p className="text-xs text-center text-muted-foreground mt-1">Your data security is our priority</p>
+          </div>
         </CardContent>
       </Card>
     </div>
