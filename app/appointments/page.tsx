@@ -1,35 +1,32 @@
 "use client"
 
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
 import { Calendar, Clock, Video, MapPin, Plus, Edit, X } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/components/auth-provider"
 
 export default function AppointmentsPage() {
-  const { data: session, status } = useSession()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuth()
 
   useEffect(() => {
-    if (status === "loading") return
+    if (loading) return
 
-    if (!session) {
+    if (!user) {
       router.push("/auth/signin")
       return
     }
 
-    if (session.user?.role === "admin") {
+    if (user.role === "admin") {
       router.push("/admin/appointments")
       return
     }
-
-    setLoading(false)
-  }, [session, status, router])
+  }, [user, loading, router])
 
   if (loading) {
     return (

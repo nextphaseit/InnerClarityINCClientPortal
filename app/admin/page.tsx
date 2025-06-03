@@ -1,8 +1,7 @@
 "use client"
 
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,26 +19,28 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
+// Add this import instead
+import { useAuth } from "@/components/auth-provider"
+
 export default function AdminDashboard() {
-  const { data: session, status } = useSession()
+  // Replace the useSession hook usage
+  const { user, loading } = useAuth()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
+  // Remove this line: const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (status === "loading") return
+    if (loading) return
 
-    if (!session) {
+    if (!user) {
       router.push("/auth/signin")
       return
     }
 
-    if (session.user?.role !== "admin") {
+    if (user.role !== "admin") {
       router.push("/dashboard")
       return
     }
-
-    setLoading(false)
-  }, [session, status, router])
+  }, [user, loading, router])
 
   if (loading) {
     return (
