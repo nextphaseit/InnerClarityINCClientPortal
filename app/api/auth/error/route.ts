@@ -2,57 +2,104 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const error = searchParams.get("error")
+    // Safely extract search params
+    let error: string | null = null
 
-    // Log the error for debugging
-    console.log("Auth error:", error)
+    try {
+      const url = new URL(request.url)
+      error = url.searchParams.get("error")
+    } catch (urlError) {
+      console.error("Failed to parse URL:", urlError)
+      error = "url_parse_error"
+    }
 
-    // Return a simple JSON response
-    return NextResponse.json(
-      {
-        error: error || "unknown_error",
-        message: getErrorMessage(error),
-        timestamp: new Date().toISOString(),
+    // Log for debugging
+    console.log("Processing auth error:", error)
+
+    // Create response data
+    const responseData = {
+      error: error || "unknown_error",
+      message: getErrorMessage(error),
+      timestamp: new Date().toISOString(),
+    }
+
+    // Return response with explicit error handling
+    return new NextResponse(JSON.stringify(responseData), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
       },
-      {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
-    )
+    })
   } catch (err) {
-    console.error("Auth error route failed:", err)
+    // Handle any unexpected errors
+    console.error("Auth error route exception:", err)
 
-    return NextResponse.json(
-      {
-        error: "internal_error",
-        message: "An unexpected error occurred",
+    try {
+      const fallbackResponse = {
+        error: "internal_server_error",
+        message: "An unexpected error occurred while processing the authentication error",
         timestamp: new Date().toISOString(),
-      },
-      {
+      }
+
+      return new NextResponse(JSON.stringify(fallbackResponse), {
         status: 500,
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
         },
-      },
-    )
+      })
+    } catch (finalError) {
+      // Last resort fallback
+      console.error("Final fallback error:", finalError)
+      return new NextResponse("Internal Server Error", { status: 500 })
+    }
   }
 }
 
 function getErrorMessage(error: string | null): string {
-  const errorMessages: Record<string, string> = {
-    Configuration: "Server configuration error",
-    AccessDenied: "Access denied",
-    Verification: "Verification token expired",
-    CredentialsSignin: "Invalid credentials",
-    OAuthSignin: "OAuth sign in error",
-    OAuthCallback: "OAuth callback error",
-    OAuthCreateAccount: "Could not create OAuth account",
-    EmailSignin: "Email sign in error",
-    SessionRequired: "Session required",
-  }
+  try {
+    if (!error) return "An authentication error occurred"
 
-  return errorMessages[error || ""] || "Authentication error occurred"
+    switch (error) {
+      case "Configuration":
+        return "There is a problem with the server configuration"
+      case "AccessDenied":
+        return "Access denied. You do not have permission to sign in"
+      case "Verification":
+        return "The verification token has expired or has already been used"
+      case "CredentialsSignin":
+        return "Invalid email or password. Please check your credentials and try again"
+      case "OAuthSignin":
+        return "Error occurred during OAuth sign in"
+      case "OAuthCallback":
+        return "Error occurred during OAuth callback"
+      case "OAuthCreateAccount":
+        return "Could not create OAuth account"
+      case "EmailSignin":
+        return "Unable to send sign-in email. Please try again later"
+      case "SessionRequired":
+        return "Please sign in to access this page"
+      case "url_parse_error":
+        return "Invalid request format"
+      default:
+        return "An unexpected authentication error occurred. Please try again"
+    }
+  } catch (err) {
+    console.error("Error in getErrorMessage:", err)
+    return "Authentication error occurred"
+  }
+}
+
+// Handle other HTTP methods
+export async function POST() {
+  return new NextResponse("Method not allowed", { status: 405 })
+}
+
+export async function PUT() {
+  return new NextResponse("Method not allowed", { status: 405 })
+}
+
+export async function DELETE() {
+  return new NextResponse("Method not allowed", { status: 405 })
 }
