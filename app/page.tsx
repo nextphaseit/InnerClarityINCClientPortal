@@ -30,11 +30,9 @@ export default function HomePage() {
               alt="Inner Clarity"
               width={120}
               height={120}
-              className="h-30 w-auto mx-auto mb-4"
+              className="h-30 w-auto mx-auto mb-6"
             />
-            <p className="text-lg text-clarity-blue-600 dark:text-clarity-blue-400 font-medium text-center mb-4">
-              Find Your Inner Peace
-            </p>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-8">Find Your Inner Peace</h2>
           </div>
 
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
