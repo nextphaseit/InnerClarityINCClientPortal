@@ -194,7 +194,7 @@ export default function HomePage() {
             </div>
 
             <div className="text-center md:text-right">
-              <p className="text-gray-400 mb-2">© 2024 Inner Clarity Inc. All rights reserved.</p>
+              <p className="text-gray-400 mb-2">© 2025 Inner Clarity Inc. All rights reserved.</p>
               <p className="text-sm text-gray-500">HIPAA Compliant Mental Health Platform</p>
             </div>
           </div>
