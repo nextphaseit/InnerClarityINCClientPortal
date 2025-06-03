@@ -30,10 +30,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkSession = async () => {
     try {
       const response = await fetch("/api/auth/session")
+
+      // Check if response is ok and content-type is JSON
+      if (!response.ok) {
+        console.log("Session check failed:", response.status)
+        setUser(null)
+        return
+      }
+
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        console.log("Session endpoint returned non-JSON response")
+        setUser(null)
+        return
+      }
+
       const data = await response.json()
-      setUser(data.user)
+      setUser(data.user || null)
     } catch (error) {
       console.error("Session check error:", error)
+      setUser(null)
     } finally {
       setLoading(false)
     }
