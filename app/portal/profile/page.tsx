@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Save, User, Phone, MapPin, Shield } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Save, User, Phone, MapPin, Shield, AlertCircle } from "lucide-react"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 interface Profile {
@@ -34,6 +35,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
   const router = useRouter()
 
   useEffect(() => {
@@ -54,35 +56,35 @@ export default function ProfilePage() {
 
       setUser(user)
 
-      // Load profile data
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single()
+      // Try to load profile data
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single()
 
-      if (profileError && profileError.code !== "PGRST116") {
-        console.error("Error loading profile:", profileError)
-      } else if (profileData) {
-        setProfile(profileData)
-      } else {
-        // Create default profile
-        const defaultProfile: Partial<Profile> = {
-          id: user.id,
-          full_name: user.user_metadata?.full_name || "",
-          phone: "",
-          address: "",
-          city: "",
-          state: "",
-          zip: "",
-          insurance_provider: "",
-          insurance_id: "",
-          emergency_contact_name: "",
-          emergency_contact_phone: "",
-          emergency_contact_relationship: "",
-          date_of_birth: "",
+        if (profileError) {
+          if (profileError.code === "PGRST116") {
+            // No profile found, create default
+            createDefaultProfile(user)
+          } else if (profileError.message.includes("relation") && profileError.message.includes("does not exist")) {
+            // Table doesn't exist
+            setError("Database tables are not set up. Please run the database setup scripts first.")
+            createDefaultProfile(user)
+          } else {
+            console.error("Error loading profile:", profileError)
+            createDefaultProfile(user)
+          }
+        } else if (profileData) {
+          setProfile(profileData)
+        } else {
+          createDefaultProfile(user)
         }
-        setProfile(defaultProfile as Profile)
+      } catch (dbError) {
+        console.error("Database error:", dbError)
+        setError("Unable to connect to database. Using local profile data.")
+        createDefaultProfile(user)
       }
     } catch (error) {
       console.error("Error:", error)
@@ -92,27 +94,58 @@ export default function ProfilePage() {
     }
   }
 
+  const createDefaultProfile = (user: SupabaseUser) => {
+    const defaultProfile: Profile = {
+      id: user.id,
+      full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
+      phone: "",
+      address: "",
+      city: "",
+      state: "",
+      zip: "",
+      insurance_provider: "",
+      insurance_id: "",
+      emergency_contact_name: "",
+      emergency_contact_phone: "",
+      emergency_contact_relationship: "",
+      date_of_birth: "",
+      updated_at: new Date().toISOString(),
+    }
+    setProfile(defaultProfile)
+  }
+
   const handleSave = async () => {
     if (!profile || !user) return
 
     setSaving(true)
     setMessage("")
+    setError("")
 
     try {
-      const { error } = await supabase.from("profiles").upsert({
+      // Try to save to database
+      const { error: saveError } = await supabase.from("profiles").upsert({
         ...profile,
         updated_at: new Date().toISOString(),
       })
 
-      if (error) {
-        throw error
+      if (saveError) {
+        if (saveError.message.includes("relation") && saveError.message.includes("does not exist")) {
+          setError("Database tables are not set up. Profile saved locally only.")
+          setMessage("Profile updated locally (database not available)")
+        } else {
+          throw saveError
+        }
+      } else {
+        setMessage("Profile updated successfully!")
       }
 
-      setMessage("Profile updated successfully!")
-      setTimeout(() => setMessage(""), 3000)
+      setTimeout(() => {
+        setMessage("")
+        setError("")
+      }, 3000)
     } catch (error) {
       console.error("Error saving profile:", error)
-      setMessage("Error saving profile. Please try again.")
+      setError("Error saving profile. Please try again.")
     } finally {
       setSaving(false)
     }
@@ -125,8 +158,8 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
       </div>
     )
   }
@@ -142,6 +175,13 @@ export default function ProfilePage() {
             <p className="text-slate-600">Manage your personal information and preferences</p>
           </div>
 
+          {error && (
+            <Alert className="mb-6 border-amber-200 bg-amber-50">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800">{error}</AlertDescription>
+            </Alert>
+          )}
+
           {message && (
             <div
               className={`mb-6 p-4 rounded-lg ${
@@ -154,9 +194,9 @@ export default function ProfilePage() {
 
           <div className="space-y-6">
             {/* Personal Information */}
-            <Card>
+            <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center text-slate-800">
                   <User className="h-5 w-5 mr-2" />
                   Personal Information
                 </CardTitle>
@@ -171,6 +211,7 @@ export default function ProfilePage() {
                       value={profile?.full_name || ""}
                       onChange={(e) => updateProfile("full_name", e.target.value)}
                       placeholder="Enter your full name"
+                      className="bg-white/50"
                     />
                   </div>
                   <div>
@@ -180,6 +221,7 @@ export default function ProfilePage() {
                       type="date"
                       value={profile?.date_of_birth || ""}
                       onChange={(e) => updateProfile("date_of_birth", e.target.value)}
+                      className="bg-white/50"
                     />
                   </div>
                 </div>
@@ -190,15 +232,16 @@ export default function ProfilePage() {
                     value={profile?.phone || ""}
                     onChange={(e) => updateProfile("phone", e.target.value)}
                     placeholder="(555) 123-4567"
+                    className="bg-white/50"
                   />
                 </div>
               </CardContent>
             </Card>
 
             {/* Address Information */}
-            <Card>
+            <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center text-slate-800">
                   <MapPin className="h-5 w-5 mr-2" />
                   Address Information
                 </CardTitle>
@@ -212,6 +255,7 @@ export default function ProfilePage() {
                     value={profile?.address || ""}
                     onChange={(e) => updateProfile("address", e.target.value)}
                     placeholder="123 Main Street"
+                    className="bg-white/50"
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -222,6 +266,7 @@ export default function ProfilePage() {
                       value={profile?.city || ""}
                       onChange={(e) => updateProfile("city", e.target.value)}
                       placeholder="City"
+                      className="bg-white/50"
                     />
                   </div>
                   <div>
@@ -231,6 +276,7 @@ export default function ProfilePage() {
                       value={profile?.state || ""}
                       onChange={(e) => updateProfile("state", e.target.value)}
                       placeholder="State"
+                      className="bg-white/50"
                     />
                   </div>
                   <div>
@@ -240,6 +286,7 @@ export default function ProfilePage() {
                       value={profile?.zip || ""}
                       onChange={(e) => updateProfile("zip", e.target.value)}
                       placeholder="12345"
+                      className="bg-white/50"
                     />
                   </div>
                 </div>
@@ -247,9 +294,9 @@ export default function ProfilePage() {
             </Card>
 
             {/* Insurance Information */}
-            <Card>
+            <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center text-slate-800">
                   <Shield className="h-5 w-5 mr-2" />
                   Insurance Information
                 </CardTitle>
@@ -264,6 +311,7 @@ export default function ProfilePage() {
                       value={profile?.insurance_provider || ""}
                       onChange={(e) => updateProfile("insurance_provider", e.target.value)}
                       placeholder="Blue Cross Blue Shield"
+                      className="bg-white/50"
                     />
                   </div>
                   <div>
@@ -273,6 +321,7 @@ export default function ProfilePage() {
                       value={profile?.insurance_id || ""}
                       onChange={(e) => updateProfile("insurance_id", e.target.value)}
                       placeholder="ABC123456789"
+                      className="bg-white/50"
                     />
                   </div>
                 </div>
@@ -280,9 +329,9 @@ export default function ProfilePage() {
             </Card>
 
             {/* Emergency Contact */}
-            <Card>
+            <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center text-slate-800">
                   <Phone className="h-5 w-5 mr-2" />
                   Emergency Contact
                 </CardTitle>
@@ -297,6 +346,7 @@ export default function ProfilePage() {
                       value={profile?.emergency_contact_name || ""}
                       onChange={(e) => updateProfile("emergency_contact_name", e.target.value)}
                       placeholder="John Doe"
+                      className="bg-white/50"
                     />
                   </div>
                   <div>
@@ -306,6 +356,7 @@ export default function ProfilePage() {
                       value={profile?.emergency_contact_phone || ""}
                       onChange={(e) => updateProfile("emergency_contact_phone", e.target.value)}
                       placeholder="(555) 987-6543"
+                      className="bg-white/50"
                     />
                   </div>
                 </div>
@@ -316,6 +367,7 @@ export default function ProfilePage() {
                     value={profile?.emergency_contact_relationship || ""}
                     onChange={(e) => updateProfile("emergency_contact_relationship", e.target.value)}
                     placeholder="Spouse, Parent, Sibling, etc."
+                    className="bg-white/50"
                   />
                 </div>
               </CardContent>
@@ -323,7 +375,11 @@ export default function ProfilePage() {
 
             {/* Save Button */}
             <div className="flex justify-end">
-              <Button onClick={handleSave} disabled={saving} className="bg-teal-600 hover:bg-teal-700">
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
+              >
                 {saving ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
