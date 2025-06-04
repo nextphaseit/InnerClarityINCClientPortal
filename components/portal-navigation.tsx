@@ -54,10 +54,10 @@ export function PortalNavigation() {
       {/* Mobile menu button */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="bg-white/90 backdrop-blur-sm shadow-lg border-white/20 hover:bg-white"
+          className="bg-slate-800/80 backdrop-blur-sm shadow-lg border border-slate-600/50 hover:bg-slate-700/80 text-white hover:text-white"
         >
           {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </Button>
@@ -140,7 +140,7 @@ export function PortalNavigation() {
       {/* Mobile overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
