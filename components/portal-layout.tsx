@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { supabase } from "@/lib/supabase"
+import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 const navigationItems = [
@@ -50,6 +51,7 @@ const navigationItems = [
     name: "Messages",
     href: "/portal/messages",
     icon: MessageSquare,
+    showBadge: true,
   },
   {
     name: "Forms",
@@ -89,6 +91,12 @@ export function PortalLayout({ children }: PortalLayoutProps) {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
+
+  // Get unread message count
+  const { unreadCount } = useUnreadMessages({
+    user,
+    userRole: "patient",
+  })
 
   useEffect(() => {
     checkAuth()
@@ -186,6 +194,7 @@ export function PortalLayout({ children }: PortalLayoutProps) {
           {navigationItems.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon
+            const showBadge = item.showBadge && unreadCount > 0
 
             return (
               <Link
@@ -193,7 +202,7 @@ export function PortalLayout({ children }: PortalLayoutProps) {
                 href={item.href}
                 onClick={closeMobileMenu}
                 className={`
-                  flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group
+                  flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group relative
                   ${
                     isActive
                       ? "bg-gradient-to-r from-teal-500 to-blue-600 text-white shadow-lg"
@@ -207,7 +216,12 @@ export function PortalLayout({ children }: PortalLayoutProps) {
                     ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"}
                   `}
                 />
-                {item.name}
+                <span className="flex-1">{item.name}</span>
+                {showBadge && (
+                  <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full animate-pulse">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </Link>
             )
           })}
@@ -241,9 +255,16 @@ export function PortalLayout({ children }: PortalLayoutProps) {
         {/* Top bar for mobile */}
         <div className="lg:hidden h-16 bg-white/80 backdrop-blur-sm border-b border-slate-200 flex items-center justify-between px-16">
           <h2 className="text-lg font-semibold text-slate-900">Patient Portal</h2>
-          <Button variant="ghost" size="sm">
-            <Bell className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center space-x-2">
+            {unreadCount > 0 && (
+              <div className="relative">
+                <Bell className="h-4 w-4 text-slate-600" />
+                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Page content */}
