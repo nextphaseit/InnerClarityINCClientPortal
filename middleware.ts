@@ -98,43 +98,4 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/patient") ||
       pathname.startsWith("/appointments") ||
       pathname.startsWith("/billing") ||
-      pathname.startsWith("/messages")
-    ) {
-      if (token.role !== "patient") {
-        console.log("❌ Access denied: Admin trying to access patient route")
-        return NextResponse.redirect(new URL("/unauthorized?reason=patient_required", request.url))
-      }
-    }
-
-    // Dashboard redirect logic
-    if (pathname === "/dashboard") {
-      if (token.role === "admin") {
-        console.log("🔄 Redirecting admin to admin dashboard")
-        return NextResponse.redirect(new URL("/admin", request.url))
-      } else if (token.role === "patient") {
-        console.log("🔄 Redirecting patient to patient dashboard")
-        return NextResponse.redirect(new URL("/patient/dashboard", request.url))
-      }
-    }
-
-    // Tenant isolation for multi-tenant setup
-    if (token.tenantId) {
-      response.headers.set("X-Tenant-ID", token.tenantId as string)
-    }
-  }
-
-  return response
-}
-
-export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ],
-}
+      pathname.startsWith("/messages")\
