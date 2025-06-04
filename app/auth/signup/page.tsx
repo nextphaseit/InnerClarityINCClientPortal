@@ -7,13 +7,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Eye, EyeOff, Check, X, Calendar, User, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getSupabaseClient } from "@/lib/supabase"
-import { passwordRequirements, isPasswordValid } from "@/lib/password-validation"
+import { supabase } from "@/lib/supabase"
 
 interface FormData {
   fullName: string
@@ -31,9 +25,25 @@ interface FormErrors {
   general?: string
 }
 
+interface PasswordRequirement {
+  label: string
+  met: boolean
+}
+
+const getPasswordRequirements = (password: string): PasswordRequirement[] => [
+  { label: "At least 8 characters", met: password.length >= 8 },
+  { label: "One uppercase letter", met: /[A-Z]/.test(password) },
+  { label: "One lowercase letter", met: /[a-z]/.test(password) },
+  { label: "One number", met: /\d/.test(password) },
+  { label: "One special character", met: /[!@#$%^&*(),.?":{}|<>]/.test(password) },
+]
+
+const isPasswordValid = (password: string): boolean => {
+  return getPasswordRequirements(password).every((req) => req.met)
+}
+
 export default function SignUpPage() {
   const router = useRouter()
-  const supabase = getSupabaseClient()
 
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
@@ -105,6 +115,8 @@ export default function SignUpPage() {
     setErrors({})
 
     try {
+      console.log("🔐 Creating account with Supabase...")
+
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -112,13 +124,13 @@ export default function SignUpPage() {
           data: {
             full_name: formData.fullName.trim(),
             date_of_birth: formData.dateOfBirth || null,
-            role: "patient", // Default role for patient portal
+            role: "patient",
           },
         },
       })
 
       if (error) {
-        console.error("Supabase sign-up error:", error)
+        console.error("❌ Supabase sign-up error:", error)
 
         // Handle specific Supabase errors
         if (error.message.includes("already registered")) {
@@ -132,16 +144,16 @@ export default function SignUpPage() {
       }
 
       if (data.user) {
-        console.log("User created successfully:", data.user.id)
+        console.log("✅ User created successfully:", data.user.id)
         setIsSuccess(true)
 
-        // Redirect to sign-in page after 3 seconds
+        // Redirect to portal dashboard after 3 seconds
         setTimeout(() => {
-          router.push("/auth/signin?message=Please check your email to verify your account")
+          router.push("/auth/login?message=Please check your email to verify your account")
         }, 3000)
       }
     } catch (error) {
-      console.error("Unexpected error during sign-up:", error)
+      console.error("❌ Unexpected error during sign-up:", error)
       setErrors({
         general: "An unexpected error occurred. Please try again.",
       })
@@ -150,34 +162,31 @@ export default function SignUpPage() {
     }
   }
 
-  const requirements = passwordRequirements(formData.password)
+  const requirements = getPasswordRequirements(formData.password)
 
   if (isSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-cyan-50 px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <CardTitle className="text-2xl text-green-800">Account Created!</CardTitle>
-            <CardDescription className="text-green-600">Please verify your email to log in.</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-gray-600 mb-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+          <div className="text-center">
+            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Account Created!</h1>
+            <p className="text-gray-600 mb-4">Please verify your email to log in.</p>
+            <p className="text-sm text-gray-500 mb-6">
               We've sent a verification email to <strong>{formData.email}</strong>
             </p>
-            <p className="text-xs text-gray-500">Redirecting to sign-in page...</p>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-gray-400">Redirecting to login page...</p>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-cyan-50 px-4 py-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
           <div className="mx-auto mb-4">
             <Image
               src="/images/inner-clarity-logo.png"
@@ -187,152 +196,172 @@ export default function SignUpPage() {
               className="mx-auto"
             />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">Create Your Account</CardTitle>
-          <CardDescription className="text-gray-600">Join Inner Clarity to access your patient portal</CardDescription>
-        </CardHeader>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Create Your Account</h1>
+          <p className="text-gray-600">Join Inner Clarity to access your patient portal</p>
+        </div>
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* General Error */}
-            {errors.general && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{errors.general}</AlertDescription>
-              </Alert>
-            )}
-
-            {/* Full Name */}
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name *</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={formData.fullName}
-                  onChange={(e) => handleInputChange("fullName", e.target.value)}
-                  className={`pl-10 ${errors.fullName ? "border-red-500" : ""}`}
-                  disabled={isLoading}
-                />
-              </div>
-              {errors.fullName && <p className="text-sm text-red-600">{errors.fullName}</p>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* General Error */}
+          {errors.general && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
+              <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <p className="text-red-700 text-sm">{errors.general}</p>
             </div>
+          )}
 
-            {/* Email */}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address *</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  className={`pl-10 ${errors.email ? "border-red-500" : ""}`}
-                  disabled={isLoading}
-                />
-              </div>
-              {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
+          {/* Full Name */}
+          <div className="space-y-2">
+            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+              Full Name *
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <input
+                id="fullName"
+                type="text"
+                placeholder="Enter your full name"
+                value={formData.fullName}
+                onChange={(e) => handleInputChange("fullName", e.target.value)}
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors ${
+                  errors.fullName ? "border-red-500" : "border-gray-300"
+                }`}
+                disabled={isLoading}
+              />
             </div>
-
-            {/* Date of Birth */}
-            <div className="space-y-2">
-              <Label htmlFor="dateOfBirth">Date of Birth (Optional)</Label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="dateOfBirth"
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                  className="pl-10"
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Create a password"
-                  value={formData.password}
-                  onChange={(e) => handleInputChange("password", e.target.value)}
-                  className={`pl-10 pr-10 ${errors.password ? "border-red-500" : ""}`}
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
-
-              {/* Password Requirements */}
-              {formData.password && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-gray-700">Password Requirements:</p>
-                  {requirements.map((req, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      {req.met ? <Check className="h-3 w-3 text-green-500" /> : <X className="h-3 w-3 text-red-500" />}
-                      <span className={`text-xs ${req.met ? "text-green-600" : "text-red-600"}`}>{req.label}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Confirm Password */}
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password *</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                  className={`pl-10 pr-10 ${errors.confirmPassword ? "border-red-500" : ""}`}
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword}</p>}
-            </div>
-
-            {/* Submit Button */}
-            <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={isLoading}>
-              {isLoading ? "Creating Account..." : "Create Account"}
-            </Button>
-          </form>
-
-          {/* Sign In Link */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Already have an account?{" "}
-              <Link href="/auth/signin" className="font-medium text-teal-600 hover:text-teal-500">
-                Sign in here
-              </Link>
-            </p>
+            {errors.fullName && <p className="text-sm text-red-600">{errors.fullName}</p>}
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Email */}
+          <div className="space-y-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              Email Address *
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={formData.email}
+                onChange={(e) => handleInputChange("email", e.target.value)}
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors ${
+                  errors.email ? "border-red-500" : "border-gray-300"
+                }`}
+                disabled={isLoading}
+              />
+            </div>
+            {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
+          </div>
+
+          {/* Date of Birth */}
+          <div className="space-y-2">
+            <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+              Date of Birth (Optional)
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <input
+                id="dateOfBirth"
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          {/* Password */}
+          <div className="space-y-2">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              Password *
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Create a password"
+                value={formData.password}
+                onChange={(e) => handleInputChange("password", e.target.value)}
+                className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors ${
+                  errors.password ? "border-red-500" : "border-gray-300"
+                }`}
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
+
+            {/* Password Requirements */}
+            {formData.password && (
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700">Password Requirements:</p>
+                {requirements.map((req, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    {req.met ? <Check className="h-3 w-3 text-green-500" /> : <X className="h-3 w-3 text-red-500" />}
+                    <span className={`text-xs ${req.met ? "text-green-600" : "text-red-600"}`}>{req.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div className="space-y-2">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              Confirm Password *
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Confirm your password"
+                value={formData.confirmPassword}
+                onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
+                className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors ${
+                  errors.confirmPassword ? "border-red-500" : "border-gray-300"
+                }`}
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+              >
+                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword}</p>}
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
+          >
+            {isLoading ? "Creating Account..." : "Create Account"}
+          </button>
+        </form>
+
+        {/* Sign In Link */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600">
+            Already have an account?{" "}
+            <Link href="/auth/login" className="font-medium text-teal-600 hover:text-teal-500">
+              Sign in here
+            </Link>
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
