@@ -1,93 +1,112 @@
+import { withAuth } from "next-auth/middleware"
 import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
-import { getToken } from "next-auth/jwt"
 
-export async function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname
+export default withAuth(
+  function middleware(req) {
+    const token = req.nextauth.token
+    const { pathname } = req.nextUrl
 
-  // Public paths that don't require authentication
-  const isPublicPath =
-    path === "/" ||
-    path === "/register" ||
-    path === "/auth/signin" ||
-    path === "/auth/error" ||
-    path === "/not-found" ||
-    path.startsWith("/api/auth") ||
-    path.startsWith("/api/register") ||
-    path.startsWith("/api/health") ||
-    path.startsWith("/api/stripe/webhook") ||
-    path.startsWith("/_next") ||
-    path.startsWith("/images") ||
-    path === "/favicon.ico"
+    // Add security headers for HIPAA compliance
+    const response = NextResponse.next()
+    response.headers.set("X-Frame-Options", "DENY")
+    response.headers.set("X-Content-Type-Options", "nosniff")
+    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.set("X-XSS-Protection", "1; mode=block")
 
-  // Get the user's session token
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  })
-
-  const isAuth = !!token
-
-  // Redirect authenticated users away from auth pages
-  if (isPublicPath && isAuth && (path === "/" || path === "/auth/signin" || path === "/register")) {
-    // Role-based redirects
-    if (token.role === "admin") {
-      return NextResponse.redirect(new URL("/admin", request.url))
-    } else {
-      return NextResponse.redirect(new URL("/dashboard", request.url))
-    }
-  }
-
-  // Redirect unauthenticated users to signin
-  if (!isPublicPath && !isAuth) {
-    const callbackUrl = encodeURIComponent(path)
-    return NextResponse.redirect(new URL(`/auth/signin?callbackUrl=${callbackUrl}`, request.url))
-  }
-
-  // Role-based access control
-  if (isAuth) {
-    // Admin routes - only admins can access
-    if (path.startsWith("/admin") && token.role !== "admin") {
-      return NextResponse.redirect(new URL("/auth/signin?error=AccessDenied", request.url))
+    if (process.env.NODE_ENV === "production") {
+      response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     }
 
-    // Admin routes - only Microsoft-authenticated admins can access
-    if (path.startsWith("/admin") && token.role === "admin" && token.authProvider !== "azure-ad") {
-      return NextResponse.redirect(new URL("/auth/signin?error=MicrosoftLoginRequired", request.url))
+    // Admin routes - require admin role and Azure AD authentication
+    if (pathname.startsWith("/admin")) {
+      if (!token) {
+        return NextResponse.redirect(new URL("/api/auth/signin/azure-ad", req.url))
+      }
+      if (token.role !== "admin" || token.provider !== "azure-ad") {
+        return NextResponse.redirect(new URL("/unauthorized", req.url))
+      }
     }
 
-    // Patient routes - only patients can access
+    // Patient routes - require patient role and Auth0 authentication
     if (
-      (path.startsWith("/dashboard") ||
-        path.startsWith("/appointments") ||
-        path.startsWith("/messages") ||
-        path.startsWith("/billing")) &&
-      token.role !== "patient"
+      pathname.startsWith("/appointments") ||
+      pathname.startsWith("/billing") ||
+      pathname.startsWith("/messages") ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/documents") ||
+      pathname.startsWith("/forms") ||
+      pathname.startsWith("/profile")
     ) {
-      return NextResponse.redirect(new URL("/auth/signin?error=AccessDenied", request.url))
+      if (!token) {
+        return NextResponse.redirect(new URL("/api/auth/signin/auth0", req.url))
+      }
+      if (token.role !== "patient") {
+        return NextResponse.redirect(new URL("/unauthorized", req.url))
+      }
     }
-  }
 
-  // Add security headers for HIPAA compliance
-  const response = NextResponse.next()
+    // Add tenant information to headers for API routes
+    if (pathname.startsWith("/api") && token?.tenantId) {
+      response.headers.set("X-Tenant-ID", token.tenantId)
+    }
 
-  response.headers.set("X-Frame-Options", "DENY")
-  response.headers.set("X-Content-Type-Options", "nosniff")
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-  response.headers.set("X-XSS-Protection", "1; mode=block")
+    return response
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl
 
-  if (process.env.NODE_ENV === "production") {
-    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-  }
+        // Public paths that don't require authentication
+        const publicPaths = [
+          "/",
+          "/register",
+          "/auth/signin",
+          "/auth/error",
+          "/auth/callback",
+          "/unauthorized",
+          "/not-found",
+        ]
 
-  // Add tenant information to headers for API routes
-  if (path.startsWith("/api") && token?.tenantId) {
-    response.headers.set("X-Tenant-ID", token.tenantId)
-  }
+        // API paths that don't require authentication
+        const publicApiPaths = ["/api/auth", "/api/register", "/api/health", "/api/stripe/webhook"]
 
-  return response
-}
+        // Check if path is public
+        if (publicPaths.some((path) => pathname === path || pathname.startsWith(path))) {
+          return true
+        }
+
+        // Check if API path is public
+        if (publicApiPaths.some((path) => pathname.startsWith(path))) {
+          return true
+        }
+
+        // Static files and Next.js internals
+        if (
+          pathname.startsWith("/_next") ||
+          pathname.startsWith("/images") ||
+          pathname.startsWith("/favicon") ||
+          pathname.includes(".")
+        ) {
+          return true
+        }
+
+        // All other paths require authentication
+        return !!token
+      },
+    },
+  },
+)
 
 export const config = {
-  matcher: ["/((?!api(?!/auth|/register|/health|/stripe/webhook)|_next|images|favicon.ico).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    "/((?!_next/static|_next/image|favicon.ico|images|public).*)",
+  ],
 }
