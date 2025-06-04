@@ -334,17 +334,17 @@ export default function HomePage() {
               <h3 className="font-semibold mb-4">Legal</h3>
               <ul className="space-y-2 text-gray-400">
                 <li>
-                  <Link href="/privacy" className="hover:text-white transition-colors">
+                  <Link href="/privacy-policy" className="hover:text-white transition-colors">
                     Privacy Policy
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="hover:text-white transition-colors">
+                  <Link href="/terms-of-service" className="hover:text-white transition-colors">
                     Terms of Service
                   </Link>
                 </li>
                 <li>
-                  <Link href="/hipaa" className="hover:text-white transition-colors">
+                  <Link href="/hipaa-notice" className="hover:text-white transition-colors">
                     HIPAA Notice
                   </Link>
                 </li>
