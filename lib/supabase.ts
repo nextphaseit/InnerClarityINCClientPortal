@@ -7,6 +7,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables")
 }
 
+export { createClient }
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Client-side Supabase client (singleton pattern)
