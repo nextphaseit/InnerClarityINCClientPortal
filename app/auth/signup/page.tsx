@@ -164,6 +164,17 @@ export default function SignUpPage() {
 
       if (data.user) {
         console.log("User created successfully:", data.user.id)
+
+        // Create user profile record
+        try {
+          await createUserProfile(data.user.id, formData.fullName, formData.dateOfBirth)
+          console.log("Profile created successfully")
+        } catch (profileError) {
+          console.error("Profile creation failed:", profileError)
+          // Continue with success flow even if profile creation fails
+          // The profile can be created later when user logs in
+        }
+
         setIsSuccess(true)
 
         // Redirect to sign-in page after 3 seconds
@@ -178,6 +189,33 @@ export default function SignUpPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const createUserProfile = async (userId: string, fullName: string, dateOfBirth: string) => {
+    try {
+      const { error } = await supabase.from("profiles").upsert(
+        {
+          id: userId,
+          full_name: fullName.trim(),
+          date_of_birth: dateOfBirth || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "id",
+        },
+      )
+
+      if (error) {
+        console.error("Error creating user profile:", error)
+        throw error
+      }
+
+      console.log("User profile created/updated successfully")
+    } catch (error) {
+      console.error("Failed to create user profile:", error)
+      throw error
     }
   }
 
