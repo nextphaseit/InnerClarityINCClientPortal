@@ -44,12 +44,11 @@ export const authOptions: NextAuthOptions = {
 
           return null
         } catch (error) {
-          console.error("Authorization error:", error)
+          console.error("Credentials authorization error:", error)
           return null
         }
       },
     }),
-    // Only add Auth0 if environment variables are present
     ...(process.env.AUTH0_CLIENT_ID && process.env.AUTH0_CLIENT_SECRET && process.env.AUTH0_DOMAIN
       ? [
           Auth0Provider({
@@ -59,24 +58,17 @@ export const authOptions: NextAuthOptions = {
             authorization: {
               params: {
                 audience: process.env.AUTH0_AUDIENCE || `https://${process.env.AUTH0_DOMAIN}/api/v2/`,
-                scope: "openid email profile",
               },
             },
           }),
         ]
       : []),
-    // Only add Azure AD if environment variables are present
     ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && process.env.MICROSOFT_TENANT_ID
       ? [
           AzureADProvider({
             clientId: process.env.MICROSOFT_CLIENT_ID,
             clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
             tenantId: process.env.MICROSOFT_TENANT_ID,
-            authorization: {
-              params: {
-                scope: "openid email profile User.Read",
-              },
-            },
           }),
         ]
       : []),
@@ -91,7 +83,7 @@ export const authOptions: NextAuthOptions = {
         if (user) {
           token.role = user.role || "patient"
           token.tenantId = user.tenantId || "inner-clarity-main"
-          token.provider = account?.provider || "credentials"
+          token.provider = account?.provider
         }
         return token
       } catch (error) {
@@ -101,7 +93,7 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       try {
-        if (session.user && token) {
+        if (session.user) {
           session.user.id = token.sub || ""
           session.user.role = token.role as string
           session.user.tenantId = token.tenantId as string
@@ -111,6 +103,22 @@ export const authOptions: NextAuthOptions = {
       } catch (error) {
         console.error("Session callback error:", error)
         return session
+      }
+    },
+    async redirect({ url, baseUrl }) {
+      try {
+        // Handle relative URLs
+        if (url.startsWith("/")) {
+          return `${baseUrl}${url}`
+        }
+        // Handle same origin URLs
+        if (new URL(url).origin === baseUrl) {
+          return url
+        }
+        return baseUrl
+      } catch (error) {
+        console.error("Redirect callback error:", error)
+        return baseUrl
       }
     },
     async signIn({ user, account, profile }) {
@@ -123,6 +131,17 @@ export const authOptions: NextAuthOptions = {
       }
     },
   },
+  events: {
+    async signIn({ user, account }) {
+      console.log(`User signed in: ${user.email} via ${account?.provider}`)
+    },
+    async signOut({ session }) {
+      console.log(`User signed out: ${session?.user?.email}`)
+    },
+    async createUser({ user }) {
+      console.log(`New user created: ${user.email}`)
+    },
+  },
   session: {
     strategy: "jwt",
     maxAge: 24 * 60 * 60, // 24 hours
@@ -130,7 +149,7 @@ export const authOptions: NextAuthOptions = {
   jwt: {
     maxAge: 24 * 60 * 60, // 24 hours
   },
-  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
+  secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === "development",
 }
 

@@ -1,91 +1,95 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertTriangle, Home, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertTriangle } from "lucide-react"
 
-export default function AuthError() {
+const errorMessages: Record<string, string> = {
+  Configuration: "There is a problem with the server configuration.",
+  AccessDenied: "You do not have permission to sign in.",
+  Verification: "The verification token has expired or has already been used.",
+  Default: "An unexpected error occurred during authentication.",
+  Signin: "There was an error during the sign-in process.",
+  OAuthSignin: "Error in constructing an authorization URL.",
+  OAuthCallback: "Error in handling the response from an OAuth provider.",
+  OAuthCreateAccount: "Could not create OAuth account in the database.",
+  EmailCreateAccount: "Could not create email account in the database.",
+  Callback: "Error in the OAuth callback handler route.",
+  OAuthAccountNotLinked: "The email on the account is already linked, but not with this OAuth account.",
+  EmailSignin: "Sending the e-mail with the verification token failed.",
+  CredentialsSignin: "The authorize callback returned null in the Credentials provider.",
+  SessionRequired: "The content of this page requires you to be signed in at all times.",
+}
+
+export default function AuthErrorPage() {
   const searchParams = useSearchParams()
-  const [errorMessage, setErrorMessage] = useState<string>("An authentication error occurred")
+  const error = searchParams?.get("error") || "Default"
 
-  useEffect(() => {
-    const error = searchParams?.get("error")
-    if (error) {
-      setErrorMessage(getErrorMessage(error))
-    }
-  }, [searchParams])
+  const errorMessage = errorMessages[error] || errorMessages.Default
+
+  const handleRetry = () => {
+    window.location.href = "/auth/signin"
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4 text-center">
-          <div className="flex justify-center">
+        <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-4">
             <Image
-              src="/placeholder.svg?height=80&width=80&text=IC"
+              src="/images/inner-clarity-logo.png"
               alt="Inner Clarity Inc."
-              width={80}
-              height={80}
-              className="h-20 w-auto"
+              width={120}
+              height={40}
+              className="h-10 w-auto"
+              priority
             />
           </div>
-          <div>
-            <CardTitle className="text-2xl font-bold">Authentication Error</CardTitle>
-            <CardDescription className="text-base mt-2">
-              We encountered an issue with your sign-in attempt
-            </CardDescription>
-          </div>
+          <CardTitle className="text-2xl font-bold text-gray-900 flex items-center justify-center gap-2">
+            <AlertTriangle className="h-6 w-6 text-red-500" />
+            Authentication Error
+          </CardTitle>
+          <CardDescription className="text-gray-600">There was a problem with your sign-in attempt</CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-900/30">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-              <p className="text-red-600 dark:text-red-400 font-medium">{errorMessage}</p>
-            </div>
-          </div>
+        <CardContent className="space-y-4">
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Error:</strong> {error}
+              <br />
+              {errorMessage}
+            </AlertDescription>
+          </Alert>
 
           <div className="space-y-3">
-            <Button asChild className="w-full">
-              <Link href="/auth/signin">Try Again</Link>
+            <Button onClick={handleRetry} className="w-full" variant="default">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
             </Button>
 
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/">Return to Home</Link>
+            <Button asChild className="w-full" variant="outline">
+              <Link href="/">
+                <Home className="h-4 w-4 mr-2" />
+                Return Home
+              </Link>
             </Button>
           </div>
 
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground">
-              <span>🔒</span>
-              <span>HIPAA Secure Portal</span>
-            </div>
-            <p className="text-xs text-center text-muted-foreground mt-1">
-              Need help? Contact support at support@innerclarity.inc
+          <div className="text-center text-sm text-gray-600">
+            <p>If this problem persists, please contact support:</p>
+            <p className="mt-2">
+              <strong>Phone:</strong> (984) 274-3723
+              <br />
+              <strong>Email:</strong> support@innerclarityinc.com
             </p>
           </div>
         </CardContent>
       </Card>
     </div>
   )
-}
-
-function getErrorMessage(error: string): string {
-  const errorMessages: Record<string, string> = {
-    Configuration: "There is a problem with the server configuration.",
-    AccessDenied: "Access denied. You do not have permission to sign in.",
-    Verification: "The verification token has expired or has already been used.",
-    CredentialsSignin: "Invalid email or password. Please check your credentials and try again.",
-    OAuthSignin: "Error occurred during sign in.",
-    OAuthCallback: "Error occurred during authentication callback.",
-    OAuthCreateAccount: "Could not create account.",
-    EmailSignin: "Unable to send sign-in email. Please try again later.",
-    SessionRequired: "Please sign in to access this page.",
-    Default: "An unexpected authentication error occurred. Please try again.",
-  }
-
-  return errorMessages[error] || errorMessages.Default
 }

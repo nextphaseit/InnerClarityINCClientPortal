@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { signIn } from "next-auth/react"
+import { signIn, getSession } from "next-auth/react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -43,6 +42,9 @@ export default function SignInPage() {
         case "CredentialsSignin":
           setError("Invalid email or password.")
           break
+        case "Configuration":
+          setError("Authentication service is not properly configured.")
+          break
         default:
           setError("An error occurred during sign in.")
       }
@@ -74,15 +76,22 @@ export default function SignInPage() {
       })
 
       if (result?.error) {
-        setError(result.error)
+        setError("Invalid email or password")
         return
       }
 
-      // Redirect based on user role (handled by middleware)
-      router.push(callbackUrl)
+      if (result?.ok) {
+        // Get the session to determine redirect
+        const session = await getSession()
+        if (session?.user?.role === "admin") {
+          router.push("/admin")
+        } else {
+          router.push("/dashboard")
+        }
+      }
     } catch (error) {
-      setError("An unexpected error occurred")
       console.error("Sign in error:", error)
+      setError("An unexpected error occurred")
     } finally {
       setLoading(false)
     }
@@ -90,12 +99,34 @@ export default function SignInPage() {
 
   const handleAuth0Login = async () => {
     setLoading(true)
-    await signIn("auth0", { callbackUrl })
+    setError(null)
+
+    try {
+      await signIn("auth0", {
+        callbackUrl: "/dashboard",
+        redirect: true,
+      })
+    } catch (error) {
+      console.error("Auth0 login error:", error)
+      setError("Auth0 login is not available")
+      setLoading(false)
+    }
   }
 
   const handleMicrosoftLogin = async () => {
     setLoading(true)
-    await signIn("azure-ad", { callbackUrl })
+    setError(null)
+
+    try {
+      await signIn("azure-ad", {
+        callbackUrl: "/admin",
+        redirect: true,
+      })
+    } catch (error) {
+      console.error("Microsoft login error:", error)
+      setError("Microsoft login is not available")
+      setLoading(false)
+    }
   }
 
   return (
@@ -136,23 +167,6 @@ export default function SignInPage() {
             </TabsList>
 
             <TabsContent value="patient" className="space-y-4">
-              <Button
-                onClick={handleAuth0Login}
-                className="w-full bg-clarity-blue-600 hover:bg-clarity-blue-700"
-                disabled={loading}
-              >
-                {loading ? "Signing in..." : "Sign in with Auth0"}
-              </Button>
-
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or</span>
-                </div>
-              </div>
-
               <form onSubmit={handleCredentialsLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -161,7 +175,7 @@ export default function SignInPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder="patient@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="pl-10"
@@ -185,7 +199,7 @@ export default function SignInPage() {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
+                      placeholder="patient123"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-10"
@@ -205,20 +219,92 @@ export default function SignInPage() {
                   {loading ? "Signing in..." : "Sign in"}
                 </Button>
               </form>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or</span>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleAuth0Login}
+                className="w-full bg-clarity-blue-600 hover:bg-clarity-blue-700"
+                disabled={loading}
+                variant="outline"
+              >
+                {loading ? "Connecting..." : "Sign in with Auth0"}
+              </Button>
             </TabsContent>
 
             <TabsContent value="admin" className="space-y-4">
+              <form onSubmit={handleCredentialsLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="admin-email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="admin-email"
+                      type="email"
+                      placeholder="admin@innerclarity.org"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="admin-password">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="admin-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="admin123"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Signing in..." : "Admin Sign in"}
+                </Button>
+              </form>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or</span>
+                </div>
+              </div>
+
               <Button
                 onClick={handleMicrosoftLogin}
                 className="w-full bg-[#0078d4] hover:bg-[#006cbe]"
                 disabled={loading}
+                variant="outline"
               >
-                {loading ? "Signing in..." : "Sign in with Microsoft"}
+                {loading ? "Connecting..." : "Sign in with Microsoft"}
               </Button>
 
               <div className="text-center text-sm text-gray-600 mt-2">
                 <p>Admin access is restricted to authorized personnel only.</p>
-                <p className="mt-1">You must use your @innerclarityinc.com or @nextphaseit.org email.</p>
               </div>
             </TabsContent>
           </Tabs>
@@ -232,8 +318,18 @@ export default function SignInPage() {
             </p>
           </div>
 
+          {/* Demo Credentials */}
+          <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p className="text-xs font-medium text-yellow-800 mb-1">Demo Credentials:</p>
+            <p className="text-xs text-yellow-700">
+              Patient: patient@example.com / patient123
+              <br />
+              Admin: admin@innerclarity.org / admin123
+            </p>
+          </div>
+
           {/* HIPAA Notice */}
-          <div className="mt-6 p-3 bg-clarity-blue-50 rounded-lg border border-clarity-blue-200">
+          <div className="mt-4 p-3 bg-clarity-blue-50 rounded-lg border border-clarity-blue-200">
             <div className="flex items-start space-x-2">
               <Shield className="h-4 w-4 text-clarity-blue-600 mt-0.5 flex-shrink-0" />
               <div>
