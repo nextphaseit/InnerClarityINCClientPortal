@@ -125,33 +125,6 @@ export default function SignUpPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const createUserProfile = async (userId: string) => {
-    try {
-      const { error } = await supabase.from("profiles").upsert(
-        {
-          id: userId,
-          full_name: formData.fullName.trim(),
-          date_of_birth: formData.dateOfBirth || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "id",
-        },
-      )
-
-      if (error) {
-        console.error("Error creating user profile:", error)
-        throw error
-      }
-
-      console.log("User profile created successfully")
-    } catch (error) {
-      console.error("Failed to create user profile:", error)
-      throw error
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -164,6 +137,7 @@ export default function SignUpPage() {
 
     try {
       // Sign up the user with Supabase Auth
+      // The database trigger will automatically create the profile
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -193,16 +167,7 @@ export default function SignUpPage() {
 
       if (data.user) {
         console.log("User created successfully:", data.user.id)
-
-        // Create user profile record
-        try {
-          await createUserProfile(data.user.id)
-          console.log("Profile created successfully")
-        } catch (profileError) {
-          console.error("Profile creation failed:", profileError)
-          // Continue with success flow even if profile creation fails
-          // The profile can be created later when user logs in
-        }
+        console.log("Profile will be created automatically by database trigger")
 
         setIsSuccess(true)
 
