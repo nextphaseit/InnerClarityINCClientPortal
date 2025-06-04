@@ -1,175 +1,180 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
 import {
-  Home,
+  LayoutDashboard,
   User,
   Calendar,
   CreditCard,
   MessageSquare,
   FileText,
-  FileUp,
+  FolderOpen,
   CalendarDays,
   Activity,
   Shield,
   LogOut,
   Menu,
   X,
-  ChevronRight,
-  Sparkles,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 
-interface NavItemProps {
-  href: string
-  icon: React.ElementType
-  label: string
-  isActive: boolean
-  onClick?: () => void
-}
-
-const NavItem = ({ href, icon: Icon, label, isActive, onClick }: NavItemProps) => (
-  <Link
-    href={href}
-    onClick={onClick}
-    className={cn(
-      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-      isActive
-        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
-        : "text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-white",
-    )}
-  >
-    <Icon className={cn("h-5 w-5", isActive ? "text-white" : "text-slate-500 dark:text-slate-400")} />
-    <span>{label}</span>
-    {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white" />}
-  </Link>
-)
+const navigationItems = [
+  {
+    name: "Dashboard",
+    href: "/portal/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    name: "Profile",
+    href: "/portal/profile",
+    icon: User,
+  },
+  {
+    name: "Appointments",
+    href: "/portal/appointments",
+    icon: Calendar,
+  },
+  {
+    name: "Billing",
+    href: "/portal/billing",
+    icon: CreditCard,
+  },
+  {
+    name: "Messages",
+    href: "/portal/messages",
+    icon: MessageSquare,
+  },
+  {
+    name: "Forms",
+    href: "/portal/forms",
+    icon: FileText,
+  },
+  {
+    name: "Documents",
+    href: "/portal/documents",
+    icon: FolderOpen,
+  },
+  {
+    name: "Calendar",
+    href: "/portal/calendar",
+    icon: CalendarDays,
+  },
+  {
+    name: "Health Log",
+    href: "/portal/health-log",
+    icon: Activity,
+  },
+  {
+    name: "Security",
+    href: "/portal/security",
+    icon: Shield,
+  },
+]
 
 export function SidebarNavigation() {
-  const pathname = usePathname()
-  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
+  const pathname = usePathname()
 
-  // Handle hydration mismatch
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut()
-      router.push("/auth/login")
-    } catch (error) {
-      console.error("Error signing out:", error)
-    }
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen)
   }
 
-  const navigationItems = [
-    { href: "/portal/dashboard", icon: Home, label: "Dashboard" },
-    { href: "/portal/profile", icon: User, label: "Profile" },
-    { href: "/portal/appointments", icon: Calendar, label: "Appointments" },
-    { href: "/portal/billing", icon: CreditCard, label: "Billing" },
-    { href: "/portal/messages", icon: MessageSquare, label: "Messages" },
-    { href: "/portal/forms", icon: FileText, label: "Forms" },
-    { href: "/portal/documents", icon: FileUp, label: "Documents" },
-    { href: "/portal/calendar", icon: CalendarDays, label: "Calendar" },
-    { href: "/portal/health-log", icon: Activity, label: "Health Log" },
-    { href: "/portal/security", icon: Shield, label: "Security" },
-  ]
-
-  // Don't render anything during SSR to prevent hydration mismatch
-  if (!isMounted) {
-    return null
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false)
   }
 
   return (
     <>
       {/* Mobile menu button */}
-      <div className="fixed top-4 left-4 z-50 lg:hidden">
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/50 dark:border-slate-700/50 text-slate-700 dark:text-slate-200 backdrop-blur-sm"
-          aria-label="Toggle menu"
+      <div className="lg:hidden fixed top-4 left-4 z-50">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={toggleMobileMenu}
+          className="bg-white/90 backdrop-blur-sm border-slate-200 shadow-lg"
         >
-          {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+          {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
       </div>
 
+      {/* Mobile backdrop */}
+      {isMobileMenuOpen && <div className="lg:hidden fixed inset-0 bg-black/50 z-40" onClick={closeMobileMenu} />}
+
       {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:shadow-none",
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-        )}
+      <div
+        className={`
+          fixed top-0 left-0 z-40 h-full w-64 bg-white/95 backdrop-blur-sm border-r border-slate-200 shadow-xl
+          transform transition-transform duration-300 ease-in-out
+          lg:translate-x-0 lg:static lg:z-auto
+          ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
       >
-        <div className="flex flex-col h-full">
-          {/* Logo/Title */}
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-md">
-                <Sparkles className="h-6 w-6" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-slate-900 dark:text-white">Inner Clarity Inc</h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Patient Portal</p>
-              </div>
+        {/* Header */}
+        <div className="flex items-center justify-center h-16 px-6 border-b border-slate-200 bg-gradient-to-r from-blue-600 to-indigo-600">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+              <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded"></div>
             </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-4 space-y-1.5">
-            {navigationItems.map((item) => (
-              <NavItem
-                key={item.href}
-                href={item.href}
-                icon={item.icon}
-                label={item.label}
-                isActive={pathname === item.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-              />
-            ))}
-          </nav>
-
-          {/* User & Logout */}
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-            <div className="mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center text-white">
-                  <User className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 dark:text-white truncate">Patient Portal</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Active Session</p>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300 transition-colors"
-            >
-              <LogOut className="h-5 w-5" />
-              <span>Sign Out</span>
-              <ChevronRight className="h-4 w-4 ml-auto" />
-            </button>
+            <h1 className="text-lg font-bold text-white">Inner Clarity Inc</h1>
           </div>
         </div>
-      </aside>
 
-      {/* Mobile overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-slate-900/50 backdrop-blur-sm lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+        {/* Navigation */}
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          {navigationItems.map((item) => {
+            const isActive = pathname === item.href
+            const Icon = item.icon
+
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={closeMobileMenu}
+                className={`
+                  flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group
+                  ${
+                    isActive
+                      ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }
+                `}
+              >
+                <Icon
+                  className={`
+                    mr-3 h-5 w-5 transition-colors duration-200
+                    ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"}
+                  `}
+                />
+                {item.name}
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* User section */}
+        <div className="border-t border-slate-200 p-4">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+              <User className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-900 truncate">Patient Portal</p>
+              <p className="text-xs text-slate-500 truncate">Secure Access</p>
+            </div>
+          </div>
+
+          <Link
+            href="/auth/login"
+            onClick={closeMobileMenu}
+            className="flex items-center w-full px-4 py-2 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors duration-200"
+          >
+            <LogOut className="mr-3 h-4 w-4" />
+            Sign Out
+          </Link>
+        </div>
+      </div>
     </>
   )
 }
