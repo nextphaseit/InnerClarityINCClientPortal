@@ -85,9 +85,7 @@ export default function HomePage() {
             <Shield className="mr-2 h-4 w-4" />
             HIPAA Compliant & Secure
           </Badge>
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            Unlock Your <span className="text-clarity-blue-600">Inner Peace</span>
-          </h1>
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">Unlock Your Inner Peace</h1>
           <p className="text-lg md:text-xl text-gray-600 mb-4 max-w-3xl mx-auto">Where Healing Begins, Peace Follows</p>
           <p className="text-lg text-gray-600 mb-8 max-w-3xl mx-auto">
             Access your secure patient portal to manage appointments, communicate with your care team, and track your
