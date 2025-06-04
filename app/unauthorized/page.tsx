@@ -1,27 +1,27 @@
 "use client"
 
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertTriangle, Home, LogIn } from "lucide-react"
 import Image from "next/image"
+import { useAuth } from "@/components/auth-provider"
 
 export default function UnauthorizedPage() {
-  const { data: session, status } = useSession()
+  const { user, status } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     // Redirect authenticated users to appropriate dashboard
-    if (status === "authenticated" && session?.user) {
-      if (session.user.role === "admin") {
+    if (status === "authenticated" && user) {
+      if (user.role === "admin") {
         router.push("/admin")
-      } else if (session.user.role === "patient") {
+      } else if (user.role === "patient") {
         router.push("/dashboard")
       }
     }
-  }, [session, status, router])
+  }, [user, status, router])
 
   const handleSignIn = () => {
     router.push("/auth/signin")
@@ -45,7 +45,7 @@ export default function UnauthorizedPage() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <Image
-              src="/placeholder.svg?height=80&width=200&text=Inner+Clarity+Inc."
+              src="/images/inner-clarity-logo.png"
               alt="Inner Clarity Inc."
               width={200}
               height={80}
@@ -65,7 +65,7 @@ export default function UnauthorizedPage() {
             {status === "unauthenticated" ? (
               <p>Please sign in with the appropriate account to access this resource.</p>
             ) : (
-              <p>Your current account ({session?.user?.email}) does not have the required permissions for this page.</p>
+              <p>Your current account ({user?.email}) does not have the required permissions for this page.</p>
             )}
           </div>
 
@@ -83,9 +83,9 @@ export default function UnauthorizedPage() {
                 </Button>
                 <Button
                   onClick={() => {
-                    if (session?.user?.role === "admin") {
+                    if (user?.role === "admin") {
                       router.push("/admin")
-                    } else if (session?.user?.role === "patient") {
+                    } else if (user?.role === "patient") {
                       router.push("/dashboard")
                     } else {
                       router.push("/")

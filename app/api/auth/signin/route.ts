@@ -1,56 +1,45 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { authenticate, createSession } from "@/lib/auth-custom"
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-export async function POST(request: NextRequest) {
-  try {
-    const { email, password } = await request.json()
-
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
-    }
-
-    const user = await authenticate(email, password)
-
-    if (!user) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
-    }
-
-    await createSession(user)
-
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
-    })
-  } catch (error) {
-    console.error("Sign in error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
+// Force dynamic rendering
+export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
-    // Handle GET requests for signin page
-    const url = new URL(request.url)
-    const callbackUrl = url.searchParams.get("callbackUrl") || "/dashboard"
-    const error = url.searchParams.get("error")
+    const searchParams = request.nextUrl.searchParams
+    const provider = searchParams.get("provider") || "auth0"
+    const callbackUrl = searchParams.get("callbackUrl") || "/"
 
-    // Redirect to the signin page with parameters
-    const signinUrl = new URL("/auth/signin", request.url)
-    if (callbackUrl) {
-      signinUrl.searchParams.set("callbackUrl", callbackUrl)
-    }
-    if (error) {
-      signinUrl.searchParams.set("error", error)
+    // Redirect to appropriate auth provider
+    if (provider === "auth0") {
+      return NextResponse.redirect(
+        new URL(`/auth/signin?provider=auth0&callbackUrl=${encodeURIComponent(callbackUrl)}`, request.url),
+      )
+    } else if (provider === "azure-ad") {
+      return NextResponse.redirect(
+        new URL(`/auth/signin?provider=azure-ad&callbackUrl=${encodeURIComponent(callbackUrl)}`, request.url),
+      )
     }
 
-    return NextResponse.redirect(signinUrl)
+    // Default to auth0
+    return NextResponse.redirect(
+      new URL(`/auth/signin?provider=auth0&callbackUrl=${encodeURIComponent(callbackUrl)}`, request.url),
+    )
   } catch (error) {
-    console.error("Signin GET error:", error)
-    return NextResponse.redirect(new URL("/auth/signin", request.url))
+    console.error("Auth signin route error:", error)
+    return NextResponse.redirect(new URL("/auth/error?error=Configuration", request.url))
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { provider = "auth0", callbackUrl = "/" } = body
+
+    // Handle sign-in logic here
+    return NextResponse.json({ success: true, provider, callbackUrl })
+  } catch (error) {
+    console.error("Auth signin POST error:", error)
+    return NextResponse.json({ error: "Sign-in failed" }, { status: 500 })
   }
 }

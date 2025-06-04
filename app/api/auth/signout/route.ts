@@ -1,12 +1,30 @@
 import { NextResponse } from "next/server"
-import { destroySession } from "@/lib/auth-custom"
+import type { NextRequest } from "next/server"
 
-export async function POST() {
+// Force dynamic rendering
+export const dynamic = "force-dynamic"
+
+export async function POST(request: NextRequest) {
   try {
-    await destroySession()
-    return NextResponse.json({ success: true })
+    // Handle sign-out logic here
+    // In a real implementation, you would clear the session/cookies
+
+    const response = NextResponse.json({ success: true })
+
+    // Clear any auth cookies
+    response.cookies.delete("next-auth.session-token")
+    response.cookies.delete("__Secure-next-auth.session-token")
+    response.cookies.delete("next-auth.csrf-token")
+    response.cookies.delete("__Host-next-auth.csrf-token")
+
+    return response
   } catch (error) {
     console.error("Sign out error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ error: "Sign-out failed" }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  // Redirect GET requests to POST for sign-out
+  return NextResponse.redirect(new URL("/", request.url))
 }
