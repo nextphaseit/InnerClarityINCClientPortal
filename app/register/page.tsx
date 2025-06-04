@@ -182,6 +182,8 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
+      console.log("📝 Submitting registration form...")
+
       const response = await fetch("/api/register", {
         method: "POST",
         headers: {
@@ -195,16 +197,36 @@ export default function RegisterPage() {
         }),
       })
 
-      const data = await response.json()
+      console.log("📡 Registration response status:", response.status)
+
+      // Handle empty response
+      let data: any = {}
+      const responseText = await response.text()
+
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText)
+        } catch (parseError) {
+          console.error("❌ Failed to parse registration response:", parseError)
+          throw new Error("Invalid server response format")
+        }
+      } else {
+        console.error("❌ Empty response from registration API")
+        throw new Error("Empty response from server")
+      }
+
+      console.log("📄 Registration response data:", data)
 
       if (!response.ok) {
-        throw new Error(data.error || "Registration failed")
+        throw new Error(data.error || data.details || `Registration failed with status ${response.status}`)
       }
+
+      console.log("✅ Registration successful")
 
       // Redirect to signin with success message
       router.push("/auth/signin?message=Registration successful! Please sign in.")
     } catch (error) {
-      console.error("Registration error:", error)
+      console.error("❌ Registration error:", error)
       setErrors({
         general: error instanceof Error ? error.message : "Registration failed. Please try again.",
       })
@@ -213,8 +235,34 @@ export default function RegisterPage() {
     }
   }
 
-  const handleAuth0Login = () => {
-    router.push("/api/auth/signin?provider=auth0")
+  const handleAuth0Login = async () => {
+    try {
+      console.log("🔑 Attempting Auth0 login...")
+      setErrors((prev) => ({ ...prev, general: undefined }))
+
+      // Use NextAuth signIn instead of custom API
+      const { signIn } = await import("next-auth/react")
+
+      const result = await signIn("auth0", {
+        redirect: false,
+        callbackUrl: "/dashboard",
+      })
+
+      if (result?.error) {
+        console.error("❌ Auth0 sign-in error:", result.error)
+        setErrors({
+          general: `Auth0 sign-in failed: ${result.error}`,
+        })
+      } else if (result?.url) {
+        console.log("✅ Auth0 sign-in successful, redirecting...")
+        router.push(result.url)
+      }
+    } catch (error) {
+      console.error("❌ Auth0 login exception:", error)
+      setErrors({
+        general: `Auth0 login failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      })
+    }
   }
 
   return (
