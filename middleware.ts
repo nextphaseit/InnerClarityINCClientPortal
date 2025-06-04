@@ -98,4 +98,49 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/patient") ||
       pathname.startsWith("/appointments") ||
       pathname.startsWith("/billing") ||
-      pathname.startsWith("/messages")\
+      pathname.startsWith("/messages") ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/documents") ||
+      pathname.startsWith("/forms") ||
+      pathname.startsWith("/profile")
+    ) {
+      if (token.role !== "patient") {
+        console.log("❌ Access denied: Admin trying to access patient route")
+        return NextResponse.redirect(new URL("/unauthorized?reason=patient_required", request.url))
+      }
+    }
+
+    // Add tenant information to headers for API routes
+    if (pathname.startsWith("/api") && token.tenantId) {
+      response.headers.set("X-Tenant-ID", token.tenantId as string)
+      response.headers.set("X-User-Role", token.role as string)
+    }
+
+    // Redirect authenticated users away from auth pages to their dashboard
+    if (pathname === "/" || pathname === "/auth/signin" || pathname === "/register") {
+      if (token.role === "admin") {
+        console.log("✅ Redirecting authenticated admin to admin dashboard")
+        return NextResponse.redirect(new URL("/admin", request.url))
+      } else if (token.role === "patient") {
+        console.log("✅ Redirecting authenticated patient to patient dashboard")
+        return NextResponse.redirect(new URL("/dashboard", request.url))
+      }
+    }
+  }
+
+  return response
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api/auth (NextAuth.js routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - images (public images)
+     */
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|images).*)",
+  ],
+}
