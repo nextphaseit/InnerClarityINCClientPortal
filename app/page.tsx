@@ -86,7 +86,7 @@ export default function HomePage() {
             HIPAA Compliant & Secure
           </Badge>
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            Your Mental Health Journey, <span className="text-clarity-blue-600">Simplified</span>
+            Unlock Your <span className="text-clarity-blue-600">Inner Peace</span>
           </h1>
           <p className="text-lg md:text-xl text-gray-600 mb-4 max-w-3xl mx-auto">Where Healing Begins, Peace Follows</p>
           <p className="text-lg text-gray-600 mb-8 max-w-3xl mx-auto">
