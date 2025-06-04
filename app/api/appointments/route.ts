@@ -1,61 +1,72 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { getToken } from "next-auth/jwt"
 
-// Mock appointments data with tenant information
-const mockAppointments = [
+// Production-ready appointments data structure
+interface Appointment {
+  id: string
+  patient: string
+  provider: string
+  datetime: string
+  status: "Upcoming" | "Confirmed" | "Completed" | "Cancelled"
+  tenantId: string
+  type?: string
+  notes?: string
+}
+
+// Mock data for development - replace with database in production
+const mockAppointments: Appointment[] = [
   {
-    id: "apt-1",
-    patient: "Jayda Smith",
+    id: "apt-001",
+    patient: "Current User",
     provider: "Dr. Sarah Johnson",
-    datetime: "2024-06-15T10:30:00",
+    datetime: "2024-06-15T10:30:00Z",
     status: "Upcoming",
     tenantId: "inner-clarity",
+    type: "Initial Consultation",
   },
   {
-    id: "apt-2",
-    patient: "Michael Johnson",
+    id: "apt-002",
+    patient: "Current User",
     provider: "Dr. Michael Chen",
-    datetime: "2024-06-16T14:00:00",
+    datetime: "2024-06-20T14:00:00Z",
     status: "Confirmed",
     tenantId: "inner-clarity",
-  },
-  {
-    id: "apt-3",
-    patient: "Sarah Wilson",
-    provider: "Dr. Sarah Johnson",
-    datetime: "2024-06-10T09:00:00",
-    status: "Completed",
-    tenantId: "inner-clarity",
-  },
-  {
-    id: "apt-4",
-    patient: "External Patient",
-    provider: "Dr. Other",
-    datetime: "2024-06-12T11:00:00",
-    status: "Upcoming",
-    tenantId: "other-org",
+    type: "Follow-up Session",
   },
 ]
 
 export async function GET(request: NextRequest) {
   try {
-    // Default to inner-clarity if no tenantId is provided
-    let tenantId = "inner-clarity"
-
-    try {
-      const { searchParams } = new URL(request.url)
-      const paramTenantId = searchParams.get("tenantId")
-      if (paramTenantId) {
-        tenantId = paramTenantId
-      }
-    } catch (error) {
-      console.error("Error parsing URL:", error)
-      // Continue with default tenantId
+    // Verify authentication
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+    if (!token) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Filter appointments by tenantId
-    const filteredAppointments = mockAppointments.filter((appointment) => appointment.tenantId === tenantId)
+    // Get tenant ID from token or headers
+    const tenantId = token.tenantId || request.headers.get("X-Tenant-ID") || "inner-clarity"
 
-    // Return appointments with proper headers
+    // In production, replace with actual database query
+    // const appointments = await db.appointments.findMany({
+    //   where: { tenantId, userId: token.sub },
+    //   orderBy: { datetime: 'asc' }
+    // })
+
+    // Filter appointments by tenant and format for client
+    const filteredAppointments = mockAppointments
+      .filter((appointment) => appointment.tenantId === tenantId)
+      .map((appointment) => ({
+        id: appointment.id,
+        date: appointment.datetime.split("T")[0],
+        time: new Date(appointment.datetime).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        provider: appointment.provider,
+        status: appointment.status,
+        type: appointment.type,
+      }))
+
     return NextResponse.json(
       { success: true, appointments: filteredAppointments },
       { status: 200, headers: { "Content-Type": "application/json" } },
@@ -71,60 +82,65 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+    if (!token) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
+    }
+
     let body
     try {
       body = await request.json()
     } catch (error) {
-      console.error("Error parsing request body:", error)
       return NextResponse.json({ success: false, error: "Invalid request body" }, { status: 400 })
     }
 
+    const { patientName, provider, datetime, type, notes } = body
+
     // Validate required fields
-    const { patientName, provider, datetime, status } = body
-
-    if (!patientName || !provider || !datetime) {
-      return NextResponse.json(
-        { success: false, error: "Missing required fields: patientName, provider, and datetime are required" },
-        { status: 400 },
-      )
+    if (!provider || !datetime) {
+      return NextResponse.json({ success: false, error: "Provider and datetime are required" }, { status: 400 })
     }
 
-    // Validate datetime format
-    let appointmentDate
-    try {
-      appointmentDate = new Date(datetime)
-      if (isNaN(appointmentDate.getTime())) {
-        throw new Error("Invalid date")
-      }
-    } catch (error) {
-      return NextResponse.json({ success: false, error: "Invalid datetime format" }, { status: 400 })
+    // Validate datetime
+    const appointmentDate = new Date(datetime)
+    if (isNaN(appointmentDate.getTime()) || appointmentDate < new Date()) {
+      return NextResponse.json({ success: false, error: "Invalid or past datetime" }, { status: 400 })
     }
 
-    // Check if appointment is in the past
-    if (appointmentDate < new Date()) {
-      return NextResponse.json({ success: false, error: "Cannot schedule appointments in the past" }, { status: 400 })
-    }
+    // In production, save to database
+    // const newAppointment = await db.appointments.create({
+    //   data: {
+    //     userId: token.sub,
+    //     provider,
+    //     datetime: appointmentDate,
+    //     type,
+    //     notes,
+    //     tenantId: token.tenantId,
+    //     status: 'Upcoming'
+    //   }
+    // })
 
-    // Create a new appointment (in a real app, this would be saved to a database)
     const newAppointment = {
       id: `apt-${Date.now()}`,
-      patient: patientName.trim(),
+      patient: token.name || "Current User",
       provider: provider.trim(),
-      datetime: datetime,
-      status: status || "Upcoming",
-      tenantId: "inner-clarity", // In production, get from session
+      datetime: appointmentDate.toISOString(),
+      status: "Upcoming" as const,
+      tenantId: token.tenantId || "inner-clarity",
+      type: type?.trim(),
+      notes: notes?.trim(),
       createdAt: new Date().toISOString(),
     }
 
-    // Log the appointment (in production, save to database)
-    console.log("New appointment scheduled:", newAppointment)
+    console.log("New appointment scheduled:", { id: newAppointment.id, provider, datetime })
 
     return NextResponse.json(
       { success: true, message: "Appointment scheduled successfully", data: newAppointment },
       { status: 201 },
     )
   } catch (error) {
-    console.error("Error in appointments POST API:", error)
+    console.error("Error scheduling appointment:", error)
     return NextResponse.json({ success: false, error: "Failed to schedule appointment" }, { status: 500 })
   }
 }

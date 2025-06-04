@@ -1,202 +1,359 @@
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Shield, Lock, Eye, Heart, Users, Calendar } from "lucide-react"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ThemeToggle } from "@/components/theme-toggle"
+import {
+  Shield,
+  Heart,
+  Users,
+  Calendar,
+  MessageSquare,
+  FileText,
+  CreditCard,
+  Lock,
+  CheckCircle,
+  Star,
+  ArrowRight,
+  Phone,
+  Mail,
+  MapPin,
+} from "lucide-react"
 
 export default function HomePage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    // Redirect authenticated users to their appropriate dashboard
+    if (status === "authenticated" && session?.user) {
+      if (session.user.role === "admin") {
+        router.push("/admin")
+      } else if (session.user.role === "patient") {
+        router.push("/dashboard")
+      }
+    }
+  }, [session, status, router])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-clarity-blue-500"></div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50">
       {/* Header */}
-      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm sticky top-0 z-50">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-clarity-blue-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-end items-center h-16">
-            <Button
-              asChild
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
-            >
-              <Link href="/auth/signin">Sign In</Link>
-            </Button>
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-3">
+              <Image
+                src="/placeholder.svg?height=40&width=40&text=IC"
+                alt="Inner Clarity Inc."
+                width={40}
+                height={40}
+                className="rounded-lg"
+              />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Inner Clarity Inc.</h1>
+                <p className="text-sm text-clarity-blue-600">Mental Health Services</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <ThemeToggle />
+              <Button asChild>
+                <Link href="/auth/signin">Sign In</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="mb-8">
-            <Image
-              src="/images/inner-clarity-logo.png"
-              alt="Inner Clarity Inc."
-              width={120}
-              height={120}
-              className="h-30 w-auto mx-auto mb-6"
-            />
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-8">
-              Where Healing Begins, Peace Follows
-            </h2>
-          </div>
-
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-            Your Mental Health Journey,{" "}
-            <span className="bg-gradient-to-r from-clarity-blue-600 to-clarity-green-600 bg-clip-text text-transparent">
-              Simplified
-            </span>
+        <div className="max-w-7xl mx-auto text-center">
+          <Badge variant="outline" className="mb-6 bg-white/50 text-clarity-blue-700 border-clarity-blue-200">
+            <Shield className="mr-2 h-4 w-4" />
+            HIPAA Compliant & Secure
+          </Badge>
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            Your Mental Health Journey, <span className="text-clarity-blue-600">Simplified</span>
           </h1>
-
-          <p className="text-xl text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-            A secure, HIPAA-compliant portal connecting clients with mental health providers. Manage appointments,
-            communicate safely, and track your progress all in one place.
+          <p className="text-lg md:text-xl text-gray-600 mb-4 max-w-3xl mx-auto">Where Healing Begins, Peace Follows</p>
+          <p className="text-lg text-gray-600 mb-8 max-w-3xl mx-auto">
+            Access your secure patient portal to manage appointments, communicate with your care team, and track your
+            mental health journey—all in one HIPAA-compliant platform.
           </p>
-
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild size="lg" className="text-lg px-8 py-3">
-              <Link href="/auth/signin">Get Started</Link>
+            <Button size="lg" asChild className="bg-clarity-blue-600 hover:bg-clarity-blue-700">
+              <Link href="/register">
+                Get Started Today
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="text-lg px-8 py-3">
-              <Link href="#features">Learn More</Link>
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/auth/signin">Sign In to Portal</Link>
             </Button>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-white/50 dark:bg-gray-800/50">
-        <div className="max-w-7xl mx-auto">
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Everything You Need for Mental Health Care
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              Our comprehensive platform provides tools for both clients and providers to ensure the best possible care
-              experience.
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Comprehensive Mental Health Care</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Our secure portal provides everything you need to manage your mental health journey with confidence and
+              privacy.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-8 text-center">
-                <Calendar className="h-12 w-12 text-clarity-blue-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Easy Scheduling</h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Book, reschedule, and manage appointments with your mental health provider through our intuitive
-                  calendar system.
-                </p>
-              </CardContent>
+            {/* Patient Features */}
+            <Card className="border-clarity-blue-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <Calendar className="h-8 w-8 text-clarity-blue-600 mb-2" />
+                <CardTitle>Appointment Management</CardTitle>
+                <CardDescription>Schedule, reschedule, and manage your therapy sessions with ease.</CardDescription>
+              </CardHeader>
             </Card>
 
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-8 text-center">
-                <Shield className="h-12 w-12 text-clarity-green-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">HIPAA Compliant</h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Your health information is protected with enterprise-grade security and full HIPAA compliance.
-                </p>
-              </CardContent>
+            <Card className="border-clarity-green-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <MessageSquare className="h-8 w-8 text-clarity-green-600 mb-2" />
+                <CardTitle>Secure Messaging</CardTitle>
+                <CardDescription>
+                  Communicate directly with your care team through encrypted, HIPAA-compliant messaging.
+                </CardDescription>
+              </CardHeader>
             </Card>
 
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-8 text-center">
-                <Lock className="h-12 w-12 text-clarity-blue-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Secure Messaging</h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Communicate safely with your provider through encrypted messaging with full audit trails.
-                </p>
-              </CardContent>
+            <Card className="border-clarity-blue-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <FileText className="h-8 w-8 text-clarity-blue-600 mb-2" />
+                <CardTitle>Document Management</CardTitle>
+                <CardDescription>
+                  Securely upload and access your treatment documents, forms, and resources.
+                </CardDescription>
+              </CardHeader>
             </Card>
 
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-8 text-center">
-                <Users className="h-12 w-12 text-clarity-green-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Provider Tools</h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Comprehensive admin dashboard for providers to manage clients, appointments, and documentation.
-                </p>
-              </CardContent>
+            <Card className="border-clarity-green-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CreditCard className="h-8 w-8 text-clarity-green-600 mb-2" />
+                <CardTitle>Billing & Payments</CardTitle>
+                <CardDescription>
+                  View invoices, make payments, and manage your billing information securely.
+                </CardDescription>
+              </CardHeader>
             </Card>
 
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-8 text-center">
-                <Heart className="h-12 w-12 text-clarity-blue-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Progress Tracking</h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Monitor your mental health journey with integrated forms, assessments, and progress reports.
-                </p>
-              </CardContent>
+            <Card className="border-clarity-blue-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <Heart className="h-8 w-8 text-clarity-blue-600 mb-2" />
+                <CardTitle>Progress Tracking</CardTitle>
+                <CardDescription>
+                  Monitor your mental health journey with personalized insights and progress reports.
+                </CardDescription>
+              </CardHeader>
             </Card>
 
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-8 text-center">
-                <Eye className="h-12 w-12 text-clarity-green-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Audit Trail</h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Complete transparency with detailed audit logs for all activities and access to your health
-                  information.
-                </p>
-              </CardContent>
+            <Card className="border-clarity-green-200 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <Users className="h-8 w-8 text-clarity-green-600 mb-2" />
+                <CardTitle>Care Team Access</CardTitle>
+                <CardDescription>
+                  Connect with your therapists, psychiatrists, and support staff in one place.
+                </CardDescription>
+              </CardHeader>
             </Card>
           </div>
         </div>
       </section>
 
       {/* Security Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-8">
-            Your Privacy is Our Priority
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-            <div className="space-y-4">
-              <Lock className="h-16 w-16 text-clarity-blue-500 mx-auto" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">End-to-End Encryption</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                All data is encrypted in transit and at rest using industry-standard protocols.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <Shield className="h-16 w-16 text-clarity-green-500 mx-auto" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">HIPAA Compliance</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Full compliance with HIPAA regulations and healthcare privacy standards.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <Eye className="h-16 w-16 text-clarity-blue-500 mx-auto" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Complete Transparency</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Detailed audit logs show exactly who accessed your information and when.
-              </p>
-            </div>
+      <section className="py-20 bg-clarity-blue-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Shield className="h-16 w-16 text-clarity-blue-600 mx-auto mb-6" />
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Your Privacy is Our Priority</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              We maintain the highest standards of security and compliance to protect your sensitive health information.
+            </p>
           </div>
 
-          <Button asChild size="lg" className="text-lg px-8 py-3">
-            <Link href="/auth/signin">Start Your Secure Journey</Link>
-          </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="text-center">
+              <div className="bg-white rounded-full p-4 w-16 h-16 mx-auto mb-4 shadow-sm">
+                <Lock className="h-8 w-8 text-clarity-blue-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">HIPAA Compliant</h3>
+              <p className="text-sm text-gray-600">Full compliance with healthcare privacy regulations</p>
+            </div>
+
+            <div className="text-center">
+              <div className="bg-white rounded-full p-4 w-16 h-16 mx-auto mb-4 shadow-sm">
+                <Shield className="h-8 w-8 text-clarity-green-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">End-to-End Encryption</h3>
+              <p className="text-sm text-gray-600">All data encrypted in transit and at rest</p>
+            </div>
+
+            <div className="text-center">
+              <div className="bg-white rounded-full p-4 w-16 h-16 mx-auto mb-4 shadow-sm">
+                <CheckCircle className="h-8 w-8 text-clarity-blue-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Secure Authentication</h3>
+              <p className="text-sm text-gray-600">Multi-factor authentication and role-based access</p>
+            </div>
+
+            <div className="text-center">
+              <div className="bg-white rounded-full p-4 w-16 h-16 mx-auto mb-4 shadow-sm">
+                <Star className="h-8 w-8 text-clarity-green-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">SOC 2 Certified</h3>
+              <p className="text-sm text-gray-600">Independently verified security controls</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Get in Touch</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Have questions about our services or need technical support? We're here to help.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Card className="text-center">
+              <CardHeader>
+                <Phone className="h-8 w-8 text-clarity-blue-600 mx-auto mb-2" />
+                <CardTitle>Phone Support</CardTitle>
+                <CardDescription>
+                  Call us during business hours
+                  <br />
+                  <span className="font-semibold text-gray-900">(555) 123-4567</span>
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center">
+              <CardHeader>
+                <Mail className="h-8 w-8 text-clarity-green-600 mx-auto mb-2" />
+                <CardTitle>Email Support</CardTitle>
+                <CardDescription>
+                  Send us a message anytime
+                  <br />
+                  <span className="font-semibold text-gray-900">support@innerclarity.com</span>
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center">
+              <CardHeader>
+                <MapPin className="h-8 w-8 text-clarity-blue-600 mx-auto mb-2" />
+                <CardTitle>Office Location</CardTitle>
+                <CardDescription>
+                  Visit us in person
+                  <br />
+                  <span className="font-semibold text-gray-900">123 Wellness Way, Suite 100</span>
+                  <br />
+                  <span className="font-semibold text-gray-900">Mental Health City, MH 12345</span>
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <Image
-                src="/images/inner-clarity-logo.png"
-                alt="Inner Clarity Inc."
-                width={32}
-                height={32}
-                className="h-8 w-auto"
-              />
-              <span className="text-lg font-bold">Inner Clarity Inc.</span>
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="col-span-1 md:col-span-2">
+              <div className="flex items-center space-x-3 mb-4">
+                <Image
+                  src="/placeholder.svg?height=32&width=32&text=IC"
+                  alt="Inner Clarity Inc."
+                  width={32}
+                  height={32}
+                  className="rounded"
+                />
+                <span className="text-xl font-bold">Inner Clarity Inc.</span>
+              </div>
+              <p className="text-gray-400 mb-4 max-w-md">
+                Providing compassionate, evidence-based mental health care through innovative technology and
+                personalized treatment approaches.
+              </p>
+              <div className="flex space-x-4">
+                <Badge variant="outline" className="text-gray-400 border-gray-600">
+                  HIPAA Compliant
+                </Badge>
+                <Badge variant="outline" className="text-gray-400 border-gray-600">
+                  SOC 2 Certified
+                </Badge>
+              </div>
             </div>
 
-            <div className="text-center md:text-right">
-              <p className="text-gray-400 mb-2">© 2025 Inner Clarity Inc. All rights reserved.</p>
-              <p className="text-sm text-gray-500">HIPAA Compliant Mental Health Platform</p>
+            <div>
+              <h3 className="font-semibold mb-4">Quick Links</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>
+                  <Link href="/auth/signin" className="hover:text-white transition-colors">
+                    Patient Portal
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/register" className="hover:text-white transition-colors">
+                    Register
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/auth/signin" className="hover:text-white transition-colors">
+                    Admin Portal
+                  </Link>
+                </li>
+              </ul>
             </div>
+
+            <div>
+              <h3 className="font-semibold mb-4">Legal</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>
+                  <Link href="/privacy" className="hover:text-white transition-colors">
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms" className="hover:text-white transition-colors">
+                    Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/hipaa" className="hover:text-white transition-colors">
+                    HIPAA Notice
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+            <p>&copy; 2024 Inner Clarity Inc. All rights reserved.</p>
           </div>
         </div>
       </footer>
