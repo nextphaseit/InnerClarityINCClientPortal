@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, CreditCard, Download, DollarSign, Calendar, FileText } from "lucide-react"
+import { CreditCard, Download, DollarSign, Calendar, FileText } from "lucide-react"
 import type { User } from "@supabase/supabase-js"
+import { PortalNavigation } from "@/components/portal-navigation"
 
 interface Invoice {
   id: string
@@ -167,197 +167,198 @@ export default function PortalBillingPage() {
   const { totalAmount, paidAmount, unpaidAmount } = calculateTotals()
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Link href="/portal/dashboard" className="inline-flex items-center text-teal-600 hover:text-teal-700 mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Link>
+    <div className="min-h-screen bg-gray-50">
+      <PortalNavigation />
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Billing & Payments</h1>
-              <p className="mt-2 text-gray-600">Manage your invoices and payment history</p>
+      <div className="lg:ml-64 p-6">
+        <div className="max-w-6xl mx-auto">
+          {/* Remove the existing header with Back to Dashboard link */}
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Billing & Payments</h1>
+                <p className="mt-2 text-gray-600">Manage your invoices and payment history</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Keep all the existing content (Summary Cards, Invoices, Payment Information) */}
+          {/* ... rest of the existing content ... */}
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Billed</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${totalAmount.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">All time billing</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Amount Paid</CardTitle>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">${paidAmount.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">Successfully processed</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">${unpaidAmount.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">Requires payment</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Invoices */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Billed</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="h-5 w-5 mr-2" />
+                Invoice History
+              </CardTitle>
+              <CardDescription>View and manage your therapy session invoices</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalAmount.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">All time billing</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Amount Paid</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">${paidAmount.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">Successfully processed</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">${unpaidAmount.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">Requires payment</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Invoices */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <FileText className="h-5 w-5 mr-2" />
-              Invoice History
-            </CardTitle>
-            <CardDescription>View and manage your therapy session invoices</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Desktop Table View */}
-            <div className="hidden md:block">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Invoice #</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Date</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Description</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mockInvoices.map((invoice) => (
-                      <tr key={invoice.id} className="border-b hover:bg-gray-50">
-                        <td className="py-4 px-4 font-mono text-sm">{invoice.invoiceNumber}</td>
-                        <td className="py-4 px-4 text-sm text-gray-600">{formatDate(invoice.date)}</td>
-                        <td className="py-4 px-4 text-sm">{invoice.description}</td>
-                        <td className="py-4 px-4 text-sm font-semibold">${invoice.amount.toFixed(2)}</td>
-                        <td className="py-4 px-4">{getStatusBadge(invoice.status)}</td>
-                        <td className="py-4 px-4">
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm">
-                              <Download className="h-4 w-4 mr-1" />
-                              Download
-                            </Button>
-                            {invoice.status === "Unpaid" && (
-                              <Button
-                                size="sm"
-                                onClick={() => handlePayNow(invoice.id, invoice.amount)}
-                                disabled={paymentLoading === invoice.id}
-                                className="bg-teal-600 hover:bg-teal-700"
-                              >
-                                {paymentLoading === invoice.id ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
-                                ) : (
-                                  <CreditCard className="h-4 w-4 mr-1" />
-                                )}
-                                Pay Now
-                              </Button>
-                            )}
-                          </div>
-                        </td>
+              {/* Desktop Table View */}
+              <div className="hidden md:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Invoice #</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Date</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Description</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-4">
-              {mockInvoices.map((invoice) => (
-                <Card key={invoice.id} className="border">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <p className="font-mono text-sm text-gray-600">{invoice.invoiceNumber}</p>
-                        <p className="text-sm text-gray-500">{formatDate(invoice.date)}</p>
-                      </div>
-                      {getStatusBadge(invoice.status)}
-                    </div>
-
-                    <p className="text-sm mb-3">{invoice.description}</p>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-semibold">${invoice.amount.toFixed(2)}</span>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        {invoice.status === "Unpaid" && (
-                          <Button
-                            size="sm"
-                            onClick={() => handlePayNow(invoice.id, invoice.amount)}
-                            disabled={paymentLoading === invoice.id}
-                            className="bg-teal-600 hover:bg-teal-700"
-                          >
-                            {paymentLoading === invoice.id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            ) : (
-                              <CreditCard className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    {invoice.dueDate && invoice.status !== "Paid" && (
-                      <p className="text-xs text-gray-500 mt-2">Due: {formatDate(invoice.dueDate)}</p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Payment Information */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Payment Information</CardTitle>
-            <CardDescription>Questions about billing or need assistance with payments?</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-medium mb-2">Accepted Payment Methods</h4>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• Credit Cards (Visa, MasterCard, American Express)</li>
-                  <li>• Debit Cards</li>
-                  <li>• HSA/FSA Cards</li>
-                  <li>• Bank Transfer (ACH)</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-medium mb-2">Billing Support</h4>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p>Phone: (555) 123-4567</p>
-                  <p>Email: billing@innerclarity.com</p>
-                  <p>Hours: Mon-Fri 9AM-5PM EST</p>
+                    </thead>
+                    <tbody>
+                      {mockInvoices.map((invoice) => (
+                        <tr key={invoice.id} className="border-b hover:bg-gray-50">
+                          <td className="py-4 px-4 font-mono text-sm">{invoice.invoiceNumber}</td>
+                          <td className="py-4 px-4 text-sm text-gray-600">{formatDate(invoice.date)}</td>
+                          <td className="py-4 px-4 text-sm">{invoice.description}</td>
+                          <td className="py-4 px-4 text-sm font-semibold">${invoice.amount.toFixed(2)}</td>
+                          <td className="py-4 px-4">{getStatusBadge(invoice.status)}</td>
+                          <td className="py-4 px-4">
+                            <div className="flex space-x-2">
+                              <Button variant="outline" size="sm">
+                                <Download className="h-4 w-4 mr-1" />
+                                Download
+                              </Button>
+                              {invoice.status === "Unpaid" && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handlePayNow(invoice.id, invoice.amount)}
+                                  disabled={paymentLoading === invoice.id}
+                                  className="bg-teal-600 hover:bg-teal-700"
+                                >
+                                  {paymentLoading === invoice.id ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
+                                  ) : (
+                                    <CreditCard className="h-4 w-4 mr-1" />
+                                  )}
+                                  Pay Now
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {mockInvoices.map((invoice) => (
+                  <Card key={invoice.id} className="border">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="font-mono text-sm text-gray-600">{invoice.invoiceNumber}</p>
+                          <p className="text-sm text-gray-500">{formatDate(invoice.date)}</p>
+                        </div>
+                        {getStatusBadge(invoice.status)}
+                      </div>
+
+                      <p className="text-sm mb-3">{invoice.description}</p>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold">${invoice.amount.toFixed(2)}</span>
+                        <div className="flex space-x-2">
+                          <Button variant="outline" size="sm">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          {invoice.status === "Unpaid" && (
+                            <Button
+                              size="sm"
+                              onClick={() => handlePayNow(invoice.id, invoice.amount)}
+                              disabled={paymentLoading === invoice.id}
+                              className="bg-teal-600 hover:bg-teal-700"
+                            >
+                              {paymentLoading === invoice.id ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              ) : (
+                                <CreditCard className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {invoice.dueDate && invoice.status !== "Paid" && (
+                        <p className="text-xs text-gray-500 mt-2">Due: {formatDate(invoice.dueDate)}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Information */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Payment Information</CardTitle>
+              <CardDescription>Questions about billing or need assistance with payments?</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-medium mb-2">Accepted Payment Methods</h4>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Credit Cards (Visa, MasterCard, American Express)</li>
+                    <li>• Debit Cards</li>
+                    <li>• HSA/FSA Cards</li>
+                    <li>• Bank Transfer (ACH)</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">Billing Support</h4>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p>Phone: (555) 123-4567</p>
+                    <p>Email: billing@innerclarity.com</p>
+                    <p>Hours: Mon-Fri 9AM-5PM EST</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

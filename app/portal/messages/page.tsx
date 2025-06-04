@@ -4,9 +4,9 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { supabase } from "@/lib/supabase"
-import { ArrowLeft, Send, MessageCircle, Clock, User, Paperclip } from "lucide-react"
+import { Send, MessageCircle, Clock, User, Paperclip } from "lucide-react"
+import { PortalNavigation } from "@/components/portal-navigation"
 
 interface Message {
   id: string
@@ -238,151 +238,143 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-blue-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/portal/dashboard"
-                className="flex items-center text-gray-600 hover:text-teal-600 transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5 mr-2" />
-                Back to Dashboard
-              </Link>
-              <div className="h-6 w-px bg-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900 flex items-center">
-                <MessageCircle className="h-6 w-6 mr-2 text-teal-600" />
-                Messages
-              </h1>
-            </div>
-            <div className="text-sm text-gray-500">Welcome, {user?.email}</div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <PortalNavigation />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="flex h-[600px]">
-            {/* Message Threads Sidebar */}
-            <div className="w-1/3 border-r border-gray-200 bg-gray-50">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
+      <div className="lg:ml-64 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              <MessageCircle className="h-8 w-8 mr-3 text-teal-600" />
+              Messages
+            </h1>
+            <p className="text-gray-600">Secure communication with your care team</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="flex h-[600px]">
+              {/* Message Threads Sidebar */}
+              <div className="w-1/3 border-r border-gray-200 bg-gray-50">
+                <div className="p-4 border-b border-gray-200">
+                  <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
+                </div>
+
+                <div className="overflow-y-auto h-full">
+                  {messageThreads.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">
+                      <MessageCircle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                      <p>No messages yet</p>
+                    </div>
+                  ) : (
+                    messageThreads.map((thread) => (
+                      <button
+                        key={thread.id}
+                        onClick={() => setSelectedThread(thread.id)}
+                        className={`w-full p-4 text-left border-b border-gray-200 hover:bg-white transition-colors ${
+                          selectedThread === thread.id ? "bg-white border-l-4 border-l-teal-500" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-medium text-gray-900 truncate">{thread.subject}</h3>
+                            <p className="text-xs text-gray-500 mt-1 truncate">
+                              {thread.messages[thread.messages.length - 1]?.content}
+                            </p>
+                            <div className="flex items-center mt-2 text-xs text-gray-400">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {formatMessageTime(thread.lastMessage)}
+                            </div>
+                          </div>
+                          {thread.unreadCount > 0 && (
+                            <span className="bg-teal-500 text-white text-xs rounded-full px-2 py-1 ml-2">
+                              {thread.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
 
-              <div className="overflow-y-auto h-full">
-                {messageThreads.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    <MessageCircle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                    <p>No messages yet</p>
-                  </div>
-                ) : (
-                  messageThreads.map((thread) => (
-                    <button
-                      key={thread.id}
-                      onClick={() => setSelectedThread(thread.id)}
-                      className={`w-full p-4 text-left border-b border-gray-200 hover:bg-white transition-colors ${
-                        selectedThread === thread.id ? "bg-white border-l-4 border-l-teal-500" : ""
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-medium text-gray-900 truncate">{thread.subject}</h3>
-                          <p className="text-xs text-gray-500 mt-1 truncate">
-                            {thread.messages[thread.messages.length - 1]?.content}
-                          </p>
-                          <div className="flex items-center mt-2 text-xs text-gray-400">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {formatMessageTime(thread.lastMessage)}
+              {/* Message Content */}
+              <div className="flex-1 flex flex-col">
+                {selectedThreadData ? (
+                  <>
+                    {/* Thread Header */}
+                    <div className="p-4 border-b border-gray-200 bg-gray-50">
+                      <h3 className="text-lg font-semibold text-gray-900">{selectedThreadData.subject}</h3>
+                    </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {selectedThreadData.messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex ${message.isFromStaff ? "justify-start" : "justify-end"}`}
+                        >
+                          <div
+                            className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
+                              message.isFromStaff ? "bg-gray-100 text-gray-900" : "bg-teal-500 text-white"
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2 mb-1">
+                              <User className="h-4 w-4" />
+                              <span className="text-sm font-medium">{message.staffName}</span>
+                              {message.isFromStaff && <span className="text-xs opacity-75">{message.staffRole}</span>}
+                            </div>
+                            <p className="text-sm">{message.content}</p>
+                            <div className="text-xs opacity-75 mt-2">{formatMessageTime(message.timestamp)}</div>
                           </div>
                         </div>
-                        {thread.unreadCount > 0 && (
-                          <span className="bg-teal-500 text-white text-xs rounded-full px-2 py-1 ml-2">
-                            {thread.unreadCount}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))
+                      ))}
+                    </div>
+
+                    {/* New Message Form */}
+                    <div className="p-4 border-t border-gray-200 bg-gray-50">
+                      <form onSubmit={handleSendMessage} className="flex space-x-3">
+                        <div className="flex-1">
+                          <textarea
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Type your message..."
+                            disabled={isSending}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            rows={3}
+                          />
+                        </div>
+                        <div className="flex flex-col space-y-2">
+                          <button
+                            type="button"
+                            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                            title="Attach file"
+                          >
+                            <Paperclip className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={!newMessage.trim() || isSending}
+                            className="p-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {isSending ? (
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            ) : (
+                              <Send className="h-5 w-5" />
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                      <p className="text-lg">Select a conversation to start messaging</p>
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-
-            {/* Message Content */}
-            <div className="flex-1 flex flex-col">
-              {selectedThreadData ? (
-                <>
-                  {/* Thread Header */}
-                  <div className="p-4 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-lg font-semibold text-gray-900">{selectedThreadData.subject}</h3>
-                  </div>
-
-                  {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {selectedThreadData.messages.map((message) => (
-                      <div key={message.id} className={`flex ${message.isFromStaff ? "justify-start" : "justify-end"}`}>
-                        <div
-                          className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                            message.isFromStaff ? "bg-gray-100 text-gray-900" : "bg-teal-500 text-white"
-                          }`}
-                        >
-                          <div className="flex items-center space-x-2 mb-1">
-                            <User className="h-4 w-4" />
-                            <span className="text-sm font-medium">{message.staffName}</span>
-                            {message.isFromStaff && <span className="text-xs opacity-75">{message.staffRole}</span>}
-                          </div>
-                          <p className="text-sm">{message.content}</p>
-                          <div className="text-xs opacity-75 mt-2">{formatMessageTime(message.timestamp)}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* New Message Form */}
-                  <div className="p-4 border-t border-gray-200 bg-gray-50">
-                    <form onSubmit={handleSendMessage} className="flex space-x-3">
-                      <div className="flex-1">
-                        <textarea
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          placeholder="Type your message..."
-                          disabled={isSending}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          rows={3}
-                        />
-                      </div>
-                      <div className="flex flex-col space-y-2">
-                        <button
-                          type="button"
-                          className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                          title="Attach file"
-                        >
-                          <Paperclip className="h-5 w-5" />
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={!newMessage.trim() || isSending}
-                          className="p-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {isSending ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          ) : (
-                            <Send className="h-5 w-5" />
-                          )}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-gray-500">
-                  <div className="text-center">
-                    <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg">Select a conversation to start messaging</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
