@@ -161,7 +161,7 @@ export default function TermsOfServicePage() {
                 <p className="text-yellow-800">
                   Our patient portal and messaging system are not intended for emergency situations. If you are
                   experiencing a mental health emergency, please call 911, go to your nearest emergency room, or call
-                  the National Suicide Prevention Lifeline at 988.
+                  the National Suicide Prevention Lifeline at (984) 274-3723.
                 </p>
               </div>
             </section>
@@ -186,13 +186,13 @@ export default function TermsOfServicePage() {
                     <strong>Inner Clarity Inc.</strong>
                   </p>
                   <p>
-                    <strong>Address:</strong> 123 Wellness Way, Suite 100, Mental Health City, MH 12345
+                    <strong>Address:</strong> 508 River Dell Townes Ave, Clayton, NC
                   </p>
                   <p>
-                    <strong>Phone:</strong> (555) 123-4567
+                    <strong>Phone:</strong> (984) 274-3723
                   </p>
                   <p>
-                    <strong>Email:</strong> legal@innerclarity.com
+                    <strong>Email:</strong> legal@innerclarityinc.com
                   </p>
                 </div>
               </div>

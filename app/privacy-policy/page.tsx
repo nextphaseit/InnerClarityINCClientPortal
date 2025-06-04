@@ -166,13 +166,13 @@ export default function PrivacyPolicyPage() {
                     <strong>Privacy Officer:</strong> Inner Clarity Inc.
                   </p>
                   <p>
-                    <strong>Address:</strong> 123 Wellness Way, Suite 100, Mental Health City, MH 12345
+                    <strong>Address:</strong> 508 River Dell Townes Ave, Clayton, NC
                   </p>
                   <p>
-                    <strong>Phone:</strong> (555) 123-4567
+                    <strong>Phone:</strong> (984) 274-3723
                   </p>
                   <p>
-                    <strong>Email:</strong> privacy@innerclarity.com
+                    <strong>Email:</strong> support@innerclarityinc.com
                   </p>
                 </div>
               </div>

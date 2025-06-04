@@ -246,7 +246,7 @@ export default function HomePage() {
                 <CardDescription>
                   Call us during business hours
                   <br />
-                  <span className="font-semibold text-gray-900">(555) 123-4567</span>
+                  <span className="font-semibold text-gray-900">(984) 274-3723</span>
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -258,7 +258,7 @@ export default function HomePage() {
                 <CardDescription>
                   Send us a message anytime
                   <br />
-                  <span className="font-semibold text-gray-900">support@innerclarity.com</span>
+                  <span className="font-semibold text-gray-900">support@innerclarityinc.com</span>
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -270,9 +270,8 @@ export default function HomePage() {
                 <CardDescription>
                   Visit us in person
                   <br />
-                  <span className="font-semibold text-gray-900">123 Wellness Way, Suite 100</span>
+                  <span className="font-semibold text-gray-900">508 River Dell Townes Ave, Clayton, NC</span>
                   <br />
-                  <span className="font-semibold text-gray-900">Mental Health City, MH 12345</span>
                 </CardDescription>
               </CardHeader>
             </Card>
