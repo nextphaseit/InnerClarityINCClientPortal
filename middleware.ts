@@ -11,8 +11,14 @@ export async function middleware(request: NextRequest) {
   const publicPaths = [
     "/",
     "/auth/signin",
+    "/auth/signup",
+    "/auth/login",
+    "/auth/reset-password",
+    "/auth/update-password",
     "/auth/error",
     "/auth/callback",
+    "/admin/login",
+    "/portal/dashboard",
     "/register",
     "/unauthorized",
     "/not-found",
@@ -59,80 +65,59 @@ export async function middleware(request: NextRequest) {
       response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     }
 
-    // Check if user is authenticated
-    if (!token) {
-      console.log(`🚫 Unauthenticated access to: ${pathname}`)
-
-      // Determine appropriate sign-in tab based on route
-      let signInUrl = "/auth/signin"
-
-      if (pathname.startsWith("/admin")) {
-        signInUrl = "/auth/signin?tab=admin"
-      } else if (
-        pathname.startsWith("/patient") ||
-        pathname.startsWith("/dashboard") ||
-        pathname.startsWith("/appointments") ||
-        pathname.startsWith("/billing") ||
-        pathname.startsWith("/messages") ||
-        pathname.startsWith("/documents") ||
-        pathname.startsWith("/forms") ||
-        pathname.startsWith("/profile")
-      ) {
-        signInUrl = "/auth/signin?tab=patient"
+    // Admin routes protection
+    if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+      if (!token) {
+        console.log(`🚫 Unauthenticated admin access attempt to: ${pathname}`)
+        return NextResponse.redirect(new URL("/admin/login", request.url))
       }
 
-      return NextResponse.redirect(new URL(signInUrl, request.url))
-    }
-
-    // Role-based access control for authenticated users
-    const userRole = token.role as string
-    console.log(`👤 User role: ${userRole} accessing: ${pathname}`)
-
-    // Admin routes - require admin role
-    if (pathname.startsWith("/admin")) {
-      if (userRole !== "admin") {
-        console.log("❌ Access denied: Non-admin trying to access admin route")
+      // Check if user has admin role
+      if (token.role !== "admin") {
+        console.log(`❌ Non-admin user trying to access admin route: ${pathname}`)
         return NextResponse.redirect(new URL("/unauthorized?reason=admin_required", request.url))
       }
+
+      // Verify Microsoft authentication
+      if (token.provider !== "azure-ad") {
+        console.log(`❌ Non-Microsoft auth trying to access admin route: ${pathname}`)
+        return NextResponse.redirect(new URL("/admin/login?error=microsoft_required", request.url))
+      }
+
+      console.log(`✅ Admin access granted to ${token.email} for ${pathname}`)
     }
 
-    // Patient routes - require patient role (but allow admin access)
-    if (
-      pathname.startsWith("/patient") ||
-      pathname.startsWith("/dashboard") ||
-      pathname.startsWith("/appointments") ||
-      pathname.startsWith("/billing") ||
-      pathname.startsWith("/messages") ||
-      pathname.startsWith("/documents") ||
-      pathname.startsWith("/forms") ||
-      pathname.startsWith("/profile")
-    ) {
-      if (userRole !== "patient" && userRole !== "admin") {
-        console.log("❌ Access denied: Unauthorized role for patient route")
-        return NextResponse.redirect(new URL("/unauthorized?reason=patient_required", request.url))
+    // Patient portal routes (if you have them)
+    if (pathname.startsWith("/portal")) {
+      // Add patient-specific protection logic here if needed
+    }
+
+    // Add user information to headers for API routes
+    if (pathname.startsWith("/api") && token) {
+      response.headers.set("X-User-Role", (token.role as string) || "")
+      response.headers.set("X-User-ID", token.sub || "")
+      response.headers.set("X-User-Email", token.email || "")
+      if (token.tenantId) {
+        response.headers.set("X-Tenant-ID", token.tenantId as string)
       }
     }
 
-    // Add tenant and role information to headers for API routes
-    if (pathname.startsWith("/api") && token.tenantId) {
-      response.headers.set("X-Tenant-ID", token.tenantId as string)
-      response.headers.set("X-User-Role", userRole)
-      response.headers.set("X-User-ID", token.sub || "")
-    }
-
-    // Redirect authenticated users from auth pages to their dashboard
-    if (pathname === "/" || pathname === "/auth/signin") {
-      const dashboardUrl = userRole === "admin" ? "/admin" : "/dashboard"
-      console.log(`✅ Redirecting authenticated ${userRole} to ${dashboardUrl}`)
-      return NextResponse.redirect(new URL(dashboardUrl, request.url))
+    // Redirect authenticated admin users away from login page
+    if (pathname === "/admin/login" && token && token.role === "admin") {
+      console.log(`✅ Redirecting authenticated admin to dashboard`)
+      return NextResponse.redirect(new URL("/admin/dashboard", request.url))
     }
 
     return response
   } catch (error) {
     console.error("❌ Middleware error:", error)
 
-    // On error, redirect to sign-in with error parameter
-    return NextResponse.redirect(new URL("/auth/signin?error=Configuration", request.url))
+    // On error, redirect admin routes to login
+    if (pathname.startsWith("/admin")) {
+      return NextResponse.redirect(new URL("/admin/login?error=Configuration", request.url))
+    }
+
+    return NextResponse.next()
   }
 }
 
