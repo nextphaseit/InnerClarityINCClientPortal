@@ -125,80 +125,13 @@ export default function SignUpPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateForm()) {
-      return
-    }
-
-    setIsLoading(true)
-    setErrors({})
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName.trim(),
-            date_of_birth: formData.dateOfBirth || null,
-            role: "patient", // Default role for patient portal
-          },
-        },
-      })
-
-      if (error) {
-        console.error("Supabase sign-up error:", error)
-
-        // Handle specific Supabase errors
-        if (error.message.includes("already registered")) {
-          setErrors({ email: "An account with this email already exists" })
-        } else if (error.message.includes("Password")) {
-          setErrors({ password: error.message })
-        } else {
-          setErrors({ general: error.message })
-        }
-        return
-      }
-
-      if (data.user) {
-        console.log("User created successfully:", data.user.id)
-
-        // Create user profile record
-        try {
-          await createUserProfile(data.user.id, formData.fullName, formData.dateOfBirth)
-          console.log("Profile created successfully")
-        } catch (profileError) {
-          console.error("Profile creation failed:", profileError)
-          // Continue with success flow even if profile creation fails
-          // The profile can be created later when user logs in
-        }
-
-        setIsSuccess(true)
-
-        // Redirect to sign-in page after 3 seconds
-        setTimeout(() => {
-          router.push("/auth/login?message=Please check your email to verify your account")
-        }, 3000)
-      }
-    } catch (error) {
-      console.error("Unexpected error during sign-up:", error)
-      setErrors({
-        general: "An unexpected error occurred. Please try again.",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const createUserProfile = async (userId: string, fullName: string, dateOfBirth: string) => {
+  const createUserProfile = async (userId: string) => {
     try {
       const { error } = await supabase.from("profiles").upsert(
         {
           id: userId,
-          full_name: fullName.trim(),
-          date_of_birth: dateOfBirth || null,
+          full_name: formData.fullName.trim(),
+          date_of_birth: formData.dateOfBirth || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -212,10 +145,79 @@ export default function SignUpPage() {
         throw error
       }
 
-      console.log("User profile created/updated successfully")
+      console.log("User profile created successfully")
     } catch (error) {
       console.error("Failed to create user profile:", error)
       throw error
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validateForm()) {
+      return
+    }
+
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      // Sign up the user with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName.trim(),
+            date_of_birth: formData.dateOfBirth || null,
+          },
+        },
+      })
+
+      if (error) {
+        console.error("Supabase sign-up error:", error)
+
+        // Handle specific Supabase errors
+        if (error.message.includes("already registered")) {
+          setErrors({ email: "An account with this email already exists" })
+        } else if (error.message.includes("Password")) {
+          setErrors({ password: error.message })
+        } else if (error.message.includes("Email")) {
+          setErrors({ email: error.message })
+        } else {
+          setErrors({ general: error.message })
+        }
+        return
+      }
+
+      if (data.user) {
+        console.log("User created successfully:", data.user.id)
+
+        // Create user profile record
+        try {
+          await createUserProfile(data.user.id)
+          console.log("Profile created successfully")
+        } catch (profileError) {
+          console.error("Profile creation failed:", profileError)
+          // Continue with success flow even if profile creation fails
+          // The profile can be created later when user logs in
+        }
+
+        setIsSuccess(true)
+
+        // Redirect to login page after 4 seconds
+        setTimeout(() => {
+          router.push("/auth/login?message=Please check your email to verify your account")
+        }, 4000)
+      }
+    } catch (error) {
+      console.error("Unexpected error during sign-up:", error)
+      setErrors({
+        general: "An unexpected error occurred. Please try again.",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -230,7 +232,7 @@ export default function SignUpPage() {
               <Check className="h-8 w-8 text-green-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Created!</h2>
-            <p className="text-green-600 mb-4">Please verify your email to log in.</p>
+            <p className="text-green-600 mb-4 font-medium">Please check your email to confirm your account.</p>
             <p className="text-sm text-gray-600 mb-4">
               We've sent a verification email to <strong>{formData.email}</strong>
             </p>
@@ -281,10 +283,11 @@ export default function SignUpPage() {
                   placeholder="Enter your full name"
                   value={formData.fullName}
                   onChange={(e) => handleInputChange("fullName", e.target.value)}
-                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
+                  className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors ${
                     errors.fullName ? "border-red-300 focus:ring-red-500" : "border-gray-300"
                   }`}
                   disabled={isLoading}
+                  required
                 />
               </div>
               {errors.fullName && <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>}
@@ -303,10 +306,11 @@ export default function SignUpPage() {
                   placeholder="Enter your email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
+                  className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors ${
                     errors.email ? "border-red-300 focus:ring-red-500" : "border-gray-300"
                   }`}
                   disabled={isLoading}
+                  required
                 />
               </div>
               {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
@@ -315,7 +319,7 @@ export default function SignUpPage() {
             {/* Date of Birth */}
             <div>
               <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700 mb-1">
-                Date of Birth (Optional)
+                Date of Birth
               </label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
@@ -324,7 +328,7 @@ export default function SignUpPage() {
                   type="date"
                   value={formData.dateOfBirth}
                   onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
                   disabled={isLoading}
                 />
               </div>
@@ -343,15 +347,16 @@ export default function SignUpPage() {
                   placeholder="Create a password"
                   value={formData.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
-                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
+                  className={`w-full pl-10 pr-10 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors ${
                     errors.password ? "border-red-300 focus:ring-red-500" : "border-gray-300"
                   }`}
                   disabled={isLoading}
+                  required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -360,15 +365,15 @@ export default function SignUpPage() {
 
               {/* Password Requirements */}
               {formData.password && (
-                <div className="mt-2 space-y-1">
-                  <p className="text-xs font-medium text-gray-700">Password Requirements:</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Password Requirements:</p>
+                  <div className="grid grid-cols-1 gap-1">
                     {requirements.map((req, index) => (
                       <div key={index} className="flex items-center space-x-2">
                         {req.met ? (
-                          <Check className="h-3.5 w-3.5 text-green-500" />
+                          <Check className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
                         ) : (
-                          <X className="h-3.5 w-3.5 text-red-500" />
+                          <X className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
                         )}
                         <span className={`text-xs ${req.met ? "text-green-600" : "text-red-600"}`}>{req.label}</span>
                       </div>
@@ -391,15 +396,16 @@ export default function SignUpPage() {
                   placeholder="Confirm your password"
                   value={formData.confirmPassword}
                   onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
+                  className={`w-full pl-10 pr-10 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors ${
                     errors.confirmPassword ? "border-red-300 focus:ring-red-500" : "border-gray-300"
                   }`}
                   disabled={isLoading}
+                  required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -410,7 +416,7 @@ export default function SignUpPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -447,8 +453,22 @@ export default function SignUpPage() {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{" "}
-              <Link href="/auth/login" className="font-medium text-teal-600 hover:text-teal-500">
+              <Link href="/auth/login" className="font-medium text-teal-600 hover:text-teal-500 transition-colors">
                 Sign in here
+              </Link>
+            </p>
+          </div>
+
+          {/* Terms and Privacy */}
+          <div className="mt-4 text-center">
+            <p className="text-xs text-gray-500">
+              By creating an account, you agree to our{" "}
+              <Link href="/terms-of-service" className="text-teal-600 hover:text-teal-500">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy-policy" className="text-teal-600 hover:text-teal-500">
+                Privacy Policy
               </Link>
             </p>
           </div>
