@@ -1,4 +1,6 @@
 const Navigation = () => {
+  const user = { name: "Inner Clarity" } // Added a user object for the Avatar component
+
   return (
     <nav>
       <ul>
@@ -21,8 +23,23 @@ const Navigation = () => {
         <p>Email: support@innerclarityinc.com</p>
         <p>Address: 508 River Dell Townes Ave, Clayton, NC</p>
       </div>
+      {/* Avatar Section - Assumed placement based on context */}
+      <div>
+        {/* Example Avatar Component - Replace with your actual Avatar component */}
+        <AvatarImage src="/images/inner-clarity-logo.png" alt={user.name} />
+      </div>
+
+      {/* Mobile Navigation Avatar Section - Assumed placement based on context */}
+      <div>
+        {/* Example Mobile Navigation Avatar Component - Replace with your actual component */}
+        <AvatarImage src="/images/inner-clarity-logo.png" alt={user.name} />
+      </div>
     </nav>
   )
 }
+
+const AvatarImage = ({ src, alt }: { src: string; alt: string }) => (
+  <img src={src || "/placeholder.svg"} alt={alt} style={{ width: "50px", height: "50px", borderRadius: "50%" }} />
+)
 
 export default Navigation
