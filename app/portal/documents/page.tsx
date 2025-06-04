@@ -279,17 +279,17 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <PortalNavigation />
 
       <div className="lg:ml-64 p-6">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Documents</h1>
-              <p className="text-gray-600">Upload and manage your important documents</p>
+              <h1 className="text-3xl font-bold text-slate-800">Documents</h1>
+              <p className="text-slate-600">Upload and manage your important documents</p>
             </div>
-            <Button onClick={() => setShowUploadForm(!showUploadForm)} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={() => setShowUploadForm(!showUploadForm)} className="bg-indigo-600 hover:bg-indigo-700">
               <Plus className="h-4 w-4 mr-2" />
               Upload Document
             </Button>
@@ -343,7 +343,7 @@ export default function DocumentsPage() {
                     <p className="text-sm text-gray-500 mt-1">Accepted formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)</p>
                   </div>
                   <div className="flex space-x-3">
-                    <Button type="submit" disabled={uploading} className="bg-teal-600 hover:bg-teal-700">
+                    <Button type="submit" disabled={uploading} className="bg-indigo-600 hover:bg-indigo-700">
                       {uploading ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -372,7 +372,7 @@ export default function DocumentsPage() {
                 <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No documents uploaded</h3>
                 <p className="text-gray-500 mb-4">Upload your first document to get started</p>
-                <Button onClick={() => setShowUploadForm(true)} className="bg-teal-600 hover:bg-teal-700">
+                <Button onClick={() => setShowUploadForm(true)} className="bg-indigo-600 hover:bg-indigo-700">
                   <Upload className="h-4 w-4 mr-2" />
                   Upload Document
                 </Button>

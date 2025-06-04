@@ -1,16 +1,48 @@
-import { PortalNavigation } from "@/components/portal-navigation"
+"use client"
 
-export default function Dashboard() {
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <PortalNavigation />
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
+import type { User } from "@supabase/supabase-js"
 
-      <div className="lg:ml-64 p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Keep all existing dashboard content */}
-          {/* ... existing content ... */}
-        </div>
+export default function PatientDashboard() {
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [fullName, setFullName] = useState<string>("")
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getUser()
+
+        if (error || !data.user) {
+          console.error("Authentication error:", error)
+          router.push("/auth/login")
+          return
+        }
+
+        setUser(data.user)
+        setFullName(data.user.user_metadata?.full_name || "Patient")
+        setLoading(false)
+      } catch (error) {
+        console.error("Session check error:", error)
+        router.push("/auth/login")
+      }
+    }
+
+    checkSession()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  // Redirect to the main portal page
+  router.push("/portal")
+  return null
 }

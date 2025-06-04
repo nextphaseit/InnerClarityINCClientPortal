@@ -167,7 +167,7 @@ export default function PortalBillingPage() {
   const { totalAmount, paidAmount, unpaidAmount } = calculateTotals()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <PortalNavigation />
 
       <div className="lg:ml-64 p-6">
@@ -176,8 +176,8 @@ export default function PortalBillingPage() {
           <div className="mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Billing & Payments</h1>
-                <p className="mt-2 text-gray-600">Manage your invoices and payment history</p>
+                <h1 className="text-3xl font-bold text-slate-800">Billing & Payments</h1>
+                <p className="mt-2 text-slate-600">Manage your invoices and payment history</p>
               </div>
             </div>
           </div>

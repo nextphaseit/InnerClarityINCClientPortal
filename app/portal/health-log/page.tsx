@@ -242,17 +242,17 @@ export default function HealthLogPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <PortalNavigation />
 
       <div className="lg:ml-64 p-6">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Health Log</h1>
-              <p className="text-gray-600">Track your daily mood, symptoms, and wellness</p>
+              <h1 className="text-3xl font-bold text-slate-800">Health Log</h1>
+              <p className="text-slate-600">Track your daily mood, symptoms, and wellness</p>
             </div>
-            <Button onClick={() => setShowAddForm(!showAddForm)} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={() => setShowAddForm(!showAddForm)} className="bg-indigo-600 hover:bg-indigo-700">
               <Plus className="h-4 w-4 mr-2" />
               Add Entry
             </Button>

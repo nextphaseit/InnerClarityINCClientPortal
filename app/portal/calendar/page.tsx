@@ -186,17 +186,17 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <PortalNavigation />
 
       <div className="lg:ml-64 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Calendar</h1>
-              <p className="text-gray-600">View your upcoming appointments and sessions</p>
+              <h1 className="text-3xl font-bold text-slate-800">Calendar</h1>
+              <p className="text-slate-600">View your upcoming appointments and sessions</p>
             </div>
-            <Button className="bg-teal-600 hover:bg-teal-700">
+            <Button className="bg-indigo-600 hover:bg-indigo-700">
               <Plus className="h-4 w-4 mr-2" />
               Request Appointment
             </Button>

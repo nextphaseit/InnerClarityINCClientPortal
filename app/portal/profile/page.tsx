@@ -132,14 +132,14 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <PortalNavigation />
 
       <div className="lg:ml-64 p-6">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
-            <p className="text-gray-600">Manage your personal information and preferences</p>
+            <h1 className="text-3xl font-bold text-slate-800">Profile Settings</h1>
+            <p className="text-slate-600">Manage your personal information and preferences</p>
           </div>
 
           {message && (

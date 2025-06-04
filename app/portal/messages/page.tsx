@@ -238,17 +238,17 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <PortalNavigation />
 
       <div className="lg:ml-64 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-              <MessageCircle className="h-8 w-8 mr-3 text-teal-600" />
+            <h1 className="text-3xl font-bold text-slate-800 flex items-center">
+              <MessageCircle className="h-8 w-8 mr-3 text-indigo-600" />
               Messages
             </h1>
-            <p className="text-gray-600">Secure communication with your care team</p>
+            <p className="text-slate-600">Secure communication with your care team</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
