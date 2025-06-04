@@ -1,4 +1,5 @@
 import type { DefaultSession, DefaultUser } from "next-auth"
+import type { DefaultJWT } from "next-auth/jwt"
 
 declare module "next-auth" {
   interface Session {
@@ -8,22 +9,25 @@ declare module "next-auth" {
     provider?: string
     user: {
       id: string
-      email: string
-      name: string
-      image?: string
+      role: "admin" | "patient"
+      tenantId: string
     } & DefaultSession["user"]
   }
 
   interface User extends DefaultUser {
-    id: string
+    role?: "admin" | "patient"
+    tenantId?: string
   }
 }
 
 declare module "next-auth/jwt" {
-  interface JWT {
+  interface JWT extends DefaultJWT {
     accessToken?: string
     refreshToken?: string
     expiresAt?: number
     provider?: string
+    role?: "admin" | "patient"
+    tenantId?: string
+    providerAccountId?: string
   }
 }

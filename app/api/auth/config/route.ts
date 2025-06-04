@@ -1,39 +1,30 @@
 import { NextResponse } from "next/server"
-
-export const dynamic = "force-dynamic"
+import { validateEnvironmentVariables } from "@/lib/env-validation"
 
 export async function GET() {
   try {
-    const config = {
-      auth0: {
-        configured: !!(process.env.AUTH0_CLIENT_ID && process.env.AUTH0_CLIENT_SECRET && process.env.AUTH0_DOMAIN),
-        domain: process.env.AUTH0_DOMAIN ? `${process.env.AUTH0_DOMAIN}` : null,
-        clientId: process.env.AUTH0_CLIENT_ID ? "***configured***" : null,
-      },
-      microsoft: {
-        configured: !!(
-          process.env.MICROSOFT_CLIENT_ID &&
-          process.env.MICROSOFT_CLIENT_SECRET &&
-          process.env.MICROSOFT_TENANT_ID
-        ),
-        tenantId: process.env.MICROSOFT_TENANT_ID ? "***configured***" : null,
-        clientId: process.env.MICROSOFT_CLIENT_ID ? "***configured***" : null,
-      },
-      nextauth: {
-        url: process.env.NEXTAUTH_URL || "not configured",
-        secret: process.env.NEXTAUTH_SECRET ? "***configured***" : "not configured",
-      },
-    }
-
-    console.log("🔧 Auth configuration check:", config)
+    const validation = validateEnvironmentVariables()
 
     return NextResponse.json({
-      success: true,
-      config,
+      isValid: validation.isValid,
+      providers: {
+        microsoft: !!(validation.config.MICROSOFT_CLIENT_ID && validation.config.MICROSOFT_CLIENT_SECRET),
+        auth0: !!(validation.config.AUTH0_DOMAIN && validation.config.AUTH0_CLIENT_ID),
+        nextauth: !!validation.config.NEXTAUTH_SECRET,
+      },
+      warnings: validation.warnings,
+      missing: validation.missing,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error("❌ Config check error:", error)
-    return NextResponse.json({ error: "Configuration check failed" }, { status: 500 })
+    console.error("Config check error:", error)
+    return NextResponse.json(
+      {
+        error: "Failed to check configuration",
+        isValid: false,
+        providers: { microsoft: false, auth0: false, nextauth: false },
+      },
+      { status: 500 },
+    )
   }
 }

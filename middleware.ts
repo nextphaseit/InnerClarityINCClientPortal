@@ -5,13 +5,15 @@ import { getToken } from "next-auth/jwt"
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  console.log(`🔒 Middleware - Processing: ${pathname}`)
+
   // Public paths that don't require authentication
   const publicPaths = [
     "/",
-    "/register",
     "/auth/signin",
     "/auth/error",
     "/auth/callback",
+    "/register",
     "/unauthorized",
     "/not-found",
     "/privacy-policy",
@@ -34,101 +36,104 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Get the user's session token
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  })
+  try {
+    // Get the user's session token
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    })
 
-  console.log(`🔒 Middleware - Path: ${pathname}, Token: ${token ? "Present" : "Missing"}`)
+    console.log(`🔐 Token status: ${token ? "Present" : "Missing"} for ${pathname}`)
 
-  // Create response with security headers
-  const response = NextResponse.next()
+    // Create response with security headers
+    const response = NextResponse.next()
 
-  // Add security headers for HIPAA compliance
-  response.headers.set("X-Frame-Options", "DENY")
-  response.headers.set("X-Content-Type-Options", "nosniff")
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-  response.headers.set("X-XSS-Protection", "1; mode=block")
+    // Add HIPAA-compliant security headers
+    response.headers.set("X-Frame-Options", "DENY")
+    response.headers.set("X-Content-Type-Options", "nosniff")
+    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.set("X-XSS-Protection", "1; mode=block")
+    response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 
-  if (process.env.NODE_ENV === "production") {
-    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-  }
-
-  // Check if user is authenticated
-  if (!token) {
-    console.log(`🚫 Unauthenticated access attempt to: ${pathname}`)
-
-    // Redirect unauthenticated users based on the route they're trying to access
-    if (pathname.startsWith("/admin")) {
-      console.log("Redirecting to Microsoft login for admin route")
-      return NextResponse.redirect(new URL("/auth/signin?tab=admin", request.url))
-    } else if (
-      pathname.startsWith("/patient") ||
-      pathname.startsWith("/appointments") ||
-      pathname.startsWith("/billing") ||
-      pathname.startsWith("/messages") ||
-      pathname.startsWith("/dashboard") ||
-      pathname.startsWith("/documents") ||
-      pathname.startsWith("/forms") ||
-      pathname.startsWith("/profile")
-    ) {
-      console.log("Redirecting to Auth0 login for patient route")
-      return NextResponse.redirect(new URL("/auth/signin?tab=patient", request.url))
-    } else {
-      // Default to sign-in page
-      return NextResponse.redirect(new URL("/auth/signin", request.url))
+    if (process.env.NODE_ENV === "production") {
+      response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     }
-  }
 
-  // Role-based access control for authenticated users
-  if (token) {
-    console.log(`👤 User role: ${token.role}, accessing: ${pathname}`)
+    // Check if user is authenticated
+    if (!token) {
+      console.log(`🚫 Unauthenticated access to: ${pathname}`)
+
+      // Determine appropriate sign-in tab based on route
+      let signInUrl = "/auth/signin"
+
+      if (pathname.startsWith("/admin")) {
+        signInUrl = "/auth/signin?tab=admin"
+      } else if (
+        pathname.startsWith("/patient") ||
+        pathname.startsWith("/dashboard") ||
+        pathname.startsWith("/appointments") ||
+        pathname.startsWith("/billing") ||
+        pathname.startsWith("/messages") ||
+        pathname.startsWith("/documents") ||
+        pathname.startsWith("/forms") ||
+        pathname.startsWith("/profile")
+      ) {
+        signInUrl = "/auth/signin?tab=patient"
+      }
+
+      return NextResponse.redirect(new URL(signInUrl, request.url))
+    }
+
+    // Role-based access control for authenticated users
+    const userRole = token.role as string
+    console.log(`👤 User role: ${userRole} accessing: ${pathname}`)
 
     // Admin routes - require admin role
     if (pathname.startsWith("/admin")) {
-      if (token.role !== "admin") {
-        console.log("❌ Access denied: Patient trying to access admin route")
+      if (userRole !== "admin") {
+        console.log("❌ Access denied: Non-admin trying to access admin route")
         return NextResponse.redirect(new URL("/unauthorized?reason=admin_required", request.url))
       }
     }
 
-    // Patient routes - require patient role
+    // Patient routes - require patient role (but allow admin access)
     if (
       pathname.startsWith("/patient") ||
+      pathname.startsWith("/dashboard") ||
       pathname.startsWith("/appointments") ||
       pathname.startsWith("/billing") ||
       pathname.startsWith("/messages") ||
-      pathname.startsWith("/dashboard") ||
       pathname.startsWith("/documents") ||
       pathname.startsWith("/forms") ||
       pathname.startsWith("/profile")
     ) {
-      if (token.role !== "patient") {
-        console.log("❌ Access denied: Admin trying to access patient route")
+      if (userRole !== "patient" && userRole !== "admin") {
+        console.log("❌ Access denied: Unauthorized role for patient route")
         return NextResponse.redirect(new URL("/unauthorized?reason=patient_required", request.url))
       }
     }
 
-    // Add tenant information to headers for API routes
+    // Add tenant and role information to headers for API routes
     if (pathname.startsWith("/api") && token.tenantId) {
       response.headers.set("X-Tenant-ID", token.tenantId as string)
-      response.headers.set("X-User-Role", token.role as string)
+      response.headers.set("X-User-Role", userRole)
+      response.headers.set("X-User-ID", token.sub || "")
     }
 
-    // Redirect authenticated users away from auth pages to their dashboard
-    if (pathname === "/" || pathname === "/auth/signin" || pathname === "/register") {
-      if (token.role === "admin") {
-        console.log("✅ Redirecting authenticated admin to admin dashboard")
-        return NextResponse.redirect(new URL("/admin", request.url))
-      } else if (token.role === "patient") {
-        console.log("✅ Redirecting authenticated patient to patient dashboard")
-        return NextResponse.redirect(new URL("/dashboard", request.url))
-      }
+    // Redirect authenticated users from auth pages to their dashboard
+    if (pathname === "/" || pathname === "/auth/signin") {
+      const dashboardUrl = userRole === "admin" ? "/admin" : "/dashboard"
+      console.log(`✅ Redirecting authenticated ${userRole} to ${dashboardUrl}`)
+      return NextResponse.redirect(new URL(dashboardUrl, request.url))
     }
+
+    return response
+  } catch (error) {
+    console.error("❌ Middleware error:", error)
+
+    // On error, redirect to sign-in with error parameter
+    return NextResponse.redirect(new URL("/auth/signin?error=Configuration", request.url))
   }
-
-  return response
 }
 
 export const config = {
