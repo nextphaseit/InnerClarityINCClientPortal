@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import { redirect } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,18 +18,13 @@ import {
 import Link from "next/link"
 
 export const metadata: Metadata = {
-  title: "Dashboard | Inner Clarity",
+  title: "Patient Dashboard | Inner Clarity",
   description: "Patient dashboard for Inner Clarity mental health services",
 }
 
-export default async function ClientDashboard() {
+export default async function PatientDashboard() {
   // Server-side authentication check
   const user = await requirePatientAuth()
-
-  // Redirect patients to the patient dashboard
-  if (user.role === "patient") {
-    redirect("/patient/dashboard")
-  }
 
   // Mock data - in a real app, this would come from your API
   const upcomingAppointment = {

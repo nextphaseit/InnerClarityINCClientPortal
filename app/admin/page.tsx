@@ -1,44 +1,30 @@
-"use client"
-
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import type { Metadata } from "next"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
-import { Users, Calendar, MessageSquare, FileText, Shield, TrendingUp, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
+import { requireAdminAuth } from "@/lib/session"
+import {
+  Users,
+  Calendar,
+  MessageSquare,
+  FileText,
+  Shield,
+  TrendingUp,
+  AlertTriangle,
+  Clock,
+  CheckCircle,
+} from "lucide-react"
 import Link from "next/link"
 
-// Add this import instead
-import { useAuth } from "@/components/auth-provider"
+export const metadata: Metadata = {
+  title: "Admin Dashboard | Inner Clarity",
+  description: "Admin dashboard for Inner Clarity mental health services",
+}
 
-export default function AdminDashboard() {
-  // Replace the useSession hook usage
-  const { user, loading } = useAuth()
-  const router = useRouter()
-  // Remove this line: const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (loading) return
-
-    if (!user) {
-      router.push("/auth/signin")
-      return
-    }
-
-    if (user.role !== "admin") {
-      router.push("/dashboard")
-      return
-    }
-  }, [user, loading, router])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-clarity-blue-500"></div>
-      </div>
-    )
-  }
+export default async function AdminDashboard() {
+  // Server-side authentication check
+  const user = await requireAdminAuth()
 
   // Mock data - in a real app, this would come from your API
   const stats = {
@@ -51,8 +37,8 @@ export default function AdminDashboard() {
 
   // Add this after the existing stats
   const tenantInfo = {
-    name: user?.tenantId === 'inner-clarity' ? 'Inner Clarity' : 'Health Corp',
-    id: user?.tenantId || 'unknown'
+    name: user?.tenantId === "inner-clarity" ? "Inner Clarity" : "Health Corp",
+    id: user?.tenantId || "unknown",
   }
 
   const upcomingAppointments = [
