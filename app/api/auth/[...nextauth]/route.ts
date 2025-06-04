@@ -1,6 +1,8 @@
 import NextAuth from "next-auth"
 import type { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
+import Auth0Provider from "next-auth/providers/auth0"
+import AzureADProvider from "next-auth/providers/azure-ad"
 import bcrypt from "bcryptjs"
 
 // Mock user database - replace with real database in production
@@ -41,6 +43,21 @@ const users = [
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    // Auth0 Provider for Patients
+    Auth0Provider({
+      clientId: process.env.AUTH0_CLIENT_ID || "",
+      clientSecret: process.env.AUTH0_CLIENT_SECRET || "",
+      issuer: process.env.AUTH0_DOMAIN,
+    }),
+
+    // Microsoft Entra ID Provider for Admins
+    AzureADProvider({
+      clientId: process.env.MICROSOFT_CLIENT_ID || "",
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET || "",
+      tenantId: process.env.MICROSOFT_TENANT_ID,
+    }),
+
+    // Credentials Provider (for development/testing)
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -50,23 +67,19 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         try {
           if (!credentials?.email || !credentials?.password) {
-            console.log("Missing credentials")
             return null
           }
 
           const user = users.find((u) => u.email === credentials.email)
           if (!user) {
-            console.log("User not found:", credentials.email)
             return null
           }
 
           const isValidPassword = await bcrypt.compare(credentials.password, user.passwordHash)
           if (!isValidPassword) {
-            console.log("Invalid password for user:", credentials.email)
             return null
           }
 
-          console.log("User authenticated successfully:", user.email)
           return {
             id: user.id,
             email: user.email,
@@ -141,4 +154,5 @@ export const authOptions: NextAuthOptions = {
 }
 
 const handler = NextAuth(authOptions)
+
 export { handler as GET, handler as POST }
