@@ -40,17 +40,35 @@ export default function MyAppointmentsPage() {
   const fetchAppointments = async () => {
     try {
       setLoading(true)
+      setError(null)
+
       const response = await fetch("/api/appointments")
 
       if (!response.ok) {
-        throw new Error("Failed to fetch appointments")
+        throw new Error(`Failed to fetch appointments: ${response.status} ${response.statusText}`)
       }
 
-      const data = await response.json()
-      setAppointments(data.appointments || [])
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        console.error("Error parsing JSON:", jsonError)
+        throw new Error("Invalid response format")
+      }
+
+      // Check if data has the expected structure
+      if (!data || !Array.isArray(data.appointments)) {
+        // Use a default empty array if appointments is missing or not an array
+        setAppointments([])
+        console.warn("Appointments data is missing or invalid, using empty array")
+      } else {
+        setAppointments(data.appointments || [])
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      setError(err instanceof Error ? err.message : "An error occurred while fetching appointments")
       console.error("Error fetching appointments:", err)
+      // Set appointments to empty array on error
+      setAppointments([])
     } finally {
       setLoading(false)
     }
@@ -70,21 +88,40 @@ export default function MyAppointmentsPage() {
   }
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return "Invalid date"
+      }
+      return date.toLocaleDateString("en-US", {
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    } catch (error) {
+      console.error("Error formatting date:", error)
+      return "Invalid date"
+    }
   }
 
   const formatTime = (timeString: string) => {
-    return timeString
+    try {
+      return timeString || "N/A"
+    } catch (error) {
+      console.error("Error formatting time:", error)
+      return "N/A"
+    }
   }
 
   const handleReschedule = (appointmentId: string) => {
-    router.push(`/appointments/book?reschedule=${appointmentId}`)
+    try {
+      router.push(`/appointments/book?reschedule=${appointmentId}`)
+    } catch (error) {
+      console.error("Navigation error:", error)
+      // Fallback to window.location if router fails
+      window.location.href = `/appointments/book?reschedule=${appointmentId}`
+    }
   }
 
   if (authLoading) {
@@ -141,6 +178,9 @@ export default function MyAppointmentsPage() {
                   </div>
                   <p className="text-gray-600 dark:text-gray-400 mb-2">Error loading appointments</p>
                   <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                  <Button onClick={() => fetchAppointments()} className="mt-4" variant="outline">
+                    Try Again
+                  </Button>
                 </div>
               </div>
             ) : appointments.length === 0 ? (
@@ -181,6 +221,7 @@ export default function MyAppointmentsPage() {
                           </div>
                         </th>
                         <th className="text-left py-4 px-6 font-semibold text-gray-900 dark:text-white">Status</th>
+                        <th className="text-left py-4 px-6 font-semibold text-gray-900 dark:text-white">Actions</th>
                       </tr>
                     </thead>
                     <tbody>

@@ -38,27 +38,46 @@ const mockAppointments = [
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const tenantId = searchParams.get("tenantId")
+    // Default to inner-clarity if no tenantId is provided
+    let tenantId = "inner-clarity"
 
-    // Return 400 if tenantId is missing or invalid
-    if (!tenantId) {
-      return NextResponse.json({ error: "tenantId query parameter is required" }, { status: 400 })
+    try {
+      const { searchParams } = new URL(request.url)
+      const paramTenantId = searchParams.get("tenantId")
+      if (paramTenantId) {
+        tenantId = paramTenantId
+      }
+    } catch (error) {
+      console.error("Error parsing URL:", error)
+      // Continue with default tenantId
     }
 
     // Filter appointments by tenantId
     const filteredAppointments = mockAppointments.filter((appointment) => appointment.tenantId === tenantId)
 
-    return NextResponse.json(filteredAppointments, { status: 200 })
+    // Return appointments with proper headers
+    return NextResponse.json(
+      { success: true, appointments: filteredAppointments },
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )
   } catch (error) {
     console.error("Error fetching appointments:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch appointments", appointments: [] },
+      { status: 500 },
+    )
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    let body
+    try {
+      body = await request.json()
+    } catch (error) {
+      console.error("Error parsing request body:", error)
+      return NextResponse.json({ success: false, error: "Invalid request body" }, { status: 400 })
+    }
 
     // Validate required fields
     const { patientName, provider, datetime, status } = body
@@ -71,8 +90,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate datetime format
-    const appointmentDate = new Date(datetime)
-    if (isNaN(appointmentDate.getTime())) {
+    let appointmentDate
+    try {
+      appointmentDate = new Date(datetime)
+      if (isNaN(appointmentDate.getTime())) {
+        throw new Error("Invalid date")
+      }
+    } catch (error) {
       return NextResponse.json({ success: false, error: "Invalid datetime format" }, { status: 400 })
     }
 
@@ -95,11 +119,10 @@ export async function POST(request: NextRequest) {
     // Log the appointment (in production, save to database)
     console.log("New appointment scheduled:", newAppointment)
 
-    return NextResponse.json({
-      success: true,
-      message: "Appointment scheduled successfully",
-      data: newAppointment,
-    })
+    return NextResponse.json(
+      { success: true, message: "Appointment scheduled successfully", data: newAppointment },
+      { status: 201 },
+    )
   } catch (error) {
     console.error("Error in appointments POST API:", error)
     return NextResponse.json({ success: false, error: "Failed to schedule appointment" }, { status: 500 })
