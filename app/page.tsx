@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/components/auth-provider"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -27,19 +27,19 @@ import {
 } from "lucide-react"
 
 export default function HomePage() {
-  const { data: session, status } = useSession()
+  const { user, status } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     // Redirect authenticated users to their appropriate dashboard
-    if (status === "authenticated" && session?.user) {
-      if (session.user.role === "admin") {
+    if (status === "authenticated" && user) {
+      if (user.role === "admin") {
         router.push("/admin")
-      } else if (session.user.role === "patient") {
+      } else if (user.role === "patient") {
         router.push("/dashboard")
       }
     }
-  }, [session, status, router])
+  }, [user, status, router])
 
   if (status === "loading") {
     return (
