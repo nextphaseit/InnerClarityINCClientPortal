@@ -1,16 +1,17 @@
 "use client"
 
 import type React from "react"
-import { useRouter } from "next/navigation"
+
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
-import { Calendar, Clock, Plus, Filter, Users, Video, MapPin, Shield } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
+import { Calendar, Clock, Plus, Filter, Users, Video, MapPin, Shield, Loader2 } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
-import { useAuth } from "@/components/auth-provider"
 
 // Mark as dynamic to prevent static rendering issues
 export const dynamic = "force-dynamic"
@@ -27,22 +28,52 @@ export default function AdminAppointmentsPage() {
     status: "Upcoming",
   })
 
-  // Use our custom auth hook which handles client/server rendering safely
-  const { user, loading } = useAuth()
+  // Use our custom auth hook with proper error handling
+  const { user, loading, error } = useAuth()
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) {
-      console.log("Unauthorized access to admin appointments page")
-      router.push("/auth/signin")
-      return
+    try {
+      if (!loading) {
+        if (!user) {
+          console.log("❌ No user found, redirecting to sign in")
+          router.push("/auth/signin?tab=admin")
+          return
+        }
+
+        if (user.role !== "admin") {
+          console.log("❌ User is not admin, redirecting to unauthorized")
+          router.push("/unauthorized?reason=admin_required")
+          return
+        }
+
+        console.log("✅ Admin user authenticated:", user.email)
+      }
+    } catch (err) {
+      console.error("❌ Error in admin appointments auth check:", err)
     }
   }, [user, loading, router])
 
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-clarity-blue-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-clarity-blue-500" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state if there's an authentication error
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2 text-red-600">Authentication Error</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+          <Button onClick={() => router.push("/auth/signin?tab=admin")}>Try Again</Button>
+        </div>
       </div>
     )
   }
@@ -50,13 +81,11 @@ export default function AdminAppointmentsPage() {
   // Show unauthorized message if no user or wrong role
   if (!user || user.role !== "admin") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-          <p className="text-gray-600">You don't have permission to view this page.</p>
-          <Button className="mt-4" onClick={() => router.push("/auth/signin")}>
-            Sign In
-          </Button>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">You don't have permission to view this page.</p>
+          <Button onClick={() => router.push("/auth/signin?tab=admin")}>Sign In as Admin</Button>
         </div>
       </div>
     )
@@ -133,6 +162,8 @@ export default function AdminAppointmentsPage() {
     setIsSubmitting(true)
 
     try {
+      console.log("📅 Scheduling appointment:", newAppointment)
+
       const response = await fetch("/api/appointments", {
         method: "POST",
         headers: {
@@ -142,15 +173,15 @@ export default function AdminAppointmentsPage() {
       })
 
       if (response.ok) {
-        console.log("Appointment scheduled successfully")
+        console.log("✅ Appointment scheduled successfully")
         setNewAppointment({ patientName: "", provider: "", datetime: "", status: "Upcoming" })
         setIsScheduleModalOpen(false)
         // Refresh appointments list here if needed
       } else {
-        console.error("Failed to schedule appointment")
+        console.error("❌ Failed to schedule appointment:", response.statusText)
       }
     } catch (error) {
-      console.error("Error scheduling appointment:", error)
+      console.error("❌ Error scheduling appointment:", error)
     } finally {
       setIsSubmitting(false)
     }
@@ -368,7 +399,14 @@ export default function AdminAppointmentsPage() {
                     Cancel
                   </Button>
                   <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Scheduling..." : "Schedule Appointment"}
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Scheduling...
+                      </>
+                    ) : (
+                      "Schedule Appointment"
+                    )}
                   </Button>
                 </div>
               </form>

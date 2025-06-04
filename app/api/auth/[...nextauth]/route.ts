@@ -1,6 +1,5 @@
 import NextAuth from "next-auth"
 import type { NextAuthOptions } from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
 import Auth0Provider from "next-auth/providers/auth0"
 import AzureADProvider from "next-auth/providers/azure-ad"
 
@@ -9,53 +8,7 @@ export const dynamic = "force-dynamic"
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    // Credentials Provider for development/testing
-    CredentialsProvider({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        try {
-          if (!credentials?.email || !credentials?.password) {
-            console.log("Missing credentials")
-            return null
-          }
-
-          // Mock user validation - replace with real authentication
-          if (credentials.email === "admin@innerclarity.org" && credentials.password === "admin123") {
-            console.log("Admin credentials validated")
-            return {
-              id: "1",
-              email: "admin@innerclarity.org",
-              name: "Admin User",
-              role: "admin",
-              tenantId: "inner-clarity-main",
-            }
-          }
-
-          if (credentials.email === "patient@example.com" && credentials.password === "patient123") {
-            console.log("Patient credentials validated")
-            return {
-              id: "2",
-              email: "patient@example.com",
-              name: "Patient User",
-              role: "patient",
-              tenantId: "inner-clarity-main",
-            }
-          }
-
-          console.log("Invalid credentials provided")
-          return null
-        } catch (error) {
-          console.error("Credentials authorization error:", error)
-          return null
-        }
-      },
-    }),
-
-    // Auth0 Provider for Patients
+    // Auth0 Provider for Patients (supports both Auth0 and Microsoft login)
     ...(process.env.AUTH0_CLIENT_ID && process.env.AUTH0_CLIENT_SECRET && process.env.AUTH0_DOMAIN
       ? [
           Auth0Provider({
@@ -64,15 +17,15 @@ export const authOptions: NextAuthOptions = {
             issuer: `https://${process.env.AUTH0_DOMAIN}`,
             authorization: {
               params: {
-                audience: process.env.AUTH0_AUDIENCE || `https://${process.env.AUTH0_DOMAIN}/api/v2/`,
                 scope: "openid email profile",
+                audience: process.env.AUTH0_AUDIENCE || `https://${process.env.AUTH0_DOMAIN}/api/v2/`,
               },
             },
           }),
         ]
       : []),
 
-    // Microsoft Entra ID Provider for Admins
+    // Microsoft Entra ID Provider for Admins (direct Azure AD integration)
     ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && process.env.MICROSOFT_TENANT_ID
       ? [
           AzureADProvider({
@@ -98,40 +51,58 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, account, profile }) {
       try {
         if (user && account) {
-          console.log(`JWT callback - Provider: ${account.provider}, User: ${user.email}`)
+          console.log(`🔐 JWT Callback - Provider: ${account.provider}, User: ${user.email}`)
 
-          // Assign roles based on provider and email domain
+          // Determine role based on provider and email domain
+          let role = "patient" // Default role
+          let tenantId = "inner-clarity-main" // Default tenant
+
           if (account.provider === "auth0") {
-            token.role = "patient"
-            token.provider = "auth0"
-            console.log("Assigned patient role for Auth0 user")
-          } else if (account.provider === "azure-ad") {
-            // Check if email domain is authorized for admin access
+            // Auth0 users are patients by default
+            // But we can also check email domain for admin privileges
             const email = user.email?.toLowerCase() || ""
             const adminDomains = ["innerclarity.org", "innerclarityinc.com", "nextphaseit.org"]
             const domain = email.split("@")[1]
 
             if (adminDomains.includes(domain)) {
-              token.role = "admin"
-              token.provider = "azure-ad"
-              console.log("Assigned admin role for Microsoft user")
+              role = "admin"
+              console.log("Auth0 user assigned admin role based on email domain")
             } else {
-              console.log("Unauthorized domain for admin access:", domain)
-              return null // Reject the token
+              role = "patient"
+              console.log("Auth0 user assigned patient role")
             }
-          } else if (account.provider === "credentials") {
-            token.role = user.role || "patient"
-            token.provider = "credentials"
+
+            token.provider = "auth0"
+          } else if (account.provider === "azure-ad") {
+            // Microsoft users are admins
+            const email = user.email?.toLowerCase() || ""
+            const adminDomains = ["innerclarity.org", "innerclarityinc.com", "nextphaseit.org"]
+            const domain = email.split("@")[1]
+
+            if (adminDomains.includes(domain)) {
+              role = "admin"
+              tenantId = process.env.MICROSOFT_TENANT_ID || "inner-clarity-main"
+              console.log("Microsoft user assigned admin role")
+            } else {
+              console.log("Unauthorized domain for Microsoft admin access:", domain)
+              throw new Error(`Unauthorized domain: ${domain}`)
+            }
+
+            token.provider = "azure-ad"
           }
 
-          token.tenantId = user.tenantId || "inner-clarity-main"
+          token.role = role
+          token.tenantId = tenantId
           token.accessToken = account.access_token
+
+          console.log(`✅ User ${user.email} assigned role: ${role}, tenant: ${tenantId}`)
         }
 
         return token
       } catch (error) {
-        console.error("JWT callback error:", error)
-        return token
+        console.error("❌ JWT callback error:", error)
+        // Return null to reject the token and prevent sign-in
+        return null
       }
     },
 
@@ -144,18 +115,18 @@ export const authOptions: NextAuthOptions = {
           session.user.provider = token.provider as string
           session.accessToken = token.accessToken as string
 
-          console.log(`Session created for ${session.user.email} with role: ${session.user.role}`)
+          console.log(`📱 Session created for ${session.user.email} with role: ${session.user.role}`)
         }
         return session
       } catch (error) {
-        console.error("Session callback error:", error)
+        console.error("❌ Session callback error:", error)
         return session
       }
     },
 
     async redirect({ url, baseUrl }) {
       try {
-        console.log(`Redirect callback - URL: ${url}, BaseURL: ${baseUrl}`)
+        console.log(`🔄 Redirect callback - URL: ${url}, Base: ${baseUrl}`)
 
         // Handle relative URLs
         if (url.startsWith("/")) {
@@ -167,17 +138,17 @@ export const authOptions: NextAuthOptions = {
           return url
         }
 
-        // Default redirect - will be handled by middleware for role-based routing
+        // Default redirect
         return baseUrl
       } catch (error) {
-        console.error("Redirect callback error:", error)
+        console.error("❌ Redirect callback error:", error)
         return baseUrl
       }
     },
 
     async signIn({ user, account, profile }) {
       try {
-        console.log(`SignIn callback - Provider: ${account?.provider}, User: ${user.email}`)
+        console.log(`🔑 SignIn callback - Provider: ${account?.provider}, User: ${user.email}`)
 
         // For Microsoft login, check domain authorization
         if (account?.provider === "azure-ad") {
@@ -186,14 +157,14 @@ export const authOptions: NextAuthOptions = {
           const domain = email.split("@")[1]
 
           if (!adminDomains.includes(domain)) {
-            console.log("Access denied for domain:", domain)
+            console.error(`❌ Access denied for domain: ${domain}`)
             return false
           }
         }
 
         return true
       } catch (error) {
-        console.error("SignIn callback error:", error)
+        console.error("❌ SignIn callback error:", error)
         return false
       }
     },

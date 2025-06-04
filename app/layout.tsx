@@ -2,21 +2,37 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { AuthProvider } from "@/components/auth-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import { AuthProvider } from "@/components/auth-provider"
-import ErrorBoundary from "@/components/error-boundary"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Inner Clarity Inc. - Mental Health Portal",
-  description: "Secure HIPAA-compliant mental health portal for clients and providers",
-  icons: {
-    icon: "/images/inner-clarity-logo.png",
-    apple: "/images/inner-clarity-logo.png",
+  title: "Inner Clarity - Mental Health Services",
+  description: "Secure, HIPAA-compliant mental health services and client portal",
+  keywords: ["mental health", "therapy", "counseling", "HIPAA", "secure"],
+  authors: [{ name: "Inner Clarity Inc." }],
+  creator: "Inner Clarity Inc.",
+  publisher: "Inner Clarity Inc.",
+  robots: {
+    index: true,
+    follow: true,
   },
-  generator: "v0.dev",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://innerclarity.org",
+    title: "Inner Clarity - Mental Health Services",
+    description: "Secure, HIPAA-compliant mental health services and client portal",
+    siteName: "Inner Clarity",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Inner Clarity - Mental Health Services",
+    description: "Secure, HIPAA-compliant mental health services and client portal",
+  },
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -27,14 +43,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ErrorBoundary>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-              {children}
-              <Toaster />
-            </ThemeProvider>
+            <div className="min-h-screen bg-background">{children}</div>
+            <Toaster />
           </AuthProvider>
-        </ErrorBoundary>
+        </ThemeProvider>
       </body>
     </html>
   )
