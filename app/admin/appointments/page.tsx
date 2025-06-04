@@ -1,23 +1,23 @@
 "use client"
 
 import type React from "react"
-
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
-import { useAuth } from "@/components/auth-provider"
 import { Calendar, Clock, Plus, Filter, Users, Video, MapPin, Shield } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
+import { useAuth } from "@/components/auth-provider"
+
+// Mark as dynamic to prevent static rendering issues
+export const dynamic = "force-dynamic"
 
 export default function AdminAppointmentsPage() {
-  const { user, loading } = useAuth()
   const router = useRouter()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
-
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [newAppointment, setNewAppointment] = useState({
@@ -27,17 +27,37 @@ export default function AdminAppointmentsPage() {
     status: "Upcoming",
   })
 
+  // Use our custom auth hook which handles client/server rendering safely
+  const { user, loading } = useAuth()
+
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) {
+      console.log("Unauthorized access to admin appointments page")
       router.push("/auth/signin")
       return
     }
   }, [user, loading, router])
 
+  // Show loading state while checking authentication
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-clarity-blue-500"></div>
+      </div>
+    )
+  }
+
+  // Show unauthorized message if no user or wrong role
+  if (!user || user.role !== "admin") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+          <p className="text-gray-600">You don't have permission to view this page.</p>
+          <Button className="mt-4" onClick={() => router.push("/auth/signin")}>
+            Sign In
+          </Button>
+        </div>
       </div>
     )
   }

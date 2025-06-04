@@ -1,5 +1,8 @@
 "use client"
 
+// Mark as dynamic to prevent static rendering issues
+export const dynamic = "force-dynamic"
+
 import type React from "react"
 
 import { useRouter } from "next/navigation"
@@ -52,7 +55,7 @@ export default function AdminClientsPage() {
       status: "active",
       lastAppointment: "2024-01-10",
       nextAppointment: "2024-01-15",
-      provider: "Dr. Sarah Johnson",
+      provider: "Dr.Sarah Johnson",
     },
     {
       id: "2",

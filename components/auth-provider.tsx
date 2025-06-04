@@ -1,100 +1,68 @@
 "use client"
 
-import type React from "react"
+import { SessionProvider, useSession } from "next-auth/react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import type { ReactNode } from "react"
 
-interface User {
+// Define the User type
+type User = {
   id: string
   name?: string | null
   email?: string | null
   image?: string | null
-  role?: string | null
+  role: "admin" | "patient"
+  tenantId?: string
 }
 
-interface AuthContextType {
+// Define the Auth context type
+type AuthContextType = {
   user: User | null
-  status: "loading" | "authenticated" | "unauthenticated"
-  signIn: (provider?: string) => Promise<void>
-  signOut: () => Promise<void>
+  loading: boolean
 }
 
+// Create the Auth context
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  status: "loading",
-  signIn: async () => {},
-  signOut: async () => {},
+  loading: true,
 })
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [status, setStatus] = useState<"loading" | "authenticated" | "unauthenticated">("loading")
-  const router = useRouter()
-
-  useEffect(() => {
-    async function loadUserSession() {
-      try {
-        // Simulate loading time for demo purposes
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        const res = await fetch("/api/auth/session")
-
-        if (!res.ok) {
-          setStatus("unauthenticated")
-          return
-        }
-
-        const session = await res.json()
-
-        if (!session || !session.user) {
-          setStatus("unauthenticated")
-          return
-        }
-
-        setUser(session.user)
-        setStatus("authenticated")
-      } catch (error) {
-        console.error("Failed to load user session:", error)
-        setStatus("unauthenticated")
-      }
-    }
-
-    loadUserSession()
-  }, [])
-
-  const signIn = async (provider = "auth0") => {
-    try {
-      const callbackUrl = window.location.origin
-      window.location.href = `/api/auth/signin?provider=${provider}&callbackUrl=${encodeURIComponent(callbackUrl)}`
-    } catch (error) {
-      console.error("Sign in error:", error)
-      router.push("/auth/error?error=OAuthSignin")
-    }
-  }
-
-  const signOut = async () => {
-    try {
-      const res = await fetch("/api/auth/signout", { method: "POST" })
-      if (res.ok) {
-        setUser(null)
-        setStatus("unauthenticated")
-        router.push("/")
-      } else {
-        throw new Error("Failed to sign out")
-      }
-    } catch (error) {
-      console.error("Sign out error:", error)
-      router.push("/auth/error?error=Default")
-    }
-  }
-
-  return <AuthContext.Provider value={{ user, status, signIn, signOut }}>{children}</AuthContext.Provider>
+// Custom hook to use the Auth context
+export function useAuth() {
+  return useContext(AuthContext)
 }
 
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
+// Auth Provider component
+export function AuthProvider({ children }: { children: ReactNode }) {
+  return (
+    <SessionProvider>
+      <AuthProviderContent>{children}</AuthProviderContent>
+    </SessionProvider>
+  )
+}
+
+// Internal component to handle the session
+function AuthProviderContent({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Safe usage of useSession with proper error handling for SSR
+  const sessionHook = useSession()
+  const { data: session, status } = sessionHook
+
+  useEffect(() => {
+    // Update user state when session changes
+    if (status === "authenticated" && session?.user) {
+      setUser(session.user as User)
+    } else if (status === "unauthenticated") {
+      setUser(null)
+    }
+
+    // Update loading state
+    if (status !== "loading") {
+      setLoading(false)
+    }
+  }, [session, status])
+
+  // Provide the auth context
+  return <AuthContext.Provider value={{ user, loading }}>{children}</AuthContext.Provider>
 }

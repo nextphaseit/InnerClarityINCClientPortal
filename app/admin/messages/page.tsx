@@ -1,5 +1,8 @@
 "use client"
 
+// Mark as dynamic to prevent static rendering issues
+export const dynamic = "force-dynamic"
+
 import type React from "react"
 
 import { useRouter } from "next/navigation"
