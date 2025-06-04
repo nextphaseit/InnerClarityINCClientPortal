@@ -104,11 +104,12 @@ export default function SignInPage() {
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <Image
-              src="/placeholder.svg?height=40&width=120&text=Inner+Clarity+Inc."
+              src="/images/inner-clarity-logo.png"
               alt="Inner Clarity Inc."
               width={120}
               height={40}
-              className="h-10 w-auto"
+              className="h-12 w-auto"
+              priority
             />
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">Welcome Back</CardTitle>

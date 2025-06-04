@@ -13,8 +13,8 @@ export const metadata: Metadata = {
   title: "Inner Clarity Inc. - Mental Health Portal",
   description: "Secure HIPAA-compliant mental health portal for clients and providers",
   icons: {
-    icon: "/placeholder.svg?height=32&width=32&text=IC",
-    apple: "/placeholder.svg?height=32&width=32&text=IC",
+    icon: "/images/inner-clarity-logo.png",
+    apple: "/images/inner-clarity-logo.png",
   },
   generator: "v0.dev",
 }
