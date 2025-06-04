@@ -6,7 +6,18 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public paths that don't require authentication
-  const publicPaths = ["/", "/register", "/auth/signin", "/auth/error", "/auth/callback", "/unauthorized", "/not-found"]
+  const publicPaths = [
+    "/",
+    "/register",
+    "/auth/signin",
+    "/auth/error",
+    "/auth/callback",
+    "/unauthorized",
+    "/not-found",
+    "/privacy-policy",
+    "/terms-of-service",
+    "/hipaa-notice",
+  ]
 
   // API paths that don't require authentication
   const publicApiPaths = ["/api/auth", "/api/register", "/api/health", "/api/stripe/webhook"]
@@ -29,6 +40,8 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   })
 
+  console.log(`🔒 Middleware - Path: ${pathname}, Token: ${token ? "Present" : "Missing"}`)
+
   // Create response with security headers
   const response = NextResponse.next()
 
@@ -44,10 +57,14 @@ export async function middleware(request: NextRequest) {
 
   // Check if user is authenticated
   if (!token) {
+    console.log(`🚫 Unauthenticated access attempt to: ${pathname}`)
+
     // Redirect unauthenticated users based on the route they're trying to access
     if (pathname.startsWith("/admin")) {
-      return NextResponse.redirect(new URL("/api/auth/signin/azure-ad", request.url))
+      console.log("Redirecting to Microsoft login for admin route")
+      return NextResponse.redirect(new URL("/auth/signin?tab=admin", request.url))
     } else if (
+      pathname.startsWith("/patient") ||
       pathname.startsWith("/appointments") ||
       pathname.startsWith("/billing") ||
       pathname.startsWith("/messages") ||
@@ -56,28 +73,29 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/forms") ||
       pathname.startsWith("/profile")
     ) {
-      return NextResponse.redirect(new URL("/api/auth/signin/auth0", request.url))
+      console.log("Redirecting to Auth0 login for patient route")
+      return NextResponse.redirect(new URL("/auth/signin?tab=patient", request.url))
     } else {
-      // Default to Auth0 for other protected routes
+      // Default to sign-in page
       return NextResponse.redirect(new URL("/auth/signin", request.url))
     }
   }
 
   // Role-based access control for authenticated users
   if (token) {
-    // Admin routes - require admin role and Azure AD authentication
+    console.log(`👤 User role: ${token.role}, accessing: ${pathname}`)
+
+    // Admin routes - require admin role
     if (pathname.startsWith("/admin")) {
       if (token.role !== "admin") {
-        return NextResponse.redirect(new URL("/unauthorized", request.url))
-      }
-      // Optionally check for Azure AD provider
-      if (token.provider && token.provider !== "azure-ad" && token.provider !== "credentials") {
-        return NextResponse.redirect(new URL("/unauthorized", request.url))
+        console.log("❌ Access denied: Patient trying to access admin route")
+        return NextResponse.redirect(new URL("/unauthorized?reason=admin_required", request.url))
       }
     }
 
     // Patient routes - require patient role
     if (
+      pathname.startsWith("/patient") ||
       pathname.startsWith("/appointments") ||
       pathname.startsWith("/billing") ||
       pathname.startsWith("/messages") ||
@@ -87,21 +105,25 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/profile")
     ) {
       if (token.role !== "patient") {
-        return NextResponse.redirect(new URL("/unauthorized", request.url))
+        console.log("❌ Access denied: Admin trying to access patient route")
+        return NextResponse.redirect(new URL("/unauthorized?reason=patient_required", request.url))
       }
     }
 
     // Add tenant information to headers for API routes
     if (pathname.startsWith("/api") && token.tenantId) {
       response.headers.set("X-Tenant-ID", token.tenantId as string)
+      response.headers.set("X-User-Role", token.role as string)
     }
 
-    // Redirect authenticated users away from auth pages
+    // Redirect authenticated users away from auth pages to their dashboard
     if (pathname === "/" || pathname === "/auth/signin" || pathname === "/register") {
       if (token.role === "admin") {
+        console.log("✅ Redirecting authenticated admin to admin dashboard")
         return NextResponse.redirect(new URL("/admin", request.url))
       } else if (token.role === "patient") {
-        return NextResponse.redirect(new URL("/dashboard", request.url))
+        console.log("✅ Redirecting authenticated patient to patient dashboard")
+        return NextResponse.redirect(new URL("/patient/dashboard", request.url))
       }
     }
   }

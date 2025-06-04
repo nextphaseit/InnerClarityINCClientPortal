@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Eye, EyeOff, Mail, Lock, Shield } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, Shield, AlertTriangle } from "lucide-react"
 
 export default function SignInPage() {
   const router = useRouter()
@@ -25,28 +25,55 @@ export default function SignInPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("patient")
 
-  // Get callbackUrl from query parameters
-  const callbackUrl = searchParams?.get("callbackUrl") || "/dashboard"
+  // Get tab from URL params
+  useEffect(() => {
+    const tab = searchParams?.get("tab")
+    if (tab === "admin" || tab === "patient") {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     // Check for error message in URL
     const errorMessage = searchParams?.get("error")
     if (errorMessage) {
+      console.log("Auth error:", errorMessage)
       switch (errorMessage) {
         case "AccessDenied":
-          setError("You don't have permission to access that page.")
+          setError("Access denied. Please check your credentials and try again.")
           break
-        case "MicrosoftLoginRequired":
-          setError("Admin access requires Microsoft login.")
+        case "OAuthSignin":
+          setError("OAuth sign-in failed. Please check your configuration.")
+          break
+        case "OAuthCallback":
+          setError("OAuth callback error. Please try again.")
+          break
+        case "OAuthCreateAccount":
+          setError("Could not create OAuth account. Please contact support.")
+          break
+        case "EmailCreateAccount":
+          setError("Could not create account with that email address.")
+          break
+        case "Callback":
+          setError("Callback URL error. Please try again.")
+          break
+        case "OAuthAccountNotLinked":
+          setError("Account not linked. Please use the same sign-in method you used before.")
+          break
+        case "EmailSignin":
+          setError("Email sign-in failed. Please check your email.")
           break
         case "CredentialsSignin":
           setError("Invalid email or password.")
+          break
+        case "SessionRequired":
+          setError("Please sign in to access this page.")
           break
         case "Configuration":
           setError("Authentication service is not properly configured.")
           break
         default:
-          setError("An error occurred during sign in.")
+          setError("An error occurred during sign in. Please try again.")
       }
     }
 
@@ -69,11 +96,15 @@ export default function SignInPage() {
     setError(null)
 
     try {
+      console.log("Attempting credentials login for:", email)
+
       const result = await signIn("credentials", {
         email,
         password,
         redirect: false,
       })
+
+      console.log("Credentials login result:", result)
 
       if (result?.error) {
         setError("Invalid email or password")
@@ -83,14 +114,18 @@ export default function SignInPage() {
       if (result?.ok) {
         // Get the session to determine redirect
         const session = await getSession()
+        console.log("Session after login:", session)
+
         if (session?.user?.role === "admin") {
+          console.log("Redirecting admin to admin dashboard")
           router.push("/admin")
         } else {
-          router.push("/dashboard")
+          console.log("Redirecting patient to patient dashboard")
+          router.push("/patient/dashboard")
         }
       }
     } catch (error) {
-      console.error("Sign in error:", error)
+      console.error("Credentials sign in error:", error)
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)
@@ -102,13 +137,17 @@ export default function SignInPage() {
     setError(null)
 
     try {
-      await signIn("auth0", {
-        callbackUrl: "/dashboard",
+      console.log("Attempting Auth0 login")
+
+      const result = await signIn("auth0", {
+        callbackUrl: "/patient/dashboard",
         redirect: true,
       })
+
+      console.log("Auth0 login initiated:", result)
     } catch (error) {
       console.error("Auth0 login error:", error)
-      setError("Auth0 login is not available")
+      setError("Auth0 login failed. Please check your configuration or try again later.")
       setLoading(false)
     }
   }
@@ -118,16 +157,24 @@ export default function SignInPage() {
     setError(null)
 
     try {
-      await signIn("azure-ad", {
+      console.log("Attempting Microsoft login")
+
+      const result = await signIn("azure-ad", {
         callbackUrl: "/admin",
         redirect: true,
       })
+
+      console.log("Microsoft login initiated:", result)
     } catch (error) {
       console.error("Microsoft login error:", error)
-      setError("Microsoft login is not available")
+      setError("Microsoft login failed. Please check your configuration or try again later.")
       setLoading(false)
     }
   }
+
+  // Check if OAuth providers are configured
+  const isAuth0Configured = process.env.NEXT_PUBLIC_AUTH0_CONFIGURED === "true"
+  const isMicrosoftConfigured = process.env.NEXT_PUBLIC_MICROSOFT_CONFIGURED === "true"
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 flex items-center justify-center p-4">
@@ -150,6 +197,7 @@ export default function SignInPage() {
         <CardContent>
           {error && (
             <Alert variant="destructive" className="mb-4">
+              <AlertTriangle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
@@ -160,20 +208,47 @@ export default function SignInPage() {
             </Alert>
           )}
 
-          <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="patient">Patient Portal</TabsTrigger>
               <TabsTrigger value="admin">Admin Portal</TabsTrigger>
             </TabsList>
 
             <TabsContent value="patient" className="space-y-4">
+              {/* Auth0 Login Button */}
+              <Button
+                onClick={handleAuth0Login}
+                className="w-full bg-clarity-blue-600 hover:bg-clarity-blue-700"
+                disabled={loading}
+              >
+                {loading ? "Connecting..." : "Sign in with Auth0"}
+              </Button>
+
+              {!isAuth0Configured && (
+                <Alert className="bg-yellow-50 border-yellow-200">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-800">
+                    Auth0 is not configured. Please use credentials or contact support.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or use credentials</span>
+                </div>
+              </div>
+
               <form onSubmit={handleCredentialsLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="patient-email">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      id="email"
+                      id="patient-email"
                       type="email"
                       placeholder="patient@example.com"
                       value={email}
@@ -186,7 +261,7 @@ export default function SignInPage() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="patient-password">Password</Label>
                     <Link
                       href="/auth/forgot-password"
                       className="text-xs text-clarity-blue-600 hover:text-clarity-blue-700"
@@ -197,9 +272,9 @@ export default function SignInPage() {
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      id="password"
+                      id="patient-password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="patient123"
+                      placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-10"
@@ -219,27 +294,36 @@ export default function SignInPage() {
                   {loading ? "Signing in..." : "Sign in"}
                 </Button>
               </form>
+            </TabsContent>
+
+            <TabsContent value="admin" className="space-y-4">
+              {/* Microsoft Login Button */}
+              <Button
+                onClick={handleMicrosoftLogin}
+                className="w-full bg-[#0078d4] hover:bg-[#006cbe]"
+                disabled={loading}
+              >
+                {loading ? "Connecting..." : "Sign in with Microsoft"}
+              </Button>
+
+              {!isMicrosoftConfigured && (
+                <Alert className="bg-yellow-50 border-yellow-200">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-800">
+                    Microsoft login is not configured. Please use credentials or contact support.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-300"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or</span>
+                  <span className="px-2 bg-white text-gray-500">Or use credentials</span>
                 </div>
               </div>
 
-              <Button
-                onClick={handleAuth0Login}
-                className="w-full bg-clarity-blue-600 hover:bg-clarity-blue-700"
-                disabled={loading}
-                variant="outline"
-              >
-                {loading ? "Connecting..." : "Sign in with Auth0"}
-              </Button>
-            </TabsContent>
-
-            <TabsContent value="admin" className="space-y-4">
               <form onSubmit={handleCredentialsLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="admin-email">Email</Label>
@@ -264,7 +348,7 @@ export default function SignInPage() {
                     <Input
                       id="admin-password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="admin123"
+                      placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-10"
@@ -285,26 +369,9 @@ export default function SignInPage() {
                 </Button>
               </form>
 
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or</span>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleMicrosoftLogin}
-                className="w-full bg-[#0078d4] hover:bg-[#006cbe]"
-                disabled={loading}
-                variant="outline"
-              >
-                {loading ? "Connecting..." : "Sign in with Microsoft"}
-              </Button>
-
               <div className="text-center text-sm text-gray-600 mt-2">
                 <p>Admin access is restricted to authorized personnel only.</p>
+                <p className="mt-1">Authorized domains: @innerclarity.org, @innerclarityinc.com, @nextphaseit.org</p>
               </div>
             </TabsContent>
           </Tabs>
