@@ -5,7 +5,7 @@ import AzureADProvider from "next-auth/providers/azure-ad"
 // Force dynamic rendering
 export const dynamic = "force-dynamic"
 
-// Validate required environment variables
+// Validate required environment variables for Microsoft authentication
 const requiredEnvVars = {
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   NEXTAUTH_URL: process.env.NEXTAUTH_URL,
@@ -23,10 +23,11 @@ if (missingVars.length > 0) {
   throw new Error(`Missing required environment variables: ${missingVars.join(", ")}`)
 }
 
-console.log("✅ All required environment variables are present")
+console.log("✅ Microsoft authentication environment variables are present")
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    // Microsoft Entra ID Provider (Admin Only)
     AzureADProvider({
       clientId: requiredEnvVars.MICROSOFT_CLIENT_ID!,
       clientSecret: requiredEnvVars.MICROSOFT_CLIENT_SECRET!,
