@@ -71,47 +71,31 @@ export default function SignInPage() {
         email,
         password,
         redirect: false,
-        callbackUrl,
       })
 
       if (result?.error) {
         setError(result.error)
-        setLoading(false)
         return
       }
 
-      if (result?.url) {
-        router.push(result.url)
-      } else {
-        router.push(callbackUrl)
-      }
+      // Redirect based on user role (handled by middleware)
+      router.push(callbackUrl)
     } catch (error) {
+      setError("An unexpected error occurred")
       console.error("Sign in error:", error)
-      setError("An unexpected error occurred. Please try again.")
+    } finally {
       setLoading(false)
     }
   }
 
   const handleAuth0Login = async () => {
     setLoading(true)
-    try {
-      await signIn("auth0", { callbackUrl })
-    } catch (error) {
-      console.error("Auth0 sign in error:", error)
-      setError("Failed to sign in with Auth0. Please try again.")
-      setLoading(false)
-    }
+    await signIn("auth0", { callbackUrl })
   }
 
   const handleMicrosoftLogin = async () => {
     setLoading(true)
-    try {
-      await signIn("azure-ad", { callbackUrl })
-    } catch (error) {
-      console.error("Microsoft sign in error:", error)
-      setError("Failed to sign in with Microsoft. Please try again.")
-      setLoading(false)
-    }
+    await signIn("azure-ad", { callbackUrl })
   }
 
   return (

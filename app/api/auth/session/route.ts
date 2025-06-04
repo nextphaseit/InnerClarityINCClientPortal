@@ -1,23 +1,53 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
+import { getServerSession } from "next-auth"
 import { authOptions } from "../[...nextauth]/route"
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
 
-    // Always return a valid JSON response
-    return NextResponse.json({
-      user: session?.user || null,
-      expires: session?.expires || null,
-    })
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { user: null },
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      )
+    }
+
+    return NextResponse.json(
+      {
+        user: {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.name,
+          role: session.user.role,
+          tenantId: session.user.tenantId,
+        },
+      },
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    )
   } catch (error) {
     console.error("Session API error:", error)
-
-    // Return a valid JSON error response
     return NextResponse.json(
-      { error: "Failed to get session", message: "An error occurred while retrieving the session" },
-      { status: 500 },
+      {
+        user: null,
+        error: "Session check failed",
+      },
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
     )
   }
 }
