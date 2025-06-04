@@ -16,34 +16,40 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            return null
+          }
+
+          // Mock user validation - replace with real authentication
+          if (credentials.email === "admin@innerclarity.org" && credentials.password === "admin123") {
+            return {
+              id: "1",
+              email: "admin@innerclarity.org",
+              name: "Admin User",
+              role: "admin",
+              tenantId: "inner-clarity-main",
+            }
+          }
+
+          if (credentials.email === "patient@example.com" && credentials.password === "patient123") {
+            return {
+              id: "2",
+              email: "patient@example.com",
+              name: "Patient User",
+              role: "patient",
+              tenantId: "inner-clarity-main",
+            }
+          }
+
+          return null
+        } catch (error) {
+          console.error("Authorization error:", error)
           return null
         }
-
-        // Mock user validation - replace with real authentication
-        if (credentials.email === "admin@innerclarity.org" && credentials.password === "admin123") {
-          return {
-            id: "1",
-            email: "admin@innerclarity.org",
-            name: "Admin User",
-            role: "admin",
-            tenantId: "inner-clarity-main",
-          }
-        }
-
-        if (credentials.email === "patient@example.com" && credentials.password === "patient123") {
-          return {
-            id: "2",
-            email: "patient@example.com",
-            name: "Patient User",
-            role: "patient",
-            tenantId: "inner-clarity-main",
-          }
-        }
-
-        return null
       },
     }),
+    // Only add Auth0 if environment variables are present
     ...(process.env.AUTH0_CLIENT_ID && process.env.AUTH0_CLIENT_SECRET && process.env.AUTH0_DOMAIN
       ? [
           Auth0Provider({
@@ -53,17 +59,24 @@ export const authOptions: NextAuthOptions = {
             authorization: {
               params: {
                 audience: process.env.AUTH0_AUDIENCE || `https://${process.env.AUTH0_DOMAIN}/api/v2/`,
+                scope: "openid email profile",
               },
             },
           }),
         ]
       : []),
+    // Only add Azure AD if environment variables are present
     ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && process.env.MICROSOFT_TENANT_ID
       ? [
           AzureADProvider({
             clientId: process.env.MICROSOFT_CLIENT_ID,
             clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
             tenantId: process.env.MICROSOFT_TENANT_ID,
+            authorization: {
+              params: {
+                scope: "openid email profile User.Read",
+              },
+            },
           }),
         ]
       : []),
@@ -74,26 +87,51 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user, account }) {
-      if (user) {
-        token.role = user.role || "patient"
-        token.tenantId = user.tenantId || "inner-clarity-main"
-        token.provider = account?.provider
+      try {
+        if (user) {
+          token.role = user.role || "patient"
+          token.tenantId = user.tenantId || "inner-clarity-main"
+          token.provider = account?.provider || "credentials"
+        }
+        return token
+      } catch (error) {
+        console.error("JWT callback error:", error)
+        return token
       }
-      return token
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub || ""
-        session.user.role = token.role as string
-        session.user.tenantId = token.tenantId as string
+      try {
+        if (session.user && token) {
+          session.user.id = token.sub || ""
+          session.user.role = token.role as string
+          session.user.tenantId = token.tenantId as string
+          session.user.provider = token.provider as string
+        }
+        return session
+      } catch (error) {
+        console.error("Session callback error:", error)
+        return session
       }
-      return session
+    },
+    async signIn({ user, account, profile }) {
+      try {
+        // Allow sign in for all configured providers
+        return true
+      } catch (error) {
+        console.error("SignIn callback error:", error)
+        return false
+      }
     },
   },
   session: {
     strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 hours
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
+  debug: process.env.NODE_ENV === "development",
 }
 
 const handler = NextAuth(authOptions)

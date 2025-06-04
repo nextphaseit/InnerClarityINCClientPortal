@@ -10,6 +10,8 @@ interface User {
   email?: string | null
   image?: string | null
   role?: string | null
+  tenantId?: string | null
+  provider?: string | null
 }
 
 interface AuthContextType {
@@ -34,24 +36,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function loadUserSession() {
       try {
-        // Simulate loading time for demo purposes
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        const res = await fetch("/api/auth/session")
+        const res = await fetch("/api/auth/session", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
 
         if (!res.ok) {
+          console.warn("Session fetch failed:", res.status, res.statusText)
           setStatus("unauthenticated")
           return
         }
 
-        const session = await res.json()
+        const data = await res.json()
 
-        if (!session || !session.user) {
+        if (!data || !data.user || !data.user.id) {
           setStatus("unauthenticated")
           return
         }
 
-        setUser(session.user)
+        setUser(data.user)
         setStatus("authenticated")
       } catch (error) {
         console.error("Failed to load user session:", error)
@@ -62,10 +67,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUserSession()
   }, [])
 
-  const signIn = async (provider = "auth0") => {
+  const signIn = async (provider = "credentials") => {
     try {
-      const callbackUrl = window.location.origin
-      window.location.href = `/api/auth/signin?provider=${provider}&callbackUrl=${encodeURIComponent(callbackUrl)}`
+      const callbackUrl = encodeURIComponent(window.location.origin + "/dashboard")
+      window.location.href = `/api/auth/signin/${provider}?callbackUrl=${callbackUrl}`
     } catch (error) {
       console.error("Sign in error:", error)
       router.push("/auth/error?error=OAuthSignin")
@@ -74,7 +79,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      const res = await fetch("/api/auth/signout", { method: "POST" })
+      const res = await fetch("/api/auth/signout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
       if (res.ok) {
         setUser(null)
         setStatus("unauthenticated")
@@ -84,7 +95,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error("Sign out error:", error)
-      router.push("/auth/error?error=Default")
+      // Force logout even if API call fails
+      setUser(null)
+      setStatus("unauthenticated")
+      router.push("/")
     }
   }
 

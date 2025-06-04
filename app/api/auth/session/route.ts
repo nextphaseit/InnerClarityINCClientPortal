@@ -1,56 +1,33 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "../[...nextauth]/route"
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { user: null },
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      )
+    if (!session) {
+      return NextResponse.json({ user: null }, { status: 200 })
     }
 
     return NextResponse.json(
       {
         user: {
-          id: session.user.id,
-          email: session.user.email,
-          name: session.user.name,
-          role: session.user.role,
-          tenantId: session.user.tenantId,
+          id: session.user?.id || "",
+          name: session.user?.name || "",
+          email: session.user?.email || "",
+          role: session.user?.role || "patient",
+          tenantId: session.user?.tenantId || "inner-clarity-main",
+          provider: session.user?.provider || "credentials",
         },
       },
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
+      { status: 200 },
     )
   } catch (error) {
     console.error("Session API error:", error)
-    return NextResponse.json(
-      {
-        user: null,
-        error: "Session check failed",
-      },
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
-    )
+    return NextResponse.json({ error: "Internal server error", user: null }, { status: 500 })
   }
 }
