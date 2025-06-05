@@ -1,48 +1,70 @@
-export default function PortalBillingLoading() {
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+
+export default function BillingLoading() {
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="p-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header Skeleton */}
         <div className="mb-8">
-          <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
-          <div className="h-8 w-64 bg-gray-200 rounded animate-pulse mb-2"></div>
-          <div className="h-4 w-96 bg-gray-200 rounded animate-pulse"></div>
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
         </div>
 
         {/* Summary Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white p-6 rounded-lg border">
-              <div className="flex justify-between items-center mb-4">
-                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
-                <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse mb-2"></div>
-              <div className="h-3 w-32 bg-gray-200 rounded animate-pulse"></div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4 rounded" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-20 mb-2" />
+                <Skeleton className="h-3 w-32" />
+              </CardContent>
+            </Card>
           ))}
         </div>
 
-        {/* Table Skeleton */}
-        <div className="bg-white rounded-lg border">
-          <div className="p-6 border-b">
-            <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-2"></div>
-            <div className="h-4 w-64 bg-gray-200 rounded animate-pulse"></div>
-          </div>
-          <div className="p-6">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex justify-between items-center py-4 border-b last:border-b-0">
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-3 w-32 bg-gray-200 rounded animate-pulse"></div>
+        {/* Quick Actions Skeleton */}
+        <Card className="mb-8">
+          <CardHeader>
+            <Skeleton className="h-6 w-32 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Skeleton className="h-10 w-32" />
+              <Skeleton className="h-10 w-32" />
+              <Skeleton className="h-10 w-40" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Payment History Skeleton */}
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-40 mb-2" />
+            <Skeleton className="h-4 w-72" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                  <div className="text-right space-y-2">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-3 w-12" />
+                  </div>
                 </div>
-                <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
-                <div className="h-6 w-20 bg-gray-200 rounded animate-pulse"></div>
-                <div className="h-8 w-24 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-            ))}
-          </div>
-        </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

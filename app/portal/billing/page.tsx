@@ -1,158 +1,109 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePatientAuth } from "@/components/patient-auth-provider"
 import { supabase, isSupabaseConfigured } from "@/lib/supabase"
 import {
   CreditCard,
   Download,
-  DollarSign,
-  FileText,
   AlertTriangle,
   CheckCircle,
   Clock,
   Zap,
   Receipt,
   Settings,
+  Calendar,
+  TrendingUp,
+  ExternalLink,
 } from "lucide-react"
-
-interface Invoice {
-  id: string
-  invoice_number?: string
-  date: string
-  description: string
-  amount: number
-  status: "draft" | "pending" | "paid" | "overdue" | "cancelled"
-  due_date?: string
-  paid_date?: string
-  created_at?: string
-}
 
 interface Payment {
   id: string
   amount: number
-  status: string
+  currency: string
+  status: "pending" | "paid" | "failed" | "canceled" | "refunded"
   description: string
+  payment_method?: string
+  stripe_payment_intent: string
   created_at: string
-  stripe_payment_intent_id?: string
+  updated_at: string
 }
 
-interface AutopaySettings {
-  id: string
-  is_active: boolean
-  billing_cycle: string
-  next_payment_date?: string
-  stripe_customer_id?: string
+interface BillingSummary {
+  totalPaid: number
+  totalPending: number
+  lastPaymentDate?: string
+  paymentCount: number
+  averagePayment: number
 }
 
 export default function BillingPage() {
-  const { user } = usePatientAuth()
+  const { user, loading: authLoading } = usePatientAuth()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [autopayLoading, setAutopayLoading] = useState(false)
-  const [invoices, setInvoices] = useState<Invoice[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
-  const [autopaySettings, setAutopaySettings] = useState<AutopaySettings | null>(null)
+  const [billingSummary, setBillingSummary] = useState<BillingSummary>({
+    totalPaid: 0,
+    totalPending: 0,
+    paymentCount: 0,
+    averagePayment: 0,
+  })
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
-  // Check for success/cancel parameters
   useEffect(() => {
-    const successParam = searchParams.get("success")
-    const canceledParam = searchParams.get("canceled")
-    const autopayParam = searchParams.get("autopay")
+    if (authLoading) return
 
-    if (successParam === "true") {
-      setSuccess("Payment completed successfully!")
-      // Remove the parameter from URL
-      router.replace("/portal/billing")
-    } else if (canceledParam === "true") {
-      setError("Payment was canceled. Please try again if needed.")
-      router.replace("/portal/billing")
-    } else if (autopayParam === "setup") {
-      setSuccess("Autopay setup completed!")
-      router.replace("/portal/billing")
-    }
-  }, [searchParams, router])
-
-  useEffect(() => {
     if (!user) {
       router.push("/portal/auth/signin")
       return
     }
+
     loadBillingData()
-  }, [user, router])
+  }, [user, authLoading, router])
 
   const loadBillingData = async () => {
+    if (!user?.id) return
+
     setLoading(true)
     setError("")
 
     try {
-      if (isSupabaseConfigured() && user?.id) {
-        // Load real data from Supabase with fallback column names
-        console.log("Loading billing data for user:", user.id)
+      if (isSupabaseConfigured()) {
+        console.log("Loading billing data for patient:", user.id)
 
-        // Try to load invoices with both patient_id and client_id for compatibility
-        const invoicesQuery = supabase
-          .from("invoices")
-          .select("*")
-          .or(`patient_id.eq.${user.id},client_id.eq.${user.id}`)
-          .order("created_at", { ascending: false })
-
-        const paymentsQuery = supabase
+        // Fetch payments from Supabase
+        const { data: paymentsData, error: paymentsError } = await supabase
           .from("payments")
           .select("*")
           .eq("patient_id", user.id)
           .order("created_at", { ascending: false })
 
-        const autopayQuery = supabase.from("autopay_settings").select("*").eq("patient_id", user.id).single()
-
-        const [invoicesResult, paymentsResult, autopayResult] = await Promise.all([
-          invoicesQuery,
-          paymentsQuery,
-          autopayQuery,
-        ])
-
-        console.log("Invoices result:", invoicesResult)
-        console.log("Payments result:", paymentsResult)
-        console.log("Autopay result:", autopayResult)
-
-        if (invoicesResult.error && invoicesResult.error.code !== "PGRST116") {
-          console.error("Invoices error:", invoicesResult.error)
-          throw new Error(`Failed to load invoices: ${invoicesResult.error.message}`)
+        if (paymentsError) {
+          console.error("Error fetching payments:", paymentsError)
+          throw new Error(`Failed to load payment history: ${paymentsError.message}`)
         }
 
-        if (paymentsResult.error && paymentsResult.error.code !== "PGRST116") {
-          console.error("Payments error:", paymentsResult.error)
-          // Don't throw error for payments, just log it
-          console.warn("Payments table might not exist, using empty array")
-        }
+        console.log("Loaded payments:", paymentsData)
+        setPayments(paymentsData || [])
 
-        // Process invoices data
-        const invoicesData = (invoicesResult.data || []).map((invoice: any) => ({
-          ...invoice,
-          date: invoice.created_at || invoice.date,
-          invoice_number: invoice.invoice_number || `INV-${invoice.id.slice(0, 8)}`,
-        }))
-
-        setInvoices(invoicesData)
-        setPayments(paymentsResult.data || [])
-        setAutopaySettings(autopayResult.data)
+        // Calculate billing summary
+        const summary = calculateBillingSummary(paymentsData || [])
+        setBillingSummary(summary)
       } else {
-        console.log("Loading mock data (Supabase not configured or no user)")
+        console.log("Supabase not configured, loading mock data")
         loadMockData()
       }
     } catch (error) {
       console.error("Error loading billing data:", error)
-      setError(`Unable to load billing information: ${error instanceof Error ? error.message : "Unknown error"}`)
+      setError(error instanceof Error ? error.message : "Failed to load billing information")
       // Fallback to mock data
       loadMockData()
     } finally {
@@ -161,57 +112,65 @@ export default function BillingPage() {
   }
 
   const loadMockData = () => {
-    console.log("Loading mock billing data")
-    const mockInvoices: Invoice[] = [
-      {
-        id: "1",
-        invoice_number: "INV-2024-001",
-        date: "2024-01-15",
-        description: "Individual Therapy Session - Dr. Sarah Johnson",
-        amount: 150.0,
-        status: "paid",
-        paid_date: "2024-01-20",
-      },
-      {
-        id: "2",
-        invoice_number: "INV-2024-002",
-        date: "2024-01-29",
-        description: "Group Therapy Session - Anxiety Management",
-        amount: 75.0,
-        status: "pending",
-        due_date: "2024-02-15",
-      },
-      {
-        id: "3",
-        invoice_number: "INV-2024-003",
-        date: "2024-02-05",
-        description: "Psychological Assessment - Dr. Michael Chen",
-        amount: 300.0,
-        status: "overdue",
-        due_date: "2024-02-20",
-      },
-    ]
-
     const mockPayments: Payment[] = [
       {
         id: "1",
-        amount: 150.0,
-        status: "succeeded",
-        description: "Payment for INV-2024-001",
-        created_at: "2024-01-20T10:30:00Z",
+        amount: 15000, // $150.00 in cents
+        currency: "usd",
+        status: "paid",
+        description: "Individual Therapy Session - Dr. Sarah Johnson",
+        payment_method: "card",
+        stripe_payment_intent: "pi_1234567890abcdef",
+        created_at: "2024-01-15T10:30:00Z",
+        updated_at: "2024-01-15T10:30:00Z",
+      },
+      {
+        id: "2",
+        amount: 7500, // $75.00 in cents
+        currency: "usd",
+        status: "paid",
+        description: "Group Therapy Session - Anxiety Management",
+        payment_method: "card",
+        stripe_payment_intent: "pi_0987654321fedcba",
+        created_at: "2024-01-29T14:15:00Z",
+        updated_at: "2024-01-29T14:15:00Z",
+      },
+      {
+        id: "3",
+        amount: 30000, // $300.00 in cents
+        currency: "usd",
+        status: "pending",
+        description: "Psychological Assessment - Dr. Michael Chen",
+        payment_method: "card",
+        stripe_payment_intent: "pi_abcdef1234567890",
+        created_at: "2024-02-05T09:00:00Z",
+        updated_at: "2024-02-05T09:00:00Z",
       },
     ]
 
-    setInvoices(mockInvoices)
     setPayments(mockPayments)
-    setAutopaySettings({
-      id: "1",
-      is_active: false,
-      billing_cycle: "monthly",
-    })
+    setBillingSummary(calculateBillingSummary(mockPayments))
   }
 
-  const handlePayNow = async (invoice: Invoice) => {
+  const calculateBillingSummary = (payments: Payment[]): BillingSummary => {
+    const paidPayments = payments.filter((p) => p.status === "paid")
+    const pendingPayments = payments.filter((p) => p.status === "pending")
+
+    const totalPaid = paidPayments.reduce((sum, p) => sum + p.amount, 0)
+    const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0)
+
+    const lastPaymentDate = paidPayments.length > 0 ? paidPayments[0].created_at : undefined
+
+    return {
+      totalPaid,
+      totalPending,
+      lastPaymentDate,
+      paymentCount: payments.length,
+      averagePayment: payments.length > 0 ? totalPaid / paidPayments.length || 0 : 0,
+    }
+  }
+
+  const handlePayNow = async (amount = 10000, description = "Medical Services Payment") => {
     if (!user?.id) return
 
     setPaymentLoading(true)
@@ -224,9 +183,8 @@ export default function BillingPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: invoice.amount,
-          description: invoice.description,
-          invoiceId: invoice.invoice_number || invoice.id,
+          amount: amount / 100, // Convert cents to dollars for API
+          description,
           patientId: user.id,
         }),
       })
@@ -292,15 +250,40 @@ export default function BillingPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Paid</Badge>
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Paid
+          </Badge>
+        )
       case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pending</Badge>
-      case "overdue":
-        return <Badge variant="destructive">Overdue</Badge>
-      case "draft":
-        return <Badge variant="secondary">Draft</Badge>
-      case "cancelled":
-        return <Badge variant="outline">Cancelled</Badge>
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </Badge>
+        )
+      case "failed":
+        return (
+          <Badge variant="destructive">
+            <AlertTriangle className="h-3 w-3 mr-1" />
+            Failed
+          </Badge>
+        )
+      case "canceled":
+        return (
+          <Badge variant="outline">
+            <AlertTriangle className="h-3 w-3 mr-1" />
+            Canceled
+          </Badge>
+        )
+      case "refunded":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+            <TrendingUp className="h-3 w-3 mr-1" />
+            Refunded
+          </Badge>
+        )
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
@@ -311,37 +294,29 @@ export default function BillingPage() {
       year: "numeric",
       month: "short",
       day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     })
   }
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amountInCents: number, currency = "USD") => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
-    }).format(amount)
+      currency: currency.toUpperCase(),
+    }).format(amountInCents / 100)
   }
 
-  const calculateTotals = () => {
-    const totalAmount = invoices.reduce((sum, invoice) => sum + invoice.amount, 0)
-    const paidAmount = invoices
-      .filter((invoice) => invoice.status === "paid")
-      .reduce((sum, invoice) => sum + invoice.amount, 0)
-    const unpaidAmount = invoices
-      .filter((invoice) => invoice.status === "pending" || invoice.status === "overdue")
-      .reduce((sum, invoice) => sum + invoice.amount, 0)
-
-    return { totalAmount, paidAmount, unpaidAmount }
+  const shortenPaymentIntent = (paymentIntent: string) => {
+    return `${paymentIntent.slice(0, 8)}...${paymentIntent.slice(-4)}`
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
       </div>
     )
   }
-
-  const { totalAmount, paidAmount, unpaidAmount } = calculateTotals()
 
   return (
     <div className="p-6">
@@ -366,8 +341,7 @@ export default function BillingPage() {
           <Alert className="mb-6 border-orange-200 bg-orange-50">
             <AlertTriangle className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-orange-800">
-              <strong>Demo Mode:</strong> This page is showing mock data. Stripe integration requires proper environment
-              configuration.
+              <strong>Demo Mode:</strong> This page is showing mock data. Connect Supabase to see real payment history.
             </AlertDescription>
           </Alert>
         )}
@@ -375,29 +349,18 @@ export default function BillingPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800">Billing & Payments</h1>
-          <p className="mt-2 text-slate-600">Manage your invoices, payments, and autopay settings</p>
+          <p className="mt-2 text-slate-600">Manage your payments and view billing history</p>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {/* Billing Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Billed</CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalAmount)}</div>
-              <p className="text-xs text-muted-foreground">All time billing</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Amount Paid</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
               <CheckCircle className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{formatCurrency(paidAmount)}</div>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(billingSummary.totalPaid)}</div>
               <p className="text-xs text-muted-foreground">Successfully processed</p>
             </CardContent>
           </Card>
@@ -405,23 +368,16 @@ export default function BillingPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
-              <Clock className="h-4 w-4 text-red-600" />
+              <Clock className="h-4 w-4 text-yellow-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">{formatCurrency(unpaidAmount)}</div>
-              <p className="text-xs text-muted-foreground">Requires payment</p>
-              {unpaidAmount > 0 && (
+              <div className="text-2xl font-bold text-yellow-600">{formatCurrency(billingSummary.totalPending)}</div>
+              <p className="text-xs text-muted-foreground">Pending payments</p>
+              {billingSummary.totalPending > 0 && (
                 <Button
                   size="sm"
                   className="mt-2 w-full bg-teal-600 hover:bg-teal-700"
-                  onClick={() => {
-                    const firstUnpaidInvoice = invoices.find(
-                      (inv) => inv.status === "pending" || inv.status === "overdue",
-                    )
-                    if (firstUnpaidInvoice) {
-                      handlePayNow(firstUnpaidInvoice)
-                    }
-                  }}
+                  onClick={() => handlePayNow(billingSummary.totalPending)}
                   disabled={paymentLoading}
                 >
                   {paymentLoading ? (
@@ -437,93 +393,122 @@ export default function BillingPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Autopay Status</CardTitle>
-              <Zap className={`h-4 w-4 ${autopaySettings?.is_active ? "text-green-600" : "text-gray-400"}`} />
+              <CardTitle className="text-sm font-medium">Last Payment</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{autopaySettings?.is_active ? "Active" : "Inactive"}</div>
+              <div className="text-2xl font-bold">
+                {billingSummary.lastPaymentDate ? formatDate(billingSummary.lastPaymentDate).split(",")[0] : "None"}
+              </div>
               <p className="text-xs text-muted-foreground">
-                {autopaySettings?.is_active ? "Automatic payments enabled" : "Manual payments only"}
+                {billingSummary.lastPaymentDate ? "Most recent payment" : "No payments yet"}
               </p>
-              <Button
-                size="sm"
-                variant={autopaySettings?.is_active ? "outline" : "default"}
-                className="mt-2 w-full"
-                onClick={handleSetupAutopay}
-                disabled={autopayLoading}
-              >
-                {autopayLoading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                ) : (
-                  <Settings className="h-4 w-4 mr-2" />
-                )}
-                {autopaySettings?.is_active ? "Manage Autopay" : "Setup Autopay"}
-              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Average Payment</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(billingSummary.averagePayment)}</div>
+              <p className="text-xs text-muted-foreground">{billingSummary.paymentCount} total payments</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="invoices" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="invoices">Invoices</TabsTrigger>
-            <TabsTrigger value="payments">Payment History</TabsTrigger>
-          </TabsList>
+        {/* Quick Actions */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Settings className="h-5 w-5 mr-2" />
+              Quick Actions
+            </CardTitle>
+            <CardDescription>Make a payment or manage your billing preferences</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button
+                onClick={() => handlePayNow()}
+                disabled={paymentLoading}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                {paymentLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                ) : (
+                  <CreditCard className="h-4 w-4 mr-2" />
+                )}
+                Make a Payment
+              </Button>
 
-          <TabsContent value="invoices">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FileText className="h-5 w-5 mr-2" />
-                  Invoices
-                </CardTitle>
-                <CardDescription>View and pay your medical service invoices</CardDescription>
-              </CardHeader>
-              <CardContent>
+              <Button variant="outline" onClick={handleSetupAutopay} disabled={autopayLoading}>
+                {autopayLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                ) : (
+                  <Zap className="h-4 w-4 mr-2" />
+                )}
+                Setup Autopay
+              </Button>
+
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Download Statements
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Payment History */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Receipt className="h-5 w-5 mr-2" />
+              Payment History
+            </CardTitle>
+            <CardDescription>View your complete payment transaction history</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {payments.length === 0 ? (
+              <div className="text-center py-12">
+                <Receipt className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No payments found</h3>
+                <p className="text-gray-500 mb-6">You haven't made any payments yet.</p>
+                <Button onClick={() => handlePayNow()} className="bg-teal-600 hover:bg-teal-700">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Make Your First Payment
+                </Button>
+              </div>
+            ) : (
+              <>
                 {/* Desktop Table View */}
                 <div className="hidden md:block">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Invoice #</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Date</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Description</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Payment ID</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Method</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {invoices.map((invoice) => (
-                          <tr key={invoice.id} className="border-b hover:bg-gray-50">
-                            <td className="py-4 px-4 font-mono text-sm">{invoice.invoice_number}</td>
-                            <td className="py-4 px-4 text-sm text-gray-600">{formatDate(invoice.date)}</td>
-                            <td className="py-4 px-4 text-sm">{invoice.description}</td>
-                            <td className="py-4 px-4 text-sm font-semibold">{formatCurrency(invoice.amount)}</td>
-                            <td className="py-4 px-4">{getStatusBadge(invoice.status)}</td>
-                            <td className="py-4 px-4">
-                              <div className="flex space-x-2">
-                                <Button variant="outline" size="sm">
-                                  <Download className="h-4 w-4 mr-1" />
-                                  Download
-                                </Button>
-                                {(invoice.status === "pending" || invoice.status === "overdue") && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handlePayNow(invoice)}
-                                    disabled={paymentLoading}
-                                    className="bg-teal-600 hover:bg-teal-700"
-                                  >
-                                    {paymentLoading ? (
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
-                                    ) : (
-                                      <CreditCard className="h-4 w-4 mr-1" />
-                                    )}
-                                    Pay Now
-                                  </Button>
-                                )}
-                              </div>
+                        {payments.map((payment) => (
+                          <tr key={payment.id} className="border-b hover:bg-gray-50">
+                            <td className="py-4 px-4 text-sm text-gray-600">{formatDate(payment.created_at)}</td>
+                            <td className="py-4 px-4 text-sm">{payment.description}</td>
+                            <td className="py-4 px-4 text-sm font-semibold">
+                              {formatCurrency(payment.amount, payment.currency)}
+                            </td>
+                            <td className="py-4 px-4">{getStatusBadge(payment.status)}</td>
+                            <td className="py-4 px-4 text-sm font-mono text-gray-500">
+                              {shortenPaymentIntent(payment.stripe_payment_intent)}
+                            </td>
+                            <td className="py-4 px-4 text-sm text-gray-600 capitalize">
+                              {payment.payment_method || "Card"}
                             </td>
                           </tr>
                         ))}
@@ -534,108 +519,35 @@ export default function BillingPage() {
 
                 {/* Mobile Card View */}
                 <div className="md:hidden space-y-4">
-                  {invoices.map((invoice) => (
-                    <Card key={invoice.id} className="border">
+                  {payments.map((payment) => (
+                    <Card key={payment.id} className="border">
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-3">
                           <div>
-                            <p className="font-mono text-sm text-gray-600">{invoice.invoice_number}</p>
-                            <p className="text-sm text-gray-500">{formatDate(invoice.date)}</p>
+                            <p className="text-sm text-gray-500">{formatDate(payment.created_at)}</p>
+                            <p className="font-medium">{payment.description}</p>
                           </div>
-                          {getStatusBadge(invoice.status)}
+                          {getStatusBadge(payment.status)}
                         </div>
 
-                        <p className="text-sm mb-3">{invoice.description}</p>
-
-                        <div className="flex justify-between items-center">
-                          <span className="text-lg font-semibold">{formatCurrency(invoice.amount)}</span>
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm">
-                              <Download className="h-4 w-4" />
-                            </Button>
-                            {(invoice.status === "pending" || invoice.status === "overdue") && (
-                              <Button
-                                size="sm"
-                                onClick={() => handlePayNow(invoice)}
-                                disabled={paymentLoading}
-                                className="bg-teal-600 hover:bg-teal-700"
-                              >
-                                {paymentLoading ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                ) : (
-                                  <CreditCard className="h-4 w-4" />
-                                )}
-                              </Button>
-                            )}
-                          </div>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-lg font-semibold">
+                            {formatCurrency(payment.amount, payment.currency)}
+                          </span>
+                          <span className="text-sm text-gray-500 capitalize">{payment.payment_method || "Card"}</span>
                         </div>
 
-                        {invoice.due_date && invoice.status !== "paid" && (
-                          <p className="text-xs text-gray-500 mt-2">Due: {formatDate(invoice.due_date)}</p>
-                        )}
+                        <div className="text-xs text-gray-400 font-mono">
+                          ID: {shortenPaymentIntent(payment.stripe_payment_intent)}
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
-
-                {invoices.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No invoices found</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="payments">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <DollarSign className="h-5 w-5 mr-2" />
-                  Payment History
-                </CardTitle>
-                <CardDescription>View your payment transaction history</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {payments.map((payment) => (
-                    <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div
-                          className={`p-2 rounded-full ${
-                            payment.status === "succeeded" ? "bg-green-100" : "bg-red-100"
-                          }`}
-                        >
-                          {payment.status === "succeeded" ? (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <AlertTriangle className="h-4 w-4 text-red-600" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium">{payment.description}</p>
-                          <p className="text-sm text-gray-500">{formatDate(payment.created_at)}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(payment.amount)}</p>
-                        <p className="text-sm text-gray-500 capitalize">{payment.status}</p>
-                      </div>
-                    </div>
-                  ))}
-
-                  {payments.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>No payments found</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Payment Information */}
         <Card className="mt-6">
@@ -662,6 +574,10 @@ export default function BillingPage() {
                   <p>Email: billing@innerclarity.com</p>
                   <p>Hours: Mon-Fri 9AM-5PM EST</p>
                 </div>
+                <Button variant="outline" size="sm" className="mt-3">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Contact Support
+                </Button>
               </div>
             </div>
           </CardContent>
