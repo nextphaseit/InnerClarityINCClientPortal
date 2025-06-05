@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Zap,
   Receipt,
   Settings,
   Calendar,
@@ -47,7 +46,7 @@ export default function BillingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [paymentLoading, setPaymentLoading] = useState(false)
-  const [autopayLoading, setAutopayLoading] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
   const [payments, setPayments] = useState<Payment[]>([])
   const [billingSummary, setBillingSummary] = useState<BillingSummary>({
     totalPaid: 0,
@@ -209,41 +208,40 @@ export default function BillingPage() {
     }
   }
 
-  const handleSetupAutopay = async () => {
+  const handleOpenCustomerPortal = async () => {
     if (!user?.id) return
 
-    setAutopayLoading(true)
+    setPortalLoading(true)
     setError("")
 
     try {
-      const response = await fetch("/api/setup-autopay", {
+      console.log("🎫 Opening customer portal...")
+
+      const response = await fetch("/api/create-customer-portal-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          patientId: user.id,
-          billingCycle: "monthly",
-        }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to setup autopay")
+        throw new Error(data.error || "Failed to create customer portal session")
       }
 
       // Redirect to Stripe Customer Portal
       if (data.url) {
+        console.log("✅ Redirecting to customer portal:", data.url)
         window.location.href = data.url
       } else {
         throw new Error("No portal URL received")
       }
     } catch (error) {
-      console.error("Error setting up autopay:", error)
-      setError("Failed to setup autopay. Please try again.")
+      console.error("Error opening customer portal:", error)
+      setError("Failed to open customer portal. Please try again.")
     } finally {
-      setAutopayLoading(false)
+      setPortalLoading(false)
     }
   }
 
@@ -442,13 +440,13 @@ export default function BillingPage() {
                 Make a Payment
               </Button>
 
-              <Button variant="outline" onClick={handleSetupAutopay} disabled={autopayLoading}>
-                {autopayLoading ? (
+              <Button variant="outline" onClick={handleOpenCustomerPortal} disabled={portalLoading}>
+                {portalLoading ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
                 ) : (
-                  <Zap className="h-4 w-4 mr-2" />
+                  <Settings className="h-4 w-4 mr-2" />
                 )}
-                Setup Autopay
+                Manage Payment Methods
               </Button>
 
               <Button variant="outline">
