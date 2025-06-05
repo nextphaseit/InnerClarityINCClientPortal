@@ -1,50 +1,86 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePatientAuth } from "@/components/patient-auth-provider"
-import { AlertCircle, CreditCard, Download, FileText, Receipt, DollarSign, CheckCircle, Clock } from "lucide-react"
+import { supabase, isSupabaseConfigured } from "@/lib/supabase"
+import {
+  CreditCard,
+  Download,
+  DollarSign,
+  FileText,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Zap,
+  Receipt,
+  Settings,
+} from "lucide-react"
 
 interface Invoice {
   id: string
+  invoice_number: string
   date: string
-  amount: number
   description: string
-  status: "paid" | "pending" | "overdue"
-  pdfUrl?: string
-}
-
-interface InsuranceClaim {
-  id: string
-  date: string
-  provider: string
-  service: string
   amount: number
-  status: "approved" | "pending" | "denied"
-  claimNumber: string
+  status: "draft" | "pending" | "paid" | "overdue" | "canceled"
+  due_date?: string
+  paid_date?: string
 }
 
-interface PaymentMethod {
+interface Payment {
   id: string
-  type: "card" | "bank"
-  last4: string
-  expiry?: string
-  isDefault: boolean
+  amount: number
+  status: string
+  description: string
+  created_at: string
+  stripe_payment_intent_id?: string
+}
+
+interface AutopaySettings {
+  id: string
+  is_active: boolean
+  billing_cycle: string
+  next_payment_date?: string
+  stripe_customer_id?: string
 }
 
 export default function BillingPage() {
   const { user } = usePatientAuth()
-  const [loading, setLoading] = useState(true)
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [claims, setClaims] = useState<InsuranceClaim[]>([])
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
-  const [error, setError] = useState("")
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [loading, setLoading] = useState(true)
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [autopayLoading, setAutopayLoading] = useState(false)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [autopaySettings, setAutopaySettings] = useState<AutopaySettings | null>(null)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+
+  // Check for success/cancel parameters
+  useEffect(() => {
+    const successParam = searchParams.get("success")
+    const canceledParam = searchParams.get("canceled")
+    const autopayParam = searchParams.get("autopay")
+
+    if (successParam === "true") {
+      setSuccess("Payment completed successfully!")
+      // Remove the parameter from URL
+      router.replace("/portal/billing")
+    } else if (canceledParam === "true") {
+      setError("Payment was canceled. Please try again if needed.")
+      router.replace("/portal/billing")
+    } else if (autopayParam === "setup") {
+      setSuccess("Autopay setup completed!")
+      router.replace("/portal/billing")
+    }
+  }, [searchParams, router])
 
   useEffect(() => {
     if (!user) {
@@ -59,112 +95,189 @@ export default function BillingPage() {
     setError("")
 
     try {
-      // Mock data for demo
-      const mockInvoices: Invoice[] = [
-        {
-          id: "INV-2023-001",
-          date: "2023-05-15",
-          amount: 75.0,
-          description: "Office Visit - General Checkup",
-          status: "paid",
-          pdfUrl: "#",
-        },
-        {
-          id: "INV-2023-002",
-          date: "2023-05-28",
-          amount: 150.0,
-          description: "Specialist Consultation",
-          status: "pending",
-          pdfUrl: "#",
-        },
-        {
-          id: "INV-2023-003",
-          date: "2023-04-10",
-          amount: 45.0,
-          description: "Lab Tests - Blood Work",
-          status: "paid",
-          pdfUrl: "#",
-        },
-        {
-          id: "INV-2023-004",
-          date: "2023-03-22",
-          amount: 200.0,
-          description: "Imaging - X-Ray",
-          status: "overdue",
-          pdfUrl: "#",
-        },
-      ]
+      if (isSupabaseConfigured() && user?.id) {
+        // Load real data from Supabase
+        const [invoicesResult, paymentsResult, autopayResult] = await Promise.all([
+          supabase.from("invoices").select("*").eq("patient_id", user.id).order("created_at", { ascending: false }),
+          supabase.from("payments").select("*").eq("patient_id", user.id).order("created_at", { ascending: false }),
+          supabase.from("autopay_settings").select("*").eq("patient_id", user.id).single(),
+        ])
 
-      const mockClaims: InsuranceClaim[] = [
-        {
-          id: "CLM-2023-001",
-          date: "2023-05-15",
-          provider: "Primary Care Physician",
-          service: "Office Visit",
-          amount: 150.0,
-          status: "approved",
-          claimNumber: "INS-12345",
-        },
-        {
-          id: "CLM-2023-002",
-          date: "2023-05-28",
-          provider: "Specialist",
-          service: "Consultation",
-          amount: 250.0,
-          status: "pending",
-          claimNumber: "INS-12346",
-        },
-        {
-          id: "CLM-2023-003",
-          date: "2023-04-10",
-          provider: "Laboratory",
-          service: "Blood Tests",
-          amount: 75.0,
-          status: "approved",
-          claimNumber: "INS-12347",
-        },
-      ]
+        if (invoicesResult.error && invoicesResult.error.code !== "PGRST116") {
+          throw invoicesResult.error
+        }
+        if (paymentsResult.error && paymentsResult.error.code !== "PGRST116") {
+          throw paymentsResult.error
+        }
 
-      const mockPaymentMethods: PaymentMethod[] = [
-        {
-          id: "pm-1",
-          type: "card",
-          last4: "4242",
-          expiry: "05/25",
-          isDefault: true,
-        },
-        {
-          id: "pm-2",
-          type: "bank",
-          last4: "9876",
-          isDefault: false,
-        },
-      ]
-
-      setInvoices(mockInvoices)
-      setClaims(mockClaims)
-      setPaymentMethods(mockPaymentMethods)
+        setInvoices(invoicesResult.data || [])
+        setPayments(paymentsResult.data || [])
+        setAutopaySettings(autopayResult.data)
+      } else {
+        // Load mock data for demo
+        loadMockData()
+      }
     } catch (error) {
       console.error("Error loading billing data:", error)
       setError("Unable to load billing information. Please try again later.")
+      // Fallback to mock data
+      loadMockData()
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMockData = () => {
+    const mockInvoices: Invoice[] = [
+      {
+        id: "1",
+        invoice_number: "INV-2024-001",
+        date: "2024-01-15",
+        description: "Individual Therapy Session - Dr. Sarah Johnson",
+        amount: 150.0,
+        status: "paid",
+        paid_date: "2024-01-20",
+      },
+      {
+        id: "2",
+        invoice_number: "INV-2024-002",
+        date: "2024-01-29",
+        description: "Group Therapy Session - Anxiety Management",
+        amount: 75.0,
+        status: "pending",
+        due_date: "2024-02-15",
+      },
+      {
+        id: "3",
+        invoice_number: "INV-2024-003",
+        date: "2024-02-05",
+        description: "Psychological Assessment - Dr. Michael Chen",
+        amount: 300.0,
+        status: "overdue",
+        due_date: "2024-02-20",
+      },
+    ]
+
+    const mockPayments: Payment[] = [
+      {
+        id: "1",
+        amount: 150.0,
+        status: "succeeded",
+        description: "Payment for INV-2024-001",
+        created_at: "2024-01-20T10:30:00Z",
+      },
+    ]
+
+    setInvoices(mockInvoices)
+    setPayments(mockPayments)
+    setAutopaySettings({
+      id: "1",
+      is_active: false,
+      billing_cycle: "monthly",
+    })
+  }
+
+  const handlePayNow = async (invoice: Invoice) => {
+    if (!user?.id) return
+
+    setPaymentLoading(true)
+    setError("")
+
+    try {
+      const response = await fetch("/api/create-payment-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: invoice.amount,
+          description: invoice.description,
+          invoiceId: invoice.invoice_number,
+          patientId: user.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create payment session")
+      }
+
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error("No checkout URL received")
+      }
+    } catch (error) {
+      console.error("Error creating payment session:", error)
+      setError("Failed to initiate payment. Please try again.")
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
+
+  const handleSetupAutopay = async () => {
+    if (!user?.id) return
+
+    setAutopayLoading(true)
+    setError("")
+
+    try {
+      const response = await fetch("/api/setup-autopay", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patientId: user.id,
+          billingCycle: "monthly",
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to setup autopay")
+      }
+
+      // Redirect to Stripe Customer Portal
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error("No portal URL received")
+      }
+    } catch (error) {
+      console.error("Error setting up autopay:", error)
+      setError("Failed to setup autopay. Please try again.")
+    } finally {
+      setAutopayLoading(false)
     }
   }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "paid":
-      case "approved":
-        return <Badge className="bg-green-500">Paid</Badge>
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Paid</Badge>
       case "pending":
-        return <Badge className="bg-amber-500">Pending</Badge>
+        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pending</Badge>
       case "overdue":
-      case "denied":
-        return <Badge className="bg-red-500">Overdue</Badge>
+        return <Badge variant="destructive">Overdue</Badge>
+      case "draft":
+        return <Badge variant="secondary">Draft</Badge>
+      case "canceled":
+        return <Badge variant="outline">Canceled</Badge>
       default:
-        return <Badge>{status}</Badge>
+        return <Badge variant="secondary">{status}</Badge>
     }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
   }
 
   const formatCurrency = (amount: number) => {
@@ -174,252 +287,351 @@ export default function BillingPage() {
     }).format(amount)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
+  const calculateTotals = () => {
+    const totalAmount = invoices.reduce((sum, invoice) => sum + invoice.amount, 0)
+    const paidAmount = invoices
+      .filter((invoice) => invoice.status === "paid")
+      .reduce((sum, invoice) => sum + invoice.amount, 0)
+    const unpaidAmount = invoices
+      .filter((invoice) => invoice.status === "pending" || invoice.status === "overdue")
+      .reduce((sum, invoice) => sum + invoice.amount, 0)
+
+    return { totalAmount, paidAmount, unpaidAmount }
   }
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
       </div>
     )
   }
 
+  const { totalAmount, paidAmount, unpaidAmount } = calculateTotals()
+
   return (
     <div className="p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-800">Billing & Payments</h1>
-          <p className="text-slate-600">Manage your invoices, insurance claims, and payment methods</p>
-        </div>
-
-        {error && (
-          <Alert className="mb-6 border-amber-200 bg-amber-50">
-            <AlertCircle className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-800">{error}</AlertDescription>
+        {/* Success/Error Messages */}
+        {success && (
+          <Alert className="mb-6 border-green-200 bg-green-50">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">{success}</AlertDescription>
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* Summary Cards */}
-          <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center text-slate-800">
-                <Receipt className="h-5 w-5 mr-2 text-blue-600" />
-                Outstanding Balance
-              </CardTitle>
+        {error && (
+          <Alert className="mb-6 border-red-200 bg-red-50">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Demo Mode Alert */}
+        {!isSupabaseConfigured() && (
+          <Alert className="mb-6 border-orange-200 bg-orange-50">
+            <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <strong>Demo Mode:</strong> This page is showing mock data. Stripe integration requires proper environment
+              configuration.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-800">Billing & Payments</h1>
+          <p className="mt-2 text-slate-600">Manage your invoices, payments, and autopay settings</p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Billed</CardTitle>
+              <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-slate-800">$350.00</div>
-              <p className="text-sm text-slate-500 mt-1">Due within 30 days</p>
-              <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700">Make a Payment</Button>
+              <div className="text-2xl font-bold">{formatCurrency(totalAmount)}</div>
+              <p className="text-xs text-muted-foreground">All time billing</p>
             </CardContent>
           </Card>
 
-          <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center text-slate-800">
-                <CheckCircle className="h-5 w-5 mr-2 text-blue-600" />
-                Insurance Coverage
-              </CardTitle>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Amount Paid</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-slate-800">80%</div>
-              <p className="text-sm text-slate-500 mt-1">In-network coverage</p>
-              <div className="mt-4 text-sm">
-                <div className="flex justify-between mb-1">
-                  <span>Deductible</span>
-                  <span className="font-medium">$500 / $1,000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Out-of-pocket max</span>
-                  <span className="font-medium">$2,000 / $5,000</span>
-                </div>
-              </div>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(paidAmount)}</div>
+              <p className="text-xs text-muted-foreground">Successfully processed</p>
             </CardContent>
           </Card>
 
-          <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center text-slate-800">
-                <Clock className="h-5 w-5 mr-2 text-blue-600" />
-                Next Payment Due
-              </CardTitle>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
+              <Clock className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-slate-800">June 15, 2023</div>
-              <p className="text-sm text-slate-500 mt-1">Invoice #INV-2023-002</p>
-              <Button variant="outline" className="w-full mt-4">
-                Set Up Auto-Pay
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(unpaidAmount)}</div>
+              <p className="text-xs text-muted-foreground">Requires payment</p>
+              {unpaidAmount > 0 && (
+                <Button
+                  size="sm"
+                  className="mt-2 w-full bg-teal-600 hover:bg-teal-700"
+                  onClick={() => {
+                    const firstUnpaidInvoice = invoices.find(
+                      (inv) => inv.status === "pending" || inv.status === "overdue",
+                    )
+                    if (firstUnpaidInvoice) {
+                      handlePayNow(firstUnpaidInvoice)
+                    }
+                  }}
+                  disabled={paymentLoading}
+                >
+                  {paymentLoading ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  ) : (
+                    <CreditCard className="h-4 w-4 mr-2" />
+                  )}
+                  Pay Now
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Autopay Status</CardTitle>
+              <Zap className={`h-4 w-4 ${autopaySettings?.is_active ? "text-green-600" : "text-gray-400"}`} />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{autopaySettings?.is_active ? "Active" : "Inactive"}</div>
+              <p className="text-xs text-muted-foreground">
+                {autopaySettings?.is_active ? "Automatic payments enabled" : "Manual payments only"}
+              </p>
+              <Button
+                size="sm"
+                variant={autopaySettings?.is_active ? "outline" : "default"}
+                className="mt-2 w-full"
+                onClick={handleSetupAutopay}
+                disabled={autopayLoading}
+              >
+                {autopayLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                ) : (
+                  <Settings className="h-4 w-4 mr-2" />
+                )}
+                {autopaySettings?.is_active ? "Manage Autopay" : "Setup Autopay"}
               </Button>
             </CardContent>
           </Card>
         </div>
 
+        {/* Tabs */}
         <Tabs defaultValue="invoices" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="invoices">Invoices</TabsTrigger>
-            <TabsTrigger value="insurance">Insurance Claims</TabsTrigger>
-            <TabsTrigger value="payment">Payment Methods</TabsTrigger>
+            <TabsTrigger value="payments">Payment History</TabsTrigger>
           </TabsList>
 
           <TabsContent value="invoices">
-            <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center text-slate-800">
+                <CardTitle className="flex items-center">
                   <FileText className="h-5 w-5 mr-2" />
-                  Invoices & Statements
+                  Invoices
                 </CardTitle>
-                <CardDescription>View and pay your medical bills</CardDescription>
+                <CardDescription>View and pay your medical service invoices</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4">Invoice #</th>
-                        <th className="text-left py-3 px-4">Date</th>
-                        <th className="text-left py-3 px-4">Description</th>
-                        <th className="text-left py-3 px-4">Amount</th>
-                        <th className="text-left py-3 px-4">Status</th>
-                        <th className="text-right py-3 px-4">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invoices.map((invoice) => (
-                        <tr key={invoice.id} className="border-b hover:bg-slate-50">
-                          <td className="py-3 px-4">{invoice.id}</td>
-                          <td className="py-3 px-4">{formatDate(invoice.date)}</td>
-                          <td className="py-3 px-4">{invoice.description}</td>
-                          <td className="py-3 px-4">{formatCurrency(invoice.amount)}</td>
-                          <td className="py-3 px-4">{getStatusBadge(invoice.status)}</td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button variant="outline" size="sm">
-                                <Download className="h-4 w-4 mr-1" />
-                                PDF
-                              </Button>
-                              {invoice.status !== "paid" && (
-                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                                  <DollarSign className="h-4 w-4 mr-1" />
-                                  Pay
+                {/* Desktop Table View */}
+                <div className="hidden md:block">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Invoice #</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Date</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Description</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Amount</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoices.map((invoice) => (
+                          <tr key={invoice.id} className="border-b hover:bg-gray-50">
+                            <td className="py-4 px-4 font-mono text-sm">{invoice.invoice_number}</td>
+                            <td className="py-4 px-4 text-sm text-gray-600">{formatDate(invoice.date)}</td>
+                            <td className="py-4 px-4 text-sm">{invoice.description}</td>
+                            <td className="py-4 px-4 text-sm font-semibold">{formatCurrency(invoice.amount)}</td>
+                            <td className="py-4 px-4">{getStatusBadge(invoice.status)}</td>
+                            <td className="py-4 px-4">
+                              <div className="flex space-x-2">
+                                <Button variant="outline" size="sm">
+                                  <Download className="h-4 w-4 mr-1" />
+                                  Download
                                 </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                                {(invoice.status === "pending" || invoice.status === "overdue") && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handlePayNow(invoice)}
+                                    disabled={paymentLoading}
+                                    className="bg-teal-600 hover:bg-teal-700"
+                                  >
+                                    {paymentLoading ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
+                                    ) : (
+                                      <CreditCard className="h-4 w-4 mr-1" />
+                                    )}
+                                    Pay Now
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-4">
+                  {invoices.map((invoice) => (
+                    <Card key={invoice.id} className="border">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p className="font-mono text-sm text-gray-600">{invoice.invoice_number}</p>
+                            <p className="text-sm text-gray-500">{formatDate(invoice.date)}</p>
+                          </div>
+                          {getStatusBadge(invoice.status)}
+                        </div>
+
+                        <p className="text-sm mb-3">{invoice.description}</p>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-lg font-semibold">{formatCurrency(invoice.amount)}</span>
+                          <div className="flex space-x-2">
+                            <Button variant="outline" size="sm">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            {(invoice.status === "pending" || invoice.status === "overdue") && (
+                              <Button
+                                size="sm"
+                                onClick={() => handlePayNow(invoice)}
+                                disabled={paymentLoading}
+                                className="bg-teal-600 hover:bg-teal-700"
+                              >
+                                {paymentLoading ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                  <CreditCard className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {invoice.due_date && invoice.status !== "paid" && (
+                          <p className="text-xs text-gray-500 mt-2">Due: {formatDate(invoice.due_date)}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {invoices.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>No invoices found</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="insurance">
-            <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
+          <TabsContent value="payments">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center text-slate-800">
-                  <FileText className="h-5 w-5 mr-2" />
-                  Insurance Claims
+                <CardTitle className="flex items-center">
+                  <DollarSign className="h-5 w-5 mr-2" />
+                  Payment History
                 </CardTitle>
-                <CardDescription>Track your insurance claim status</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4">Claim #</th>
-                        <th className="text-left py-3 px-4">Date</th>
-                        <th className="text-left py-3 px-4">Provider</th>
-                        <th className="text-left py-3 px-4">Service</th>
-                        <th className="text-left py-3 px-4">Amount</th>
-                        <th className="text-left py-3 px-4">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {claims.map((claim) => (
-                        <tr key={claim.id} className="border-b hover:bg-slate-50">
-                          <td className="py-3 px-4">{claim.claimNumber}</td>
-                          <td className="py-3 px-4">{formatDate(claim.date)}</td>
-                          <td className="py-3 px-4">{claim.provider}</td>
-                          <td className="py-3 px-4">{claim.service}</td>
-                          <td className="py-3 px-4">{formatCurrency(claim.amount)}</td>
-                          <td className="py-3 px-4">{getStatusBadge(claim.status)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="payment">
-            <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center text-slate-800">
-                  <CreditCard className="h-5 w-5 mr-2" />
-                  Payment Methods
-                </CardTitle>
-                <CardDescription>Manage your payment options</CardDescription>
+                <CardDescription>View your payment transaction history</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {paymentMethods.map((method) => (
-                    <div
-                      key={method.id}
-                      className="p-4 border rounded-lg bg-white flex flex-col sm:flex-row sm:items-center justify-between"
-                    >
-                      <div className="flex items-center">
-                        {method.type === "card" ? (
-                          <CreditCard className="h-5 w-5 mr-3 text-blue-600" />
-                        ) : (
-                          <DollarSign className="h-5 w-5 mr-3 text-blue-600" />
-                        )}
-                        <div>
-                          <div className="font-medium">
-                            {method.type === "card" ? "Credit Card" : "Bank Account"} •••• {method.last4}
-                          </div>
-                          {method.expiry && <div className="text-sm text-slate-500">Expires {method.expiry}</div>}
-                          {method.isDefault && (
-                            <Badge variant="outline" className="mt-1 text-blue-600 border-blue-200 bg-blue-50">
-                              Default
-                            </Badge>
+                  {payments.map((payment) => (
+                    <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div
+                          className={`p-2 rounded-full ${
+                            payment.status === "succeeded" ? "bg-green-100" : "bg-red-100"
+                          }`}
+                        >
+                          {payment.status === "succeeded" ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 text-red-600" />
                           )}
                         </div>
+                        <div>
+                          <p className="font-medium">{payment.description}</p>
+                          <p className="text-sm text-gray-500">{formatDate(payment.created_at)}</p>
+                        </div>
                       </div>
-                      <div className="mt-3 sm:mt-0 flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
-                          Edit
-                        </Button>
-                        {!method.isDefault && (
-                          <Button variant="outline" size="sm">
-                            Set as Default
-                          </Button>
-                        )}
-                        <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600">
-                          Remove
-                        </Button>
+                      <div className="text-right">
+                        <p className="font-semibold">{formatCurrency(payment.amount)}</p>
+                        <p className="text-sm text-gray-500 capitalize">{payment.status}</p>
                       </div>
                     </div>
                   ))}
 
-                  <Button className="mt-4 bg-blue-600 hover:bg-blue-700">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Add Payment Method
-                  </Button>
+                  {payments.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>No payments found</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Payment Information */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Payment Information</CardTitle>
+            <CardDescription>Secure payments powered by Stripe</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-medium mb-2">Accepted Payment Methods</h4>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li>• Credit Cards (Visa, MasterCard, American Express)</li>
+                  <li>• Debit Cards</li>
+                  <li>• HSA/FSA Cards</li>
+                  <li>• Bank Transfer (ACH)</li>
+                  <li>• Apple Pay & Google Pay</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-medium mb-2">Billing Support</h4>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p>Phone: (555) 123-4567</p>
+                  <p>Email: billing@innerclarity.com</p>
+                  <p>Hours: Mon-Fri 9AM-5PM EST</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
