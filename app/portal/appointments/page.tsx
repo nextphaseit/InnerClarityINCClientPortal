@@ -9,9 +9,19 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePatientAuth } from "@/components/patient-auth-provider"
-import { AlertCircle, CalendarIcon, Check, Clock, X } from "lucide-react"
-import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, isSameDay } from "date-fns"
-import { TelehealthSession } from "@/components/telehealth-session"
+import { AlertCircle, CalendarIcon, Check, Clock, Video, X } from "lucide-react"
+import {
+  format,
+  addDays,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  addWeeks,
+  isSameDay,
+  differenceInMinutes,
+  addMinutes,
+} from "date-fns"
+import { TelehealthSection } from "@/components/telehealth-section"
 
 interface TimeSlot {
   id: string
@@ -27,9 +37,11 @@ interface Appointment {
   date: string
   time: string
   provider: string
-  status: "confirmed" | "pending" | "cancelled" | "no-show"
+  status: "confirmed" | "pending" | "cancelled"
   type: string
+  appointmentType?: "in-person" | "video" | "phone"
   meetingLink?: string
+  startDateTime?: Date
 }
 
 export default function AppointmentsPage() {
@@ -45,29 +57,6 @@ export default function AppointmentsPage() {
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const router = useRouter()
 
-  // Find the next upcoming appointment for telehealth
-  const upcomingAppointment =
-    appointments.length > 0
-      ? appointments.find(
-          (app) =>
-            app.status === "confirmed" && new Date(app.date) >= new Date() && app.type.toLowerCase().includes("video"),
-        )
-      : null
-
-  // Convert the upcoming appointment to the format expected by TelehealthSession
-  const telehealthAppointment = upcomingAppointment
-    ? {
-        id: upcomingAppointment.id,
-        date: upcomingAppointment.date,
-        startTime: upcomingAppointment.time.split(" - ")[0],
-        endTime: upcomingAppointment.time.split(" - ")[1],
-        provider: upcomingAppointment.provider,
-        type: "video",
-        status: upcomingAppointment.status,
-        meetingLink: upcomingAppointment.meetingLink || "https://teams.microsoft.com/l/meetup-join/sample-meeting-link",
-      }
-    : null
-
   useEffect(() => {
     if (!user) {
       router.push("/portal/auth/signin")
@@ -81,6 +70,12 @@ export default function AppointmentsPage() {
     setError("")
 
     try {
+      // In a real app, we would fetch from Supabase
+      // For now, using mock data with one upcoming video appointment for demo
+
+      const now = new Date()
+      const upcomingVideoStart = addMinutes(now, 10) // Video appointment starting in 10 minutes
+
       // Demo data for available slots
       const weekDays = eachDayOfInterval({
         start: currentWeekStart,
@@ -138,40 +133,36 @@ export default function AppointmentsPage() {
 
       setAvailableSlots(mockTimeSlots)
 
-      // Mock appointments - add a video appointment that's coming up soon
-      const today = new Date()
-      const fifteenMinutesFromNow = new Date(today.getTime() + 15 * 60000)
-      const formattedUpcomingDate = format(fifteenMinutesFromNow, "yyyy-MM-dd")
-      const upcomingHour = fifteenMinutesFromNow.getHours()
-      const upcomingMinute = fifteenMinutesFromNow.getMinutes() < 30 ? "00" : "30"
-      const nextHour = upcomingMinute === "00" ? upcomingHour : upcomingHour + 1
-      const nextMinute = upcomingMinute === "00" ? "30" : "00"
-
+      // Mock appointments with one upcoming video appointment
       const mockAppointments: Appointment[] = [
-        {
-          id: "video-soon",
-          date: formattedUpcomingDate,
-          time: `${upcomingHour}:${upcomingMinute} - ${nextHour}:${nextMinute}`,
-          provider: "Dr. Smith",
-          status: "confirmed",
-          type: "Video Consultation",
-          meetingLink: "https://teams.microsoft.com/l/meetup-join/sample-meeting-link",
-        },
         {
           id: "1",
           date: format(addDays(new Date(), 3), "yyyy-MM-dd"),
           time: "10:00 - 10:30",
-          provider: "Dr. Johnson",
+          provider: "Dr. Smith",
           status: "confirmed",
           type: "Check-up",
+          appointmentType: "in-person",
         },
         {
           id: "2",
+          date: format(upcomingVideoStart, "yyyy-MM-dd"),
+          time: `${format(upcomingVideoStart, "HH:mm")} - ${format(addMinutes(upcomingVideoStart, 30), "HH:mm")}`,
+          provider: "Dr. Johnson",
+          status: "confirmed",
+          type: "Therapy Session",
+          appointmentType: "video",
+          meetingLink: "https://teams.microsoft.com/l/meetup-join/example-meeting-link",
+          startDateTime: upcomingVideoStart,
+        },
+        {
+          id: "3",
           date: format(addDays(new Date(), 10), "yyyy-MM-dd"),
           time: "14:30 - 15:00",
           provider: "Dr. Williams",
           status: "pending",
           type: "Follow-up",
+          appointmentType: "phone",
         },
       ]
 
@@ -235,6 +226,18 @@ export default function AppointmentsPage() {
     setCurrentWeekStart(addWeeks(currentWeekStart, 1))
   }
 
+  // Get the next upcoming video appointment
+  const getUpcomingVideoAppointment = () => {
+    const now = new Date()
+    return appointments.find(
+      (appointment) =>
+        appointment.appointmentType === "video" &&
+        appointment.startDateTime &&
+        appointment.startDateTime > now &&
+        differenceInMinutes(appointment.startDateTime, now) < 60, // Show only if less than an hour away
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -251,10 +254,8 @@ export default function AppointmentsPage() {
           <p className="text-slate-600">Schedule and manage your appointments</p>
         </div>
 
-        {/* Telehealth Session Card */}
-        <div className="mb-8">
-          <TelehealthSession appointment={telehealthAppointment} />
-        </div>
+        {/* Telehealth Section */}
+        <TelehealthSection upcomingAppointment={getUpcomingVideoAppointment()} patientId={user?.id} />
 
         {error && (
           <Alert className="mb-6 border-amber-200 bg-amber-50">
@@ -435,6 +436,16 @@ export default function AppointmentsPage() {
                           <div className="text-sm text-gray-500">
                             {appointment.provider} • {appointment.type}
                           </div>
+                          {appointment.appointmentType && (
+                            <div className="flex items-center mt-1">
+                              {appointment.appointmentType === "video" && (
+                                <Video className="h-3 w-3 mr-1 text-blue-600" />
+                              )}
+                              <span className="text-xs uppercase font-medium text-blue-600">
+                                {appointment.appointmentType} appointment
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="mt-3 sm:mt-0 flex items-center">
                           <Badge
@@ -442,7 +453,6 @@ export default function AppointmentsPage() {
                               ${appointment.status === "confirmed" ? "bg-green-500" : ""}
                               ${appointment.status === "pending" ? "bg-amber-500" : ""}
                               ${appointment.status === "cancelled" ? "bg-red-500" : ""}
-                              ${appointment.status === "no-show" ? "bg-red-500" : ""}
                             `}
                           >
                             {appointment.status === "confirmed" && <Check className="h-3 w-3 mr-1" />}
