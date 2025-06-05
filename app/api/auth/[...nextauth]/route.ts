@@ -1,20 +1,15 @@
 import NextAuth from "next-auth"
 import type { NextAuthOptions } from "next-auth"
-import AzureADProvider from "next-auth/providers/azure-ad"
+import Auth0Provider from "next-auth/providers/auth0"
 
 export const dynamic = "force-dynamic"
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    AzureADProvider({
-      clientId: process.env.MICROSOFT_CLIENT_ID!,
-      clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
-      tenantId: process.env.MICROSOFT_TENANT_ID!,
-      authorization: {
-        params: {
-          scope: "openid email profile User.Read offline_access",
-        },
-      },
+    Auth0Provider({
+      clientId: process.env.AUTH0_CLIENT_ID!,
+      clientSecret: process.env.AUTH0_CLIENT_SECRET!,
+      issuer: process.env.AUTH0_DOMAIN,
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
@@ -27,9 +22,9 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async signIn({ user, account }) {
-      // Only allow Azure AD authentication for admin portal
-      if (account?.provider !== "azure-ad") {
-        console.error("❌ Admin login requires Microsoft authentication")
+      // Only allow Auth0 authentication for admin portal
+      if (account?.provider !== "auth0") {
+        console.error("❌ Admin login requires Auth0 authentication")
         return false
       }
 
