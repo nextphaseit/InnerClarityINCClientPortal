@@ -1,341 +1,231 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  Calendar,
-  MessageSquare,
-  FileText,
-  CreditCard,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  User,
-  Activity,
-} from "lucide-react"
-import Link from "next/link"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { usePatientAuth } from "@/components/patient-auth-provider"
+import { isSupabaseConfigured } from "@/lib/supabase"
+import Link from "next/link"
+import {
+  AlertCircle,
+  Calendar,
+  FileText,
+  MessageSquare,
+  CreditCard,
+  Activity,
+  FolderOpen,
+  ChevronRight,
+} from "lucide-react"
 
 export default function PatientDashboard() {
-  const { user } = usePatientAuth()
-  const [stats, setStats] = useState({
-    upcomingAppointments: 2,
-    unreadMessages: 3,
-    pendingForms: 1,
-    outstandingBalance: 150.0,
-  })
+  const { user, loading } = usePatientAuth()
+  const [isDemo, setIsDemo] = useState(false)
 
-  const upcomingAppointments = [
-    {
-      id: "1",
-      date: "2024-01-15",
-      time: "10:00 AM",
-      type: "Therapy Session",
-      provider: "Dr. Sarah Johnson",
-      status: "confirmed",
-    },
-    {
-      id: "2",
-      date: "2024-01-22",
-      time: "2:00 PM",
-      type: "Follow-up",
-      provider: "Dr. Sarah Johnson",
-      status: "pending",
-    },
-  ]
+  useEffect(() => {
+    setIsDemo(!isSupabaseConfigured())
+  }, [])
 
-  const recentMessages = [
-    {
-      id: "1",
-      from: "Dr. Sarah Johnson",
-      subject: "Appointment Reminder",
-      preview: "Your appointment is scheduled for tomorrow at 10:00 AM...",
-      timestamp: "2 hours ago",
-      unread: true,
-    },
-    {
-      id: "2",
-      from: "Billing Department",
-      subject: "Payment Confirmation",
-      preview: "Thank you for your recent payment...",
-      timestamp: "1 day ago",
-      unread: false,
-    },
-  ]
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
 
   return (
-    <div className="p-6 space-y-8">
-      {/* Demo Mode Banner */}
-      {user?.id === "demo-user" && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="h-5 w-5 text-yellow-400" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-800">
-                <strong>Demo Mode:</strong> You're using the demo version. Supabase is not configured.
-              </p>
-            </div>
-          </div>
+    <div className="p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-800">Patient Dashboard</h1>
+          <p className="text-slate-600">Welcome back, {user?.user_metadata?.full_name || "Patient"}</p>
         </div>
-      )}
 
-      {/* Welcome Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-teal-100 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Welcome back, {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Patient"}!
-            </h1>
-            <p className="text-gray-600 mt-1">Here's what's happening with your care</p>
-          </div>
-          <div className="hidden md:flex items-center space-x-2">
-            <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-blue-600 rounded-full flex items-center justify-center">
-              <User className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
+        {isDemo && (
+          <Alert className="mb-6 border-amber-200 bg-amber-50">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800">
+              You are viewing the demo version of the patient portal. Some features may be limited.
+            </AlertDescription>
+          </Alert>
+        )}
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-teal-100">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Calendar className="h-8 w-8 text-teal-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Upcoming Appointments</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.upcomingAppointments}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-100">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <MessageSquare className="h-8 w-8 text-blue-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Unread Messages</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.unreadMessages}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-100">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <FileText className="h-8 w-8 text-purple-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending Forms</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pendingForms}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-100">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <CreditCard className="h-8 w-8 text-orange-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Outstanding Balance</p>
-                <p className="text-2xl font-bold text-gray-900">${stats.outstandingBalance}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Upcoming Appointments */}
-        <Card className="border-teal-100">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Calendar className="mr-2 h-5 w-5 text-teal-600" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Upcoming Appointments */}
+          <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-slate-800">
+                <Calendar className="h-5 w-5 mr-2 text-blue-600" />
                 Upcoming Appointments
-              </div>
-              <Badge variant="outline" className="text-teal-600 border-teal-200">
-                {stats.upcomingAppointments} scheduled
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {upcomingAppointments.map((appointment) => (
-                <div
-                  key={appointment.id}
-                  className="flex items-center justify-between p-4 rounded-lg border border-teal-100 bg-teal-50/50"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="flex-shrink-0">
-                      <Clock className="h-5 w-5 text-teal-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{appointment.type}</p>
-                      <p className="text-sm text-gray-600">
-                        {appointment.date} at {appointment.time}
-                      </p>
-                      <p className="text-sm text-gray-500">{appointment.provider}</p>
-                    </div>
-                  </div>
-                  <Badge
-                    variant={appointment.status === "confirmed" ? "default" : "secondary"}
-                    className={appointment.status === "confirmed" ? "bg-teal-500" : ""}
-                  >
-                    {appointment.status}
-                  </Badge>
+              </CardTitle>
+              <CardDescription>Your scheduled appointments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                  <div className="font-medium">Check-up with Dr. Smith</div>
+                  <div className="text-sm text-slate-500">Tomorrow, 10:00 AM</div>
                 </div>
-              ))}
-              <Button asChild variant="outline" className="w-full border-teal-200 text-teal-700 hover:bg-teal-50">
-                <Link href="/portal/appointments">View All Appointments</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Messages */}
-        <Card className="border-blue-100">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center">
-                <MessageSquare className="mr-2 h-5 w-5 text-blue-600" />
-                Recent Messages
-              </div>
-              <Badge variant="outline" className="text-blue-600 border-blue-200">
-                {stats.unreadMessages} unread
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`p-4 rounded-lg border ${
-                    message.unread ? "border-blue-200 bg-blue-50/50" : "border-gray-200 bg-gray-50/50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <p className="font-medium text-gray-900">{message.from}</p>
-                        {message.unread && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
-                      </div>
-                      <p className="text-sm font-medium text-gray-700 mt-1">{message.subject}</p>
-                      <p className="text-sm text-gray-600 mt-1">{message.preview}</p>
-                      <p className="text-xs text-gray-500 mt-2">{message.timestamp}</p>
-                    </div>
-                  </div>
+                <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg">
+                  <div className="font-medium">Follow-up Consultation</div>
+                  <div className="text-sm text-slate-500">June 15, 2:30 PM</div>
                 </div>
-              ))}
-              <Button asChild variant="outline" className="w-full border-blue-200 text-blue-700 hover:bg-blue-50">
-                <Link href="/portal/messages">View All Messages</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <Card className="border-purple-100">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Activity className="mr-2 h-5 w-5 text-purple-600" />
-              Quick Actions
-            </CardTitle>
-            <CardDescription>Common tasks and shortcuts</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                asChild
-                variant="outline"
-                className="h-auto p-4 flex flex-col items-center space-y-2 border-teal-200 hover:bg-teal-50"
-              >
+              </div>
+              <Button asChild variant="ghost" className="w-full mt-4 text-blue-600">
                 <Link href="/portal/appointments">
-                  <Calendar className="h-6 w-6 text-teal-600" />
-                  <span className="text-sm">Book Appointment</span>
+                  View All Appointments
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Link>
               </Button>
+            </CardContent>
+          </Card>
 
-              <Button
-                asChild
-                variant="outline"
-                className="h-auto p-4 flex flex-col items-center space-y-2 border-blue-200 hover:bg-blue-50"
-              >
+          {/* Messages */}
+          <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-slate-800">
+                <MessageSquare className="h-5 w-5 mr-2 text-blue-600" />
+                Recent Messages
+              </CardTitle>
+              <CardDescription>Communications from your care team</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                  <div className="font-medium">Lab Results Available</div>
+                  <div className="text-sm text-slate-500">Dr. Johnson • 2 days ago</div>
+                </div>
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                  <div className="font-medium">Appointment Confirmation</div>
+                  <div className="text-sm text-slate-500">Admin • 1 week ago</div>
+                </div>
+              </div>
+              <Button asChild variant="ghost" className="w-full mt-4 text-blue-600">
                 <Link href="/portal/messages">
-                  <MessageSquare className="h-6 w-6 text-blue-600" />
-                  <span className="text-sm">Send Message</span>
+                  View All Messages
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Link>
               </Button>
+            </CardContent>
+          </Card>
 
-              <Button
-                asChild
-                variant="outline"
-                className="h-auto p-4 flex flex-col items-center space-y-2 border-purple-200 hover:bg-purple-50"
-              >
+          {/* Forms */}
+          <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-slate-800">
+                <FileText className="h-5 w-5 mr-2 text-blue-600" />
+                Forms to Complete
+              </CardTitle>
+              <CardDescription>Required paperwork and questionnaires</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                  <div className="font-medium">Health History Update</div>
+                  <div className="text-sm text-slate-500">Due before next appointment</div>
+                </div>
+                <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg">
+                  <div className="font-medium">Insurance Information</div>
+                  <div className="text-sm text-slate-500">Complete when convenient</div>
+                </div>
+              </div>
+              <Button asChild variant="ghost" className="w-full mt-4 text-blue-600">
                 <Link href="/portal/forms">
-                  <FileText className="h-6 w-6 text-purple-600" />
-                  <span className="text-sm">Complete Forms</span>
+                  View All Forms
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Link>
               </Button>
+            </CardContent>
+          </Card>
 
-              <Button
-                asChild
-                variant="outline"
-                className="h-auto p-4 flex flex-col items-center space-y-2 border-orange-200 hover:bg-orange-50"
-              >
+          {/* Billing */}
+          <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-slate-800">
+                <CreditCard className="h-5 w-5 mr-2 text-blue-600" />
+                Billing Summary
+              </CardTitle>
+              <CardDescription>Recent invoices and payments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg">
+                  <div className="font-medium">Invoice #1234</div>
+                  <div className="text-sm text-slate-500">$75.00 • Paid on May 15</div>
+                </div>
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                  <div className="font-medium">Invoice #1235</div>
+                  <div className="text-sm text-slate-500">$150.00 • Due June 30</div>
+                </div>
+              </div>
+              <Button asChild variant="ghost" className="w-full mt-4 text-blue-600">
                 <Link href="/portal/billing">
-                  <CreditCard className="h-6 w-6 text-orange-600" />
-                  <span className="text-sm">Pay Bill</span>
+                  View Billing History
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Link>
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Health Summary */}
-        <Card className="border-green-100">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <CheckCircle className="mr-2 h-5 w-5 text-green-600" />
-              Health Summary
-            </CardTitle>
-            <CardDescription>Your recent health activity</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="text-sm font-medium text-green-900">Last Session</p>
-                    <p className="text-xs text-green-700">Completed on Jan 8, 2024</p>
-                  </div>
+          {/* Health Log */}
+          <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-slate-800">
+                <Activity className="h-5 w-5 mr-2 text-blue-600" />
+                Health Tracking
+              </CardTitle>
+              <CardDescription>Monitor your health metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                  <div className="font-medium">Blood Pressure</div>
+                  <div className="text-sm text-slate-500">120/80 • Recorded yesterday</div>
+                </div>
+                <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg">
+                  <div className="font-medium">Weight</div>
+                  <div className="text-sm text-slate-500">165 lbs • Recorded 3 days ago</div>
                 </div>
               </div>
-
-              <div className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 border border-yellow-200">
-                <div className="flex items-center space-x-3">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                  <div>
-                    <p className="text-sm font-medium text-yellow-900">Pending Forms</p>
-                    <p className="text-xs text-yellow-700">1 form needs completion</p>
-                  </div>
-                </div>
-              </div>
-
-              <Button asChild variant="outline" className="w-full border-green-200 text-green-700 hover:bg-green-50">
-                <Link href="/portal/health-log">View Health Log</Link>
+              <Button asChild variant="ghost" className="w-full mt-4 text-blue-600">
+                <Link href="/portal/health-log">
+                  View Health Log
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Documents */}
+          <Card className="backdrop-blur-sm bg-white/70 border-white/20 shadow-xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-slate-800">
+                <FolderOpen className="h-5 w-5 mr-2 text-blue-600" />
+                Recent Documents
+              </CardTitle>
+              <CardDescription>Medical records and documents</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                  <div className="font-medium">Lab Results</div>
+                  <div className="text-sm text-slate-500">PDF • Uploaded 1 week ago</div>
+                </div>
+                <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg">
+                  <div className="font-medium">Prescription</div>
+                  <div className="text-sm text-slate-500">PDF • Uploaded 2 weeks ago</div>
+                </div>
+              </div>
+              <Button asChild variant="ghost" className="w-full mt-4 text-blue-600">
+                <Link href="/portal/documents">
+                  View All Documents
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

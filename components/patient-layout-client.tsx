@@ -92,6 +92,7 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
   const pathname = usePathname()
   const { user, session, loading, signOut } = usePatientAuth()
   const [isOnline, setIsOnline] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
 
   // Scroll to top on route change
   useEffect(() => {
@@ -112,7 +113,6 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
   const handleLogout = async () => {
     try {
       await signOut()
-      router.push("/portal/auth/signin")
     } catch (error) {
       console.error("Logout error:", error)
     }
@@ -128,11 +128,15 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
 
   // Redirect to signin if not authenticated (but only after loading is complete)
   useEffect(() => {
-    if (!loading && !user && !session) {
+    if (!loading && !user && !session && !redirecting) {
       console.log("No user found, redirecting to signin")
-      router.push("/portal/auth/signin")
+      setRedirecting(true)
+      // Use a timeout to prevent redirect loops
+      setTimeout(() => {
+        router.push("/portal/auth/signin")
+      }, 100)
     }
-  }, [user, session, loading, router])
+  }, [user, session, loading, router, redirecting])
 
   if (loading) {
     return (
@@ -145,8 +149,15 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
     )
   }
 
+  // Show a simple loading state instead of null to prevent flash
   if (!user && !session) {
-    return null // Will redirect to signin
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-slate-600">Redirecting to login...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
