@@ -5,7 +5,17 @@ import AzureADProvider from "next-auth/providers/azure-ad"
 // Force dynamic rendering
 export const dynamic = "force-dynamic"
 
-// Validate required environment variables for Microsoft authentication
+// Check if we're on the admin domain
+function isAdminDomain(request?: Request): boolean {
+  if (typeof window !== "undefined") {
+    return window.location.hostname.includes("admin")
+  }
+
+  const url = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || "http://localhost:3000"
+  return url.includes("admin")
+}
+
+// Validate required environment variables for Microsoft authentication (admin only)
 const requiredEnvVars = {
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   NEXTAUTH_URL: process.env.NEXTAUTH_URL,
@@ -14,38 +24,43 @@ const requiredEnvVars = {
   MICROSOFT_TENANT_ID: process.env.MICROSOFT_TENANT_ID,
 }
 
-const missingVars = Object.entries(requiredEnvVars)
-  .filter(([key, value]) => !value)
-  .map(([key]) => key)
+// Only validate Microsoft env vars if we're on admin domain
+if (isAdminDomain()) {
+  const missingVars = Object.entries(requiredEnvVars)
+    .filter(([key, value]) => !value)
+    .map(([key]) => key)
 
-if (missingVars.length > 0) {
-  console.error("❌ Missing required environment variables:", missingVars.join(", "))
-  throw new Error(`Missing required environment variables: ${missingVars.join(", ")}`)
+  if (missingVars.length > 0) {
+    console.error("❌ Missing required environment variables for admin portal:", missingVars.join(", "))
+    throw new Error(`Missing required environment variables for admin portal: ${missingVars.join(", ")}`)
+  }
+
+  console.log("✅ Microsoft authentication environment variables are present for admin portal")
 }
 
-console.log("✅ Microsoft authentication environment variables are present")
-
 export const authOptions: NextAuthOptions = {
-  providers: [
-    // Microsoft Entra ID Provider (Admin Only)
-    AzureADProvider({
-      clientId: requiredEnvVars.MICROSOFT_CLIENT_ID!,
-      clientSecret: requiredEnvVars.MICROSOFT_CLIENT_SECRET!,
-      tenantId: requiredEnvVars.MICROSOFT_TENANT_ID!,
-      authorization: {
-        params: {
-          scope: "openid email profile User.Read offline_access",
-          prompt: "select_account",
-        },
-      },
-      httpOptions: {
-        timeout: 10000,
-      },
-    }),
-  ],
+  providers: isAdminDomain()
+    ? [
+        // Microsoft Entra ID Provider (Admin Portal Only)
+        AzureADProvider({
+          clientId: requiredEnvVars.MICROSOFT_CLIENT_ID!,
+          clientSecret: requiredEnvVars.MICROSOFT_CLIENT_SECRET!,
+          tenantId: requiredEnvVars.MICROSOFT_TENANT_ID!,
+          authorization: {
+            params: {
+              scope: "openid email profile User.Read offline_access",
+              prompt: "select_account",
+            },
+          },
+          httpOptions: {
+            timeout: 10000,
+          },
+        }),
+      ]
+    : [],
 
   pages: {
-    signIn: "/admin/login",
+    signIn: isAdminDomain() ? "/admin/login" : "/portal/auth/signin",
     error: "/auth/error",
     signOut: "/auth/signout",
   },
@@ -57,6 +72,12 @@ export const authOptions: NextAuthOptions = {
 
         if (!account || !user.email) {
           console.error("❌ Missing account or email in signIn callback")
+          return false
+        }
+
+        // Only allow Microsoft login on admin domain
+        if (!isAdminDomain()) {
+          console.error("❌ Microsoft login attempted on non-admin domain")
           return false
         }
 
@@ -144,8 +165,12 @@ export const authOptions: NextAuthOptions = {
           return url
         }
 
-        // Default redirect to admin dashboard
-        return `${baseUrl}/admin/dashboard`
+        // Default redirect to admin dashboard for admin domain
+        if (isAdminDomain()) {
+          return `${baseUrl}/admin/dashboard`
+        }
+
+        return baseUrl
       } catch (error) {
         console.error("❌ Redirect callback error:", error)
         return `${baseUrl}/admin/dashboard`

@@ -6,16 +6,28 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Shield, AlertCircle } from "lucide-react"
+import { Loader2, Shield, AlertCircle, ExternalLink } from "lucide-react"
 import Image from "next/image"
 
 function AdminLoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isAdminDomain, setIsAdminDomain] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
 
   useEffect(() => {
+    // Check if we're on the admin domain
+    const hostname = window.location.hostname
+    const isAdmin = hostname.includes("admin") || hostname.includes("localhost")
+    setIsAdminDomain(isAdmin)
+
+    if (!isAdmin) {
+      // Redirect to patient portal if not on admin domain
+      window.location.href = "https://patients.nextphaseit.org/portal/auth/signin"
+      return
+    }
+
     // Check for error parameters
     const errorParam = searchParams.get("error")
     if (errorParam) {
@@ -93,6 +105,20 @@ function AdminLoginForm() {
     }
   }
 
+  // Show loading while checking domain
+  if (!isAdminDomain) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin mb-4" />
+            <p className="text-center text-gray-600">Redirecting to patient portal...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
       <Card className="w-full max-w-md">
@@ -147,6 +173,21 @@ function AdminLoginForm() {
             </div>
 
             <div className="pt-4 border-t">
+              <div className="text-center space-y-2">
+                <p className="text-xs text-gray-500">Patient Portal Access:</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open("https://patients.nextphaseit.org", "_blank")}
+                  className="text-xs"
+                >
+                  <ExternalLink className="mr-1 h-3 w-3" />
+                  Go to Patient Portal
+                </Button>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t">
               <p className="text-xs text-center text-gray-500">
                 Need help? Contact{" "}
                 <a href="mailto:support@innerclarity.org" className="text-blue-600 hover:underline">

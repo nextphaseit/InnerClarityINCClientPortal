@@ -4,8 +4,14 @@ import { getToken } from "next-auth/jwt"
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const hostname = request.nextUrl.hostname
 
-  console.log(`🔒 Middleware - Processing: ${pathname}`)
+  console.log(`🔒 Middleware - Processing: ${pathname} on ${hostname}`)
+
+  // Determine if this is admin or patient domain
+  const isAdminDomain = hostname.includes("admin") || (hostname.includes("localhost") && pathname.startsWith("/admin"))
+  const isPatientDomain =
+    hostname.includes("patients") || (hostname.includes("localhost") && pathname.startsWith("/portal"))
 
   // Public paths that don't require authentication
   const publicPaths = [
@@ -41,9 +47,9 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // ADMIN ROUTE PROTECTION
-    if (pathname.startsWith("/admin")) {
-      console.log(`🛡️ Protecting admin route: ${pathname}`)
+    // ADMIN DOMAIN PROTECTION
+    if (isAdminDomain && pathname.startsWith("/admin")) {
+      console.log(`🛡️ Protecting admin route: ${pathname} on admin domain`)
 
       // Get the user's session token for admin routes
       const token = await getToken({
@@ -74,9 +80,9 @@ export async function middleware(request: NextRequest) {
       console.log(`✅ Admin access granted to ${token.email} for ${pathname}`)
     }
 
-    // PATIENT PORTAL ROUTE PROTECTION
-    if (pathname.startsWith("/portal") && !pathname.startsWith("/portal/auth")) {
-      console.log(`🏥 Patient route accessed: ${pathname}`)
+    // PATIENT DOMAIN PROTECTION
+    if (isPatientDomain && pathname.startsWith("/portal") && !pathname.startsWith("/portal/auth")) {
+      console.log(`🏥 Patient route accessed: ${pathname} on patient domain`)
 
       // For patient routes, we'll let the client-side auth handle redirects
       // since Supabase auth is client-side. The middleware won't block these routes.
@@ -87,6 +93,17 @@ export async function middleware(request: NextRequest) {
       response.headers.set("X-Frame-Options", "DENY")
       response.headers.set("X-Content-Type-Options", "nosniff")
       return response
+    }
+
+    // DOMAIN SEPARATION - Redirect if on wrong domain
+    if (isAdminDomain && pathname.startsWith("/portal")) {
+      console.log(`🔄 Redirecting portal route from admin domain to patient domain`)
+      return NextResponse.redirect(new URL(`https://patients.nextphaseit.org${pathname}`, request.url))
+    }
+
+    if (isPatientDomain && pathname.startsWith("/admin")) {
+      console.log(`🔄 Redirecting admin route from patient domain to admin domain`)
+      return NextResponse.redirect(new URL(`https://admin.nextphaseit.org${pathname}`, request.url))
     }
 
     const response = NextResponse.next()
