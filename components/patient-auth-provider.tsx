@@ -1,7 +1,6 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { supabase, isSupabaseConfigured } from "@/lib/supabase"
 import type { User, Session } from "@supabase/supabase-js"
 import type { ReactNode } from "react"
@@ -34,30 +33,36 @@ export default function PatientAuthProvider({ children }: PatientAuthProviderPro
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
 
   useEffect(() => {
     // Check if Supabase is configured
     if (!isSupabaseConfigured()) {
       console.log("🔧 Supabase not configured, using demo mode")
       // Set mock user for demo
-      setUser({
+      const demoUser = {
         id: "demo-user",
-        email: "patient@example.com",
-        user_metadata: { full_name: "Demo Patient" },
-      } as User)
-      setSession({
-        user: {
-          id: "demo-user",
-          email: "patient@example.com",
-          user_metadata: { full_name: "Demo Patient" },
+        email: "demo@patient.com",
+        user_metadata: {
+          full_name: "Demo Patient",
+          avatar_url: null,
         },
+        app_metadata: {},
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as User
+
+      const demoSession = {
+        user: demoUser,
         access_token: "demo-token",
         refresh_token: "demo-refresh",
         expires_in: 3600,
-        expires_at: Date.now() + 3600000,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
         token_type: "bearer",
-      } as Session)
+      } as Session
+
+      setUser(demoUser)
+      setSession(demoSession)
       setLoading(false)
       return
     }
@@ -105,23 +110,30 @@ export default function PatientAuthProvider({ children }: PatientAuthProviderPro
     if (!isSupabaseConfigured()) {
       console.log("Using demo mode sign in")
       // Mock sign in for demo - set the demo user state
-      setUser({
+      const demoUser = {
         id: "demo-user",
         email: email,
-        user_metadata: { full_name: "Demo Patient" },
-      } as User)
-      setSession({
-        user: {
-          id: "demo-user",
-          email: email,
-          user_metadata: { full_name: "Demo Patient" },
+        user_metadata: {
+          full_name: "Demo Patient",
+          avatar_url: null,
         },
+        app_metadata: {},
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as User
+
+      const demoSession = {
+        user: demoUser,
         access_token: "demo-token",
         refresh_token: "demo-refresh",
         expires_in: 3600,
-        expires_at: Date.now() + 3600000,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
         token_type: "bearer",
-      } as Session)
+      } as Session
+
+      setUser(demoUser)
+      setSession(demoSession)
       return { error: null }
     }
 
@@ -155,12 +167,10 @@ export default function PatientAuthProvider({ children }: PatientAuthProviderPro
       // Mock sign out for demo
       setUser(null)
       setSession(null)
-      router.push("/portal/auth/signin")
       return
     }
 
     await supabase.auth.signOut()
-    router.push("/portal/auth/signin")
   }
 
   const resetPassword = async (email: string) => {
