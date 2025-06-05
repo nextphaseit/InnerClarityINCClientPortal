@@ -19,6 +19,7 @@ import {
   Calendar,
   TrendingUp,
   ExternalLink,
+  Database,
 } from "lucide-react"
 
 interface Payment {
@@ -56,6 +57,7 @@ export default function BillingPage() {
   })
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [databaseSetupNeeded, setDatabaseSetupNeeded] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -73,12 +75,30 @@ export default function BillingPage() {
 
     setLoading(true)
     setError("")
+    setDatabaseSetupNeeded(false)
 
     try {
       if (isSupabaseConfigured()) {
         console.log("Loading billing data for patient:", user.id)
 
-        // Fetch payments from Supabase
+        // First, check if the payments table exists
+        const { data: tableCheck, error: tableError } = await supabase.from("payments").select("id").limit(1)
+
+        if (tableError) {
+          console.error("Payments table error:", tableError)
+
+          // Check if it's a "relation does not exist" error
+          if (tableError.message.includes('relation "public.payments" does not exist') || tableError.code === "42P01") {
+            console.log("Payments table does not exist, showing setup message")
+            setDatabaseSetupNeeded(true)
+            loadMockData()
+            return
+          } else {
+            throw new Error(`Database error: ${tableError.message}`)
+          }
+        }
+
+        // If table exists, fetch payments from Supabase
         const { data: paymentsData, error: paymentsError } = await supabase
           .from("payments")
           .select("*")
@@ -111,6 +131,7 @@ export default function BillingPage() {
   }
 
   const loadMockData = () => {
+    console.log("Loading mock billing data")
     const mockPayments: Payment[] = [
       {
         id: "1",
@@ -334,12 +355,31 @@ export default function BillingPage() {
           </Alert>
         )}
 
+        {/* Database Setup Alert */}
+        {databaseSetupNeeded && (
+          <Alert className="mb-6 border-blue-200 bg-blue-50">
+            <Database className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Database Setup Required:</strong> The payments table doesn't exist yet. Please run the database
+              setup script to enable payment tracking.
+              <div className="mt-2">
+                <code className="bg-blue-100 px-2 py-1 rounded text-sm">
+                  Run: scripts/23-create-payments-table-stripe.sql
+                </code>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Demo Mode Alert */}
-        {!isSupabaseConfigured() && (
+        {(!isSupabaseConfigured() || databaseSetupNeeded) && (
           <Alert className="mb-6 border-orange-200 bg-orange-50">
             <AlertTriangle className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-orange-800">
-              <strong>Demo Mode:</strong> This page is showing mock data. Connect Supabase to see real payment history.
+              <strong>Demo Mode:</strong> This page is showing mock data.
+              {!isSupabaseConfigured()
+                ? " Connect Supabase to see real payment history."
+                : " Set up the payments table to track real payments."}
             </AlertDescription>
           </Alert>
         )}
@@ -464,18 +504,28 @@ export default function BillingPage() {
               <Receipt className="h-5 w-5 mr-2" />
               Payment History
             </CardTitle>
-            <CardDescription>View your complete payment transaction history</CardDescription>
+            <CardDescription>
+              {databaseSetupNeeded
+                ? "Demo payment history (set up database to see real payments)"
+                : "View your complete payment transaction history"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {payments.length === 0 ? (
               <div className="text-center py-12">
                 <Receipt className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No payments found</h3>
-                <p className="text-gray-500 mb-6">You haven't made any payments yet.</p>
-                <Button onClick={() => handlePayNow()} className="bg-teal-600 hover:bg-teal-700">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Make Your First Payment
-                </Button>
+                <p className="text-gray-500 mb-6">
+                  {databaseSetupNeeded
+                    ? "Set up the payments table to start tracking payments."
+                    : "You haven't made any payments yet."}
+                </p>
+                {!databaseSetupNeeded && (
+                  <Button onClick={() => handlePayNow()} className="bg-teal-600 hover:bg-teal-700">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Make Your First Payment
+                  </Button>
+                )}
               </div>
             ) : (
               <>
