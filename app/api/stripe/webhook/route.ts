@@ -50,22 +50,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
     }
 
-    // Handle only checkout.session.completed events
+    // Handle checkout.session.completed events
     if (event.type === "checkout.session.completed") {
       console.log("💳 Processing checkout.session.completed event")
 
       const session = event.data.object as Stripe.Checkout.Session
 
       // Extract required data from the session
-      const { customer_email, amount_total, payment_status, payment_intent, created } = session
+      const { customer_email, amount_total, payment_status, payment_intent, customer, created, currency } = session
 
       console.log("📊 Session data:", {
         customer_email,
         amount_total,
         payment_status,
         payment_intent,
-        created,
+        customer,
         session_id: session.id,
+        currency,
       })
 
       // Validate required fields
@@ -79,41 +80,47 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Missing amount total" }, { status: 400 })
       }
 
+      if (!payment_intent) {
+        console.error("❌ Missing payment_intent in session")
+        return NextResponse.json({ error: "Missing payment intent" }, { status: 400 })
+      }
+
       try {
-        // Find the patient profile by email
+        // Find the patient by email in auth.users
         console.log("🔍 Looking up patient by email:", customer_email)
 
-        const { data: profile, error: profileError } = await supabaseAdmin
-          .from("profiles")
-          .select("id")
-          .eq("email", customer_email)
-          .single()
+        const { data: user, error: userError } = await supabaseAdmin.auth.admin.listUsers()
 
-        if (profileError || !profile) {
-          console.error("❌ Patient profile not found:", profileError)
-          // Still log the payment but without patient_id
-          console.log("⚠️ Proceeding without patient_id")
+        if (userError) {
+          console.error("❌ Error fetching users:", userError)
+          return NextResponse.json({ error: "Failed to lookup user" }, { status: 500 })
         }
 
-        // Prepare payment data
+        // Find user by email
+        const patient = user.users.find((u) => u.email === customer_email)
+
+        if (!patient) {
+          console.error("❌ Patient not found for email:", customer_email)
+          // Continue without patient_id - we'll store the payment anyway
+        }
+
+        // Prepare payment data according to our new schema
         const paymentData = {
-          id: payment_intent as string, // Use payment_intent as primary key
-          patient_id: profile?.id || null,
+          patient_id: patient?.id || null,
           email: customer_email,
-          amount: amount_total / 100, // Convert from cents to dollars
-          currency: session.currency || "usd",
-          status: payment_status || "succeeded",
-          payment_status: payment_status,
-          stripe_payment_intent_id: payment_intent as string,
-          stripe_checkout_session_id: session.id,
+          amount: amount_total, // Already in cents from Stripe
+          currency: currency || "usd",
+          status: payment_status === "paid" ? "paid" : "pending",
+          stripe_payment_intent: payment_intent as string,
+          stripe_customer_id: customer as string,
+          stripe_session_id: session.id,
           description: `Payment for checkout session ${session.id}`,
-          created_at: new Date(created * 1000).toISOString(), // Convert Unix timestamp
-          updated_at: new Date().toISOString(),
+          payment_method: "card", // Default for checkout sessions
         }
 
         console.log("💾 Inserting payment record:", paymentData)
 
-        // Insert payment record into Supabase
+        // Insert payment record into Supabase using service role
         const { data: payment, error: paymentError } = await supabaseAdmin
           .from("payments")
           .insert(paymentData)
@@ -125,16 +132,15 @@ export async function POST(request: NextRequest) {
 
           // If it's a duplicate key error, try to update instead
           if (paymentError.code === "23505") {
-            console.log("🔄 Payment already exists, updating instead")
+            console.log("🔄 Payment already exists, updating status")
 
             const { data: updatedPayment, error: updateError } = await supabaseAdmin
               .from("payments")
               .update({
-                status: payment_status || "succeeded",
-                payment_status: payment_status,
+                status: payment_status === "paid" ? "paid" : "pending",
                 updated_at: new Date().toISOString(),
               })
-              .eq("stripe_payment_intent_id", payment_intent as string)
+              .eq("stripe_payment_intent", payment_intent as string)
               .select()
               .single()
 
@@ -151,8 +157,8 @@ export async function POST(request: NextRequest) {
           console.log("✅ Payment inserted successfully:", payment)
         }
 
-        // If we have a patient_id, update any related invoices
-        if (profile?.id && session.metadata?.invoice_id) {
+        // Update related invoices if metadata contains invoice info
+        if (patient?.id && session.metadata?.invoice_id) {
           console.log("📄 Updating related invoice:", session.metadata.invoice_id)
 
           const { error: invoiceError } = await supabaseAdmin
@@ -163,7 +169,7 @@ export async function POST(request: NextRequest) {
               updated_at: new Date().toISOString(),
             })
             .eq("invoice_number", session.metadata.invoice_id)
-            .eq("patient_id", profile.id)
+            .eq("patient_id", patient.id)
 
           if (invoiceError) {
             console.error("⚠️ Failed to update invoice:", invoiceError)
@@ -178,6 +184,7 @@ export async function POST(request: NextRequest) {
           {
             received: true,
             payment_id: payment_intent,
+            status: "success",
           },
           { status: 200 },
         )
@@ -185,8 +192,58 @@ export async function POST(request: NextRequest) {
         console.error("❌ Database operation failed:", dbError)
         return NextResponse.json({ error: "Database operation failed" }, { status: 500 })
       }
-    } else {
-      // Log other event types but don't process them
+    }
+
+    // Handle payment_intent.succeeded events (for additional confirmation)
+    else if (event.type === "payment_intent.succeeded") {
+      console.log("💰 Processing payment_intent.succeeded event")
+
+      const paymentIntent = event.data.object as Stripe.PaymentIntent
+
+      // Update payment status to ensure it's marked as paid
+      const { error: updateError } = await supabaseAdmin
+        .from("payments")
+        .update({
+          status: "paid",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("stripe_payment_intent", paymentIntent.id)
+
+      if (updateError) {
+        console.error("⚠️ Failed to update payment status:", updateError)
+      } else {
+        console.log("✅ Payment status updated to paid")
+      }
+
+      return NextResponse.json({ received: true }, { status: 200 })
+    }
+
+    // Handle payment_intent.payment_failed events
+    else if (event.type === "payment_intent.payment_failed") {
+      console.log("❌ Processing payment_intent.payment_failed event")
+
+      const paymentIntent = event.data.object as Stripe.PaymentIntent
+
+      // Update payment status to failed
+      const { error: updateError } = await supabaseAdmin
+        .from("payments")
+        .update({
+          status: "failed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("stripe_payment_intent", paymentIntent.id)
+
+      if (updateError) {
+        console.error("⚠️ Failed to update payment status:", updateError)
+      } else {
+        console.log("✅ Payment status updated to failed")
+      }
+
+      return NextResponse.json({ received: true }, { status: 200 })
+    }
+
+    // Log other event types but don't process them
+    else {
       console.log(`ℹ️ Received unhandled event type: ${event.type}`)
       return NextResponse.json(
         {
