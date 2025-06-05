@@ -11,7 +11,7 @@ export default function Error({
   reset,
 }: {
   error: Error & { digest?: string }
-  reset: () => void
+  reset?: () => void
 }) {
   useEffect(() => {
     // Log the error to an error reporting service
@@ -45,7 +45,21 @@ export default function Error({
             )}
 
             <div className="space-y-2">
-              <Button onClick={() => reset()} className="w-full">
+              <Button
+                onClick={() => {
+                  try {
+                    if (typeof reset === "function") {
+                      reset()
+                    } else {
+                      window.location.reload()
+                    }
+                  } catch (err) {
+                    console.error("Reset failed:", err)
+                    window.location.reload()
+                  }
+                }}
+                className="w-full"
+              >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Try again
               </Button>
