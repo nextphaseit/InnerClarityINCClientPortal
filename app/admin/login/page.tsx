@@ -29,17 +29,18 @@ export default function AdminLoginPage() {
       setIsLoading(true)
       setError(null)
 
-      console.log("🔄 Initiating Microsoft sign-in...")
+      console.log("🔄 Initiating Microsoft sign-in with NextAuth...")
 
+      // Use NextAuth's signIn function directly - no manual POST requests
       const result = await signIn("azure-ad", {
         callbackUrl: "/admin/dashboard",
         redirect: false,
       })
 
-      console.log("📋 Sign-in result:", result)
+      console.log("📋 NextAuth sign-in result:", result)
 
       if (result?.error) {
-        console.error("❌ Sign-in error:", result.error)
+        console.error("❌ NextAuth sign-in error:", result.error)
 
         let errorMessage = "Sign in failed. Please try again."
 
@@ -56,23 +57,11 @@ export default function AdminLoginPage() {
           case "OAuthCreateAccount":
             errorMessage = "Account creation failed. Please contact your administrator."
             break
-          case "EmailCreateAccount":
-            errorMessage = "Email verification required. Please check your email."
-            break
           case "Callback":
             errorMessage = "Authentication callback failed. Please try again."
             break
           case "OAuthAccountNotLinked":
             errorMessage = "Account not linked. Please use the same email address."
-            break
-          case "EmailSignin":
-            errorMessage = "Email sign-in failed. Please try again."
-            break
-          case "CredentialsSignin":
-            errorMessage = "Invalid credentials. Please check your login information."
-            break
-          case "SessionRequired":
-            errorMessage = "Session required. Please sign in again."
             break
           default:
             errorMessage = `Authentication error: ${result.error}`
@@ -80,13 +69,14 @@ export default function AdminLoginPage() {
 
         setError(errorMessage)
       } else if (result?.url) {
-        console.log("✅ Sign-in successful, redirecting to:", result.url)
+        console.log("✅ NextAuth sign-in successful, redirecting to:", result.url)
         router.push(result.url)
       } else {
-        console.log("🔄 Sign-in in progress...")
+        console.log("🔄 NextAuth sign-in in progress...")
+        // NextAuth will handle the redirect automatically
       }
     } catch (error) {
-      console.error("💥 Unexpected error during sign-in:", error)
+      console.error("💥 Unexpected error during NextAuth sign-in:", error)
       setError("An unexpected error occurred. Please try again or contact support.")
     } finally {
       setIsLoading(false)

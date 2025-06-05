@@ -2,8 +2,6 @@ import NextAuth from "next-auth"
 import type { NextAuthOptions } from "next-auth"
 import AzureADProvider from "next-auth/providers/azure-ad"
 
-export const dynamic = "force-dynamic"
-
 export const authOptions: NextAuthOptions = {
   providers: [
     AzureADProvider({
@@ -12,74 +10,78 @@ export const authOptions: NextAuthOptions = {
       tenantId: process.env.MICROSOFT_TENANT_ID!,
       authorization: {
         params: {
-          scope: "openid email profile User.Read offline_access",
+          scope: "openid profile email User.Read",
         },
       },
     }),
   ],
-
   secret: process.env.NEXTAUTH_SECRET,
-  debug: true, // Enable detailed error logging
-
-  pages: {
-    signIn: "/admin/login",
-    error: "/auth/error",
-  },
-
-  callbacks: {
-    async signIn({ user, account }) {
-      // Only allow Azure AD authentication
-      if (account?.provider !== "azure-ad") {
-        console.error("❌ Admin login requires Microsoft authentication")
-        return false
-      }
-
-      // Validate authorized email domains
-      if (user.email) {
-        const domain = user.email.split("@")[1]
-        const authorizedDomains = ["innerclarity.org", "innerclarityinc.com", "nextphaseit.org"]
-
-        if (!authorizedDomains.includes(domain)) {
-          console.error(`❌ Unauthorized domain for admin access: ${domain}`)
-          return false
-        }
-      }
-
-      console.log("✅ Successful admin sign-in:", user.email)
-      return true
-    },
-
-    async jwt({ token, user, account }) {
-      if (account && user) {
-        token.accessToken = account.access_token
-        token.role = "admin"
-        token.email = user.email
-      }
-      return token
-    },
-
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.role = "admin"
-        session.accessToken = token.accessToken as string
-      }
-      return session
-    },
-
-    async redirect({ url, baseUrl }) {
-      // Always redirect to admin dashboard after successful sign-in
-      if (url.startsWith("/")) {
-        return `${baseUrl}${url}`
-      } else if (url.startsWith(baseUrl)) {
-        return url
-      }
-      return `${baseUrl}/admin/dashboard`
-    },
-  },
-
+  debug: process.env.NODE_ENV === "development",
   session: {
     strategy: "jwt",
     maxAge: 8 * 60 * 60, // 8 hours
+  },
+  pages: {
+    signIn: "/admin/login",
+    error: "/admin/login",
+  },
+  callbacks: {
+    async signIn({ user, account, profile }) {
+      console.log("🔐 NextAuth signIn callback:", { user, account, profile })
+
+      // Check if user email is from authorized domain
+      const authorizedDomains = ["@innerclarity.org", "@innerclarityinc.com", "@nextphaseit.org"]
+
+      const userEmail = user.email
+      if (!userEmail) {
+        console.log("❌ No email provided")
+        return false
+      }
+
+      const hasAuthorizedDomain = authorizedDomains.some((domain) => userEmail.endsWith(domain))
+
+      if (!hasAuthorizedDomain) {
+        console.log("❌ Unauthorized domain:", userEmail)
+        return false
+      }
+
+      console.log("✅ Authorized user:", userEmail)
+      return true
+    },
+    async jwt({ token, user, account }) {
+      if (account && user) {
+        token.accessToken = account.access_token
+        token.provider = account.provider
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.accessToken = token.accessToken as string
+        session.provider = token.provider as string
+      }
+      return session
+    },
+    async redirect({ url, baseUrl }) {
+      console.log("🔄 NextAuth redirect:", { url, baseUrl })
+
+      // Always redirect to admin dashboard after successful login
+      if (url.startsWith("/admin/login")) {
+        return `${baseUrl}/admin/dashboard`
+      }
+
+      // Allow relative callback URLs
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`
+      }
+
+      // Allow callback URLs on the same origin
+      if (new URL(url).origin === baseUrl) {
+        return url
+      }
+
+      return `${baseUrl}/admin/dashboard`
+    },
   },
 }
 
