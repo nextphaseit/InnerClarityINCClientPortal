@@ -24,6 +24,7 @@ if (missingVars.length > 0) {
 }
 
 console.log("✅ Microsoft authentication environment variables are present")
+console.log("🔗 NextAuth URL:", requiredEnvVars.NEXTAUTH_URL)
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -45,7 +46,7 @@ export const authOptions: NextAuthOptions = {
   ],
 
   pages: {
-    signIn: "/admin/login",
+    signIn: "/auth/signin",
     error: "/auth/error",
     signOut: "/auth/signout",
   },
@@ -60,7 +61,7 @@ export const authOptions: NextAuthOptions = {
           return false
         }
 
-        // Restrict to Microsoft login only for admin
+        // Only allow Microsoft authentication
         if (account.provider !== "azure-ad") {
           console.error("❌ Admin login requires Microsoft authentication")
           return false
@@ -104,7 +105,7 @@ export const authOptions: NextAuthOptions = {
         return token
       } catch (error) {
         console.error("❌ JWT callback error:", error)
-        return null
+        return token
       }
     },
 

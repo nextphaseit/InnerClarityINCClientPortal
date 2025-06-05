@@ -22,7 +22,7 @@ export async function requireAuth(redirectTo = "/auth/signin") {
 }
 
 export async function requireAdminAuth() {
-  const user = await requireAuth("/unauthorized?reason=admin_required")
+  const user = await requireAuth("/auth/signin")
 
   if (user.role !== "admin") {
     redirect("/unauthorized?reason=admin_required")
@@ -31,12 +31,21 @@ export async function requireAdminAuth() {
   return user
 }
 
-export async function requirePatientAuth() {
-  const user = await requireAuth("/unauthorized?reason=patient_required")
+// Remove patient auth since this is admin-only
+export async function requireMicrosoftAuth() {
+  const session = await getSession()
 
-  if (user.role !== "patient") {
-    redirect("/unauthorized?reason=patient_required")
+  if (!session?.user) {
+    redirect("/auth/signin")
   }
 
-  return user
+  if (session.provider !== "azure-ad") {
+    redirect("/auth/signin?error=microsoft_required")
+  }
+
+  if (session.user.role !== "admin") {
+    redirect("/unauthorized?reason=admin_required")
+  }
+
+  return session.user
 }

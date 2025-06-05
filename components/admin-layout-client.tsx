@@ -4,13 +4,13 @@ import type React from "react"
 import { useState, Suspense } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { signOut } from "next-auth/react"
 import { LayoutDashboard, Users, Calendar, MessageSquare, FileText, Shield, Menu, X, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useRealtimeNotifications } from "@/hooks/use-realtime-notifications"
 import { usePendingNotifications } from "@/hooks/use-pending-notifications"
 import { NotificationBadge } from "@/components/notification-badge"
-import { supabase } from "@/lib/supabase"
 
 const navigationItems = [
   {
@@ -85,10 +85,15 @@ export function AdminLayoutClient({ children, session }: AdminLayoutClientProps)
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut()
-      window.location.href = "/auth/login"
+      console.log("🚪 Admin logging out...")
+      await signOut({
+        callbackUrl: "/auth/signin",
+        redirect: true,
+      })
     } catch (error) {
-      console.error("Logout error:", error)
+      console.error("❌ Logout error:", error)
+      // Fallback redirect
+      window.location.href = "/auth/signin"
     }
   }
 
