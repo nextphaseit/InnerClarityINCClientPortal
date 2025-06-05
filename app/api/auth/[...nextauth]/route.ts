@@ -4,23 +4,6 @@ import AzureADProvider from "next-auth/providers/azure-ad"
 
 export const dynamic = "force-dynamic"
 
-// Validate environment variables
-const requiredEnvVars = {
-  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-  MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID,
-  MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET,
-  MICROSOFT_TENANT_ID: process.env.MICROSOFT_TENANT_ID,
-}
-
-const missingVars = Object.entries(requiredEnvVars)
-  .filter(([key, value]) => !value)
-  .map(([key]) => key)
-
-if (missingVars.length > 0) {
-  throw new Error(`Missing required environment variables: ${missingVars.join(", ")}`)
-}
-
 export const authOptions: NextAuthOptions = {
   providers: [
     AzureADProvider({
@@ -35,6 +18,9 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: true, // Enable detailed error logging
+
   pages: {
     signIn: "/admin/login",
     error: "/auth/error",
@@ -42,40 +28,51 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async signIn({ user, account }) {
-      if (account?.provider !== "azure-ad") return false
+      // Only allow Azure AD authentication
+      if (account?.provider !== "azure-ad") {
+        console.error("❌ Admin login requires Microsoft authentication")
+        return false
+      }
 
+      // Validate authorized email domains
       if (user.email) {
         const domain = user.email.split("@")[1]
         const authorizedDomains = ["innerclarity.org", "innerclarityinc.com", "nextphaseit.org"]
 
         if (!authorizedDomains.includes(domain)) {
-          console.error(`Unauthorized domain: ${domain}`)
+          console.error(`❌ Unauthorized domain for admin access: ${domain}`)
           return false
         }
       }
 
+      console.log("✅ Successful admin sign-in:", user.email)
       return true
     },
 
     async jwt({ token, user, account }) {
       if (account && user) {
         token.accessToken = account.access_token
-        token.role = user.email?.includes("admin") ? "admin" : "staff"
+        token.role = "admin"
+        token.email = user.email
       }
       return token
     },
 
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role as string
+        session.user.role = "admin"
         session.accessToken = token.accessToken as string
       }
       return session
     },
 
     async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      if (url.startsWith(baseUrl)) return url
+      // Always redirect to admin dashboard after successful sign-in
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`
+      } else if (url.startsWith(baseUrl)) {
+        return url
+      }
       return `${baseUrl}/admin/dashboard`
     },
   },
@@ -84,8 +81,6 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 8 * 60 * 60, // 8 hours
   },
-
-  secret: process.env.NEXTAUTH_SECRET,
 }
 
 const handler = NextAuth(authOptions)

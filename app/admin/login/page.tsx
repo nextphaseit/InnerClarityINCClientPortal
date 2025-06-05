@@ -29,22 +29,65 @@ export default function AdminLoginPage() {
       setIsLoading(true)
       setError(null)
 
+      console.log("🔄 Initiating Microsoft sign-in...")
+
       const result = await signIn("azure-ad", {
         callbackUrl: "/admin/dashboard",
         redirect: false,
       })
 
+      console.log("📋 Sign-in result:", result)
+
       if (result?.error) {
-        setError(
-          result.error === "AccessDenied"
-            ? "Access denied. Your email domain is not authorized for admin access."
-            : `Sign in failed: ${result.error}`,
-        )
+        console.error("❌ Sign-in error:", result.error)
+
+        let errorMessage = "Sign in failed. Please try again."
+
+        switch (result.error) {
+          case "AccessDenied":
+            errorMessage = "Access denied. Your email domain is not authorized for admin access."
+            break
+          case "OAuthSignin":
+            errorMessage = "OAuth configuration error. Please check your Microsoft app settings."
+            break
+          case "OAuthCallback":
+            errorMessage = "OAuth callback error. Please verify your redirect URI configuration."
+            break
+          case "OAuthCreateAccount":
+            errorMessage = "Account creation failed. Please contact your administrator."
+            break
+          case "EmailCreateAccount":
+            errorMessage = "Email verification required. Please check your email."
+            break
+          case "Callback":
+            errorMessage = "Authentication callback failed. Please try again."
+            break
+          case "OAuthAccountNotLinked":
+            errorMessage = "Account not linked. Please use the same email address."
+            break
+          case "EmailSignin":
+            errorMessage = "Email sign-in failed. Please try again."
+            break
+          case "CredentialsSignin":
+            errorMessage = "Invalid credentials. Please check your login information."
+            break
+          case "SessionRequired":
+            errorMessage = "Session required. Please sign in again."
+            break
+          default:
+            errorMessage = `Authentication error: ${result.error}`
+        }
+
+        setError(errorMessage)
       } else if (result?.url) {
+        console.log("✅ Sign-in successful, redirecting to:", result.url)
         router.push(result.url)
+      } else {
+        console.log("🔄 Sign-in in progress...")
       }
     } catch (error) {
-      setError("An unexpected error occurred. Please try again.")
+      console.error("💥 Unexpected error during sign-in:", error)
+      setError("An unexpected error occurred. Please try again or contact support.")
     } finally {
       setIsLoading(false)
     }
