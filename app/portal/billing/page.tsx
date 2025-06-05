@@ -24,13 +24,14 @@ import {
 
 interface Invoice {
   id: string
-  invoice_number: string
+  invoice_number?: string
   date: string
   description: string
   amount: number
-  status: "draft" | "pending" | "paid" | "overdue" | "canceled"
+  status: "draft" | "pending" | "paid" | "overdue" | "cancelled"
   due_date?: string
   paid_date?: string
+  created_at?: string
 }
 
 interface Payment {
@@ -96,30 +97,62 @@ export default function BillingPage() {
 
     try {
       if (isSupabaseConfigured() && user?.id) {
-        // Load real data from Supabase
+        // Load real data from Supabase with fallback column names
+        console.log("Loading billing data for user:", user.id)
+
+        // Try to load invoices with both patient_id and client_id for compatibility
+        const invoicesQuery = supabase
+          .from("invoices")
+          .select("*")
+          .or(`patient_id.eq.${user.id},client_id.eq.${user.id}`)
+          .order("created_at", { ascending: false })
+
+        const paymentsQuery = supabase
+          .from("payments")
+          .select("*")
+          .eq("patient_id", user.id)
+          .order("created_at", { ascending: false })
+
+        const autopayQuery = supabase.from("autopay_settings").select("*").eq("patient_id", user.id).single()
+
         const [invoicesResult, paymentsResult, autopayResult] = await Promise.all([
-          supabase.from("invoices").select("*").eq("patient_id", user.id).order("created_at", { ascending: false }),
-          supabase.from("payments").select("*").eq("patient_id", user.id).order("created_at", { ascending: false }),
-          supabase.from("autopay_settings").select("*").eq("patient_id", user.id).single(),
+          invoicesQuery,
+          paymentsQuery,
+          autopayQuery,
         ])
 
+        console.log("Invoices result:", invoicesResult)
+        console.log("Payments result:", paymentsResult)
+        console.log("Autopay result:", autopayResult)
+
         if (invoicesResult.error && invoicesResult.error.code !== "PGRST116") {
-          throw invoicesResult.error
-        }
-        if (paymentsResult.error && paymentsResult.error.code !== "PGRST116") {
-          throw paymentsResult.error
+          console.error("Invoices error:", invoicesResult.error)
+          throw new Error(`Failed to load invoices: ${invoicesResult.error.message}`)
         }
 
-        setInvoices(invoicesResult.data || [])
+        if (paymentsResult.error && paymentsResult.error.code !== "PGRST116") {
+          console.error("Payments error:", paymentsResult.error)
+          // Don't throw error for payments, just log it
+          console.warn("Payments table might not exist, using empty array")
+        }
+
+        // Process invoices data
+        const invoicesData = (invoicesResult.data || []).map((invoice: any) => ({
+          ...invoice,
+          date: invoice.created_at || invoice.date,
+          invoice_number: invoice.invoice_number || `INV-${invoice.id.slice(0, 8)}`,
+        }))
+
+        setInvoices(invoicesData)
         setPayments(paymentsResult.data || [])
         setAutopaySettings(autopayResult.data)
       } else {
-        // Load mock data for demo
+        console.log("Loading mock data (Supabase not configured or no user)")
         loadMockData()
       }
     } catch (error) {
       console.error("Error loading billing data:", error)
-      setError("Unable to load billing information. Please try again later.")
+      setError(`Unable to load billing information: ${error instanceof Error ? error.message : "Unknown error"}`)
       // Fallback to mock data
       loadMockData()
     } finally {
@@ -128,6 +161,7 @@ export default function BillingPage() {
   }
 
   const loadMockData = () => {
+    console.log("Loading mock billing data")
     const mockInvoices: Invoice[] = [
       {
         id: "1",
@@ -192,7 +226,7 @@ export default function BillingPage() {
         body: JSON.stringify({
           amount: invoice.amount,
           description: invoice.description,
-          invoiceId: invoice.invoice_number,
+          invoiceId: invoice.invoice_number || invoice.id,
           patientId: user.id,
         }),
       })
@@ -265,8 +299,8 @@ export default function BillingPage() {
         return <Badge variant="destructive">Overdue</Badge>
       case "draft":
         return <Badge variant="secondary">Draft</Badge>
-      case "canceled":
-        return <Badge variant="outline">Canceled</Badge>
+      case "cancelled":
+        return <Badge variant="outline">Cancelled</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
