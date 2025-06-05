@@ -12,6 +12,7 @@ import { Calendar, Clock, Plus, Filter, Users, Video, Shield, Loader2 } from "lu
 import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabaseClient"
 import { StatusBadge } from "@/components/status-badge"
+import { useRealtimeNotifications } from "@/hooks/use-realtime-notifications"
 
 // Mark as dynamic to prevent static rendering issues
 export const dynamic = "force-dynamic"
@@ -35,6 +36,37 @@ export default function AdminAppointmentsPage() {
   const [filteredAppointments, setFilteredAppointments] = useState<any[]>([])
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [dateFilter, setDateFilter] = useState<string>("")
+
+  // Set up realtime notifications and auto-refresh
+  useRealtimeNotifications({
+    enabled: true,
+    playSound: true,
+  })
+
+  // Auto-refresh appointments when new data arrives
+  useEffect(() => {
+    if (!user || user.role !== "admin") return
+
+    const channel = supabase
+      .channel("appointments-refresh")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "appointments",
+        },
+        () => {
+          console.log("🔄 Auto-refreshing appointments due to realtime update")
+          loadAppointments()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
 
   useEffect(() => {
     try {

@@ -4,9 +4,12 @@ import type React from "react"
 import { useState, Suspense } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, Calendar, MessageSquare, FileText, Shield, Bell, Menu, X, LogOut } from "lucide-react"
+import { LayoutDashboard, Users, Calendar, MessageSquare, FileText, Shield, Menu, X, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
+import { useRealtimeNotifications } from "@/hooks/use-realtime-notifications"
+import { usePendingNotifications } from "@/hooks/use-pending-notifications"
+import { NotificationBadge } from "@/components/notification-badge"
 import { supabase } from "@/lib/supabase"
 
 const navigationItems = [
@@ -24,16 +27,19 @@ const navigationItems = [
     name: "Appointments",
     href: "/admin/appointments",
     icon: Calendar,
+    showPendingBadge: true,
   },
   {
     name: "Forms",
     href: "/admin/forms",
     icon: FileText,
+    showPendingBadge: true,
   },
   {
     name: "Documents",
     href: "/admin/documents",
     icon: FileText,
+    showPendingBadge: true,
   },
   {
     name: "Messages",
@@ -68,6 +74,15 @@ export function AdminLayoutClient({ children, session }: AdminLayoutClientProps)
     userRole: "admin",
   })
 
+  // Set up realtime notifications
+  useRealtimeNotifications({
+    enabled: true,
+    playSound: true,
+  })
+
+  // Get pending notifications count
+  const { pendingCount } = usePendingNotifications()
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut()
@@ -83,6 +98,19 @@ export function AdminLayoutClient({ children, session }: AdminLayoutClientProps)
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false)
+  }
+
+  const getPendingCountForItem = (itemName: string) => {
+    // This is a simplified version - you could make this more specific
+    // by tracking individual counts for each type
+    switch (itemName) {
+      case "Appointments":
+      case "Forms":
+      case "Documents":
+        return pendingCount > 0 ? Math.ceil(pendingCount / 3) : 0
+      default:
+        return 0
+    }
   }
 
   return (
@@ -122,6 +150,7 @@ export function AdminLayoutClient({ children, session }: AdminLayoutClientProps)
             const isActive = pathname === item.href
             const Icon = item.icon
             const showBadge = item.showBadge && unreadCount > 0
+            const showPendingBadge = item.showPendingBadge && getPendingCountForItem(item.name) > 0
 
             return (
               <Link
@@ -147,6 +176,11 @@ export function AdminLayoutClient({ children, session }: AdminLayoutClientProps)
                 {showBadge && (
                   <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full animate-pulse">
                     {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+                {showPendingBadge && (
+                  <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-orange-500 rounded-full animate-pulse">
+                    {getPendingCountForItem(item.name)}
                   </span>
                 )}
               </Link>
@@ -185,14 +219,7 @@ export function AdminLayoutClient({ children, session }: AdminLayoutClientProps)
             <h2 className="text-lg font-semibold text-gray-900">Inner Clarity Admin Portal</h2>
           </div>
           <div className="flex items-center space-x-4">
-            {unreadCount > 0 && (
-              <div className="relative">
-                <Bell className="h-5 w-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              </div>
-            )}
+            <NotificationBadge count={pendingCount} className="text-gray-600" />
             <span className="text-sm text-gray-600">Welcome, {session.user.name || session.user.email}</span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
               Microsoft Authenticated
