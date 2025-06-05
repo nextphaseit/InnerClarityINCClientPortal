@@ -18,6 +18,7 @@ interface Profile {
   id: string
   user_id?: string
   client_id?: string
+  email?: string
   full_name: string
   phone: string
   address: string
@@ -62,6 +63,7 @@ export default function ProfilePage() {
         const mockProfile: Profile = {
           id: user.id,
           user_id: user.id,
+          email: user.email || "",
           full_name: user.user_metadata?.full_name || "Demo Patient",
           phone: "",
           address: "",
@@ -82,29 +84,41 @@ export default function ProfilePage() {
         return
       }
 
-      // Try multiple column variations for compatibility
+      console.log("Loading profile for user:", user.id)
+
+      // Try to get profile by id first
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
-        .or(`id.eq.${user.id},user_id.eq.${user.id},client_id.eq.${user.id}`)
+        .eq("id", user.id)
         .single()
 
       if (profileError) {
-        if (profileError.code === "PGRST116") {
-          // No profile found, create default
+        console.log("No profile found with id match, trying alternative columns")
+
+        // Try alternative columns
+        const { data: altProfileData, error: altProfileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .or(`user_id.eq.${user.id},client_id.eq.${user.id}`)
+          .single()
+
+        if (altProfileError) {
+          console.log("No profile found with any column match, creating default")
           await createDefaultProfile()
-        } else {
-          console.error("Error loading profile:", profileError)
-          setError("Unable to load profile data.")
-          await createDefaultProfile()
+        } else if (altProfileData) {
+          console.log("Profile found with alternative column match")
+          setProfile(altProfileData)
         }
       } else if (profileData) {
+        console.log("Profile found with id match")
         setProfile(profileData)
       } else {
+        console.log("No profile found, creating default")
         await createDefaultProfile()
       }
     } catch (error) {
-      console.error("Error:", error)
+      console.error("Error loading profile:", error)
       setError("Unable to connect to database.")
       await createDefaultProfile()
     } finally {
@@ -119,6 +133,7 @@ export default function ProfilePage() {
       id: user.id,
       user_id: user.id,
       client_id: user.id,
+      email: user.email || "",
       full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
       phone: "",
       address: "",
@@ -137,11 +152,15 @@ export default function ProfilePage() {
 
     if (isSupabaseConfigured()) {
       try {
+        console.log("Creating default profile:", defaultProfile)
+
         // Try to insert the default profile
         const { error: insertError } = await supabase.from("profiles").insert(defaultProfile)
 
         if (insertError) {
           console.error("Error creating default profile:", insertError)
+        } else {
+          console.log("Default profile created successfully")
         }
       } catch (error) {
         console.error("Error inserting profile:", error)
@@ -179,21 +198,21 @@ export default function ProfilePage() {
         throw new Error("File must be an image")
       }
 
-      // Upload to Supabase Storage with user ID in path
+      // Simple file name to avoid path issues
       const fileExt = file.name.split(".").pop()
-      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`
-      const filePath = fileName
+      const fileName = `avatar-${Date.now()}.${fileExt}`
 
-      console.log("🔄 Uploading file to:", filePath)
+      console.log("🔄 Uploading file:", fileName)
 
-      const { data: uploadData, error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, {
+      // Upload with simpler path
+      const { data: uploadData, error: uploadError } = await supabase.storage.from("avatars").upload(fileName, file, {
         cacheControl: "3600",
-        upsert: true, // Allow overwriting existing files
+        upsert: true,
       })
 
       if (uploadError) {
         console.error("❌ Upload error:", uploadError)
-        throw uploadError
+        throw new Error(`Upload failed: ${uploadError.message}`)
       }
 
       console.log("✅ Upload successful:", uploadData)
@@ -201,7 +220,7 @@ export default function ProfilePage() {
       // Get public URL
       const {
         data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(filePath)
+      } = supabase.storage.from("avatars").getPublicUrl(fileName)
 
       console.log("🔗 Public URL:", publicUrl)
 
@@ -217,7 +236,7 @@ export default function ProfilePage() {
 
       if (updateError) {
         console.error("❌ Profile update error:", updateError)
-        throw updateError
+        throw new Error(`Profile update failed: ${updateError.message}`)
       }
 
       console.log("✅ Profile updated successfully")
@@ -246,15 +265,19 @@ export default function ProfilePage() {
         return
       }
 
+      console.log("Saving profile:", profile)
+
       const { error: saveError } = await supabase.from("profiles").upsert({
         ...profile,
         updated_at: new Date().toISOString(),
       })
 
       if (saveError) {
-        throw saveError
+        console.error("❌ Save error:", saveError)
+        throw new Error(`Save failed: ${saveError.message}`)
       }
 
+      console.log("✅ Profile saved successfully")
       setMessage("Profile updated successfully!")
       setTimeout(() => setMessage(""), 3000)
     } catch (error: any) {
