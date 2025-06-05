@@ -1,21 +1,67 @@
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import Image from "next/image"
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-blue-50 to-white">
-      <div className="text-center space-y-6 max-w-3xl">
-        <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">NextPhase IT Admin Portal</h1>
-        <p className="text-xl text-gray-600">Secure administrative access for NextPhase IT and Inner Clarity Inc</p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700">
-            <Link href="/admin/login">Admin Login</Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link href="/admin/dashboard">Dashboard</Link>
-          </Button>
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <header className="container mx-auto px-4 py-6 flex justify-between items-center">
+        <div className="flex items-center">
+          <Image src="/images/inner-clarity-logo.png" alt="Inner Clarity" width={120} height={40} />
         </div>
-      </div>
+
+        <nav className="hidden md:flex space-x-8">
+          <Link href="/" className="text-gray-800 hover:text-blue-600 transition-colors">
+            Home
+          </Link>
+          <Link href="/about" className="text-gray-800 hover:text-blue-600 transition-colors">
+            About
+          </Link>
+          <Link href="/services" className="text-gray-800 hover:text-blue-600 transition-colors">
+            Services
+          </Link>
+          <Link href="/contact" className="text-gray-800 hover:text-blue-600 transition-colors">
+            Contact
+          </Link>
+        </nav>
+
+        <div className="flex items-center space-x-4">
+          <Link href="/auth/signin" className="text-blue-600 hover:text-blue-800 transition-colors">
+            Sign In
+          </Link>
+          <Link
+            href="/auth/signup"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Get Started
+          </Link>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-16">
+        <div className="text-center max-w-3xl mx-auto">
+          <h1 className="text-4xl md:text-5xl font-bold mb-6">
+            Your Journey to <span className="text-blue-600">Mental Wellness</span> Starts Here
+          </h1>
+          <p className="text-lg text-gray-600 mb-8">
+            Secure, HIPAA-compliant mental health services with personalized care, professional therapy, and a
+            comprehensive patient portal designed for your privacy and peace of mind.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <Link
+              href="/auth/signup"
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-lg font-medium"
+            >
+              Start Your Journey
+            </Link>
+            <Link
+              href="/auth/signin"
+              className="bg-white text-blue-600 border border-blue-600 px-6 py-3 rounded-lg hover:bg-blue-50 transition-colors text-lg font-medium"
+            >
+              Patient Portal
+            </Link>
+          </div>
+        </div>
+      </main>
     </div>
   )
 }

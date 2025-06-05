@@ -1,175 +1,108 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertTriangle, Home, RefreshCw, Mail } from "lucide-react"
 import Link from "next/link"
-import { Suspense } from "react"
-
-function ErrorContent() {
-  const searchParams = useSearchParams()
-  const error = searchParams?.get("error")
-
-  const errorMessages: Record<string, { title: string; description: string; action?: string }> = {
-    Configuration: {
-      title: "Configuration Error",
-      description: "The authentication service is not properly configured. Please contact your system administrator.",
-      action: "contact_admin",
-    },
-    AccessDenied: {
-      title: "Access Denied",
-      description: "You don't have permission to access this application. Your email domain may not be authorized.",
-      action: "contact_admin",
-    },
-    Verification: {
-      title: "Verification Failed",
-      description: "The verification link has expired or has already been used. Please try signing in again.",
-      action: "retry",
-    },
-    OAuthSignin: {
-      title: "OAuth Sign-in Failed",
-      description: "There was a problem with the OAuth sign-in process. Please try again.",
-      action: "retry",
-    },
-    OAuthCallback: {
-      title: "OAuth Callback Error",
-      description: "There was a problem processing the OAuth callback. This may be a configuration issue.",
-      action: "contact_admin",
-    },
-    OAuthCreateAccount: {
-      title: "Account Creation Failed",
-      description: "We couldn't create your account. Please contact support for assistance.",
-      action: "contact_admin",
-    },
-    EmailCreateAccount: {
-      title: "Email Account Creation Failed",
-      description:
-        "We couldn't create an account with that email address. Please try a different email or contact support.",
-      action: "contact_admin",
-    },
-    Callback: {
-      title: "Callback Error",
-      description: "There was a problem with the authentication callback. Please try signing in again.",
-      action: "retry",
-    },
-    OAuthAccountNotLinked: {
-      title: "Account Not Linked",
-      description: "This account is not linked to your profile. Please use the same sign-in method you used before.",
-      action: "retry",
-    },
-    EmailSignin: {
-      title: "Email Sign-in Failed",
-      description: "We couldn't send you a sign-in email. Please check your email address and try again.",
-      action: "retry",
-    },
-    CredentialsSignin: {
-      title: "Invalid Credentials",
-      description: "The email or password you entered is incorrect. Please try again.",
-      action: "retry",
-    },
-    SessionRequired: {
-      title: "Session Required",
-      description: "You need to be signed in to access this page. Please sign in and try again.",
-      action: "retry",
-    },
-    Default: {
-      title: "Authentication Error",
-      description: "An unexpected error occurred during authentication. Please try again.",
-      action: "retry",
-    },
-  }
-
-  const errorInfo = errorMessages[error || "Default"] || errorMessages.Default
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <AlertTriangle className="h-16 w-16 text-red-500 mx-auto" />
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Authentication Error</h1>
-          <p className="text-gray-600 dark:text-gray-400">Something went wrong during sign-in</p>
-        </div>
-
-        <Card className="shadow-lg border-red-200">
-          <CardHeader>
-            <CardTitle className="text-red-700 dark:text-red-400">{errorInfo.title}</CardTitle>
-            <CardDescription>{errorInfo.description}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Error Code:</strong> {error}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <div className="space-y-2">
-              {errorInfo.action === "retry" && (
-                <Button asChild className="w-full">
-                  <Link href="/auth/signin">
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Try Again
-                  </Link>
-                </Button>
-              )}
-
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/">
-                  <Home className="mr-2 h-4 w-4" />
-                  Go Home
-                </Link>
-              </Button>
-
-              {errorInfo.action === "contact_admin" && (
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="mailto:support@innerclarityinc.com">
-                    <Mail className="mr-2 h-4 w-4" />
-                    Contact Support
-                  </Link>
-                </Button>
-              )}
-            </div>
-
-            <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-              <p>If this problem persists, please contact support at:</p>
-              <p className="font-medium">support@innerclarityinc.com</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
-}
+import Image from "next/image"
 
 export default function AuthErrorPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
-            <Card className="shadow-lg">
-              <CardHeader>
-                <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="animate-pulse space-y-3">
-                  <div className="h-10 bg-gray-200 rounded"></div>
-                  <div className="h-10 bg-gray-200 rounded"></div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+  const searchParams = useSearchParams()
+  const [errorMessage, setErrorMessage] = useState<string>("An authentication error occurred")
+
+  useEffect(() => {
+    const error = searchParams?.get("error")
+
+    if (error) {
+      switch (error) {
+        case "AccessDenied":
+          setErrorMessage("Access denied. You do not have permission to access this resource.")
+          break
+        case "Configuration":
+          setErrorMessage("There is a problem with the server configuration.")
+          break
+        case "Verification":
+          setErrorMessage("The verification link is invalid or has expired.")
+          break
+        case "OAuthSignin":
+          setErrorMessage("Error in the OAuth sign-in process.")
+          break
+        case "OAuthCallback":
+          setErrorMessage("Error in the OAuth callback process.")
+          break
+        case "OAuthCreateAccount":
+          setErrorMessage("Could not create OAuth provider account.")
+          break
+        case "EmailCreateAccount":
+          setErrorMessage("Could not create email provider account.")
+          break
+        case "Callback":
+          setErrorMessage("Error in the OAuth callback handler.")
+          break
+        case "OAuthAccountNotLinked":
+          setErrorMessage("Email already in use with different provider.")
+          break
+        case "EmailSignin":
+          setErrorMessage("Error sending the verification email.")
+          break
+        case "CredentialsSignin":
+          setErrorMessage("Invalid credentials.")
+          break
+        case "SessionRequired":
+          setErrorMessage("Authentication required. Please sign in to access this page.")
+          break
+        default:
+          setErrorMessage(`Authentication error: ${error}`)
       }
-    >
-      <ErrorContent />
-    </Suspense>
+    }
+  }, [searchParams])
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="bg-white shadow-lg rounded-xl p-8 max-w-md w-full text-center">
+        <div className="mx-auto mb-6">
+          <Image src="/images/inner-clarity-logo.png" alt="NextPhase IT" width={120} height={40} className="mx-auto" />
+        </div>
+
+        <div className="text-red-600 mb-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-12 w-12 mx-auto"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
+          </svg>
+        </div>
+
+        <h1 className="text-2xl font-semibold mb-2">Authentication Error</h1>
+        <p className="text-gray-600 mb-6">{errorMessage}</p>
+
+        <div className="space-y-3">
+          <Link
+            href="/auth/signin"
+            className="block w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Try Again
+          </Link>
+
+          <Link
+            href="/"
+            className="block w-full bg-gray-200 text-gray-800 py-2.5 rounded-lg hover:bg-gray-300 transition-colors"
+          >
+            Return to Home
+          </Link>
+        </div>
+
+        <div className="mt-6 text-xs text-gray-500">
+          <p>If this problem persists, please contact support at support@nextphaseit.org</p>
+        </div>
+      </div>
+    </div>
   )
 }

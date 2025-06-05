@@ -5,14 +5,6 @@ import { getToken } from "next-auth/jwt"
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Public paths that don't require authentication
-  const publicPaths = ["/admin/login", "/auth/error", "/api/auth"]
-
-  // Allow public paths
-  if (publicPaths.some((path) => pathname.startsWith(path))) {
-    return NextResponse.next()
-  }
-
   // Protect admin routes
   if (pathname.startsWith("/admin")) {
     const token = await getToken({
@@ -20,14 +12,33 @@ export async function middleware(request: NextRequest) {
       secret: process.env.NEXTAUTH_SECRET,
     })
 
+    // If no token or not admin role, redirect to sign-in
+    if (!token || token.role !== "admin") {
+      const url = new URL("/auth/signin", request.url)
+      url.searchParams.set("callbackUrl", encodeURI(request.url))
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // Protect patient portal routes
+  if (pathname.startsWith("/portal") || pathname.startsWith("/patient")) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    })
+
+    // If no token, redirect to sign-in
     if (!token) {
-      return NextResponse.redirect(new URL("/admin/login", request.url))
+      const url = new URL("/auth/signin", request.url)
+      url.searchParams.set("callbackUrl", encodeURI(request.url))
+      return NextResponse.redirect(url)
     }
   }
 
   return NextResponse.next()
 }
 
+// Configure which paths the middleware runs on
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/portal/:path*", "/patient/:path*"],
 }
