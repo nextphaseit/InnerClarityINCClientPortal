@@ -6,15 +6,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public paths that don't require authentication
-  const publicPaths = [
-    "/",
-    "/auth/signin",
-    "/auth/signup",
-    "/auth/reset-password",
-    "/auth/error",
-    "/api/auth",
-    "/admin/login",
-  ]
+  const publicPaths = ["/", "/auth/signin", "/auth/signup", "/auth/reset-password", "/auth/error", "/api/auth"]
 
   // Allow public paths and static files
   if (
@@ -28,21 +20,28 @@ export async function middleware(request: NextRequest) {
 
   // Handle ADMIN routes with NextAuth
   if (pathname.startsWith("/admin")) {
+    console.log("🔒 Checking admin authentication for:", pathname)
+
     const token = await getToken({
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
     })
 
     if (!token) {
+      console.log("❌ No admin token found, redirecting to signin")
       const url = new URL("/auth/signin", request.url)
       url.searchParams.set("tab", "admin")
+      url.searchParams.set("callbackUrl", request.url)
       return NextResponse.redirect(url)
     }
 
     // Check if user has admin role
     if (token.role !== "admin") {
+      console.log("❌ User is not admin, redirecting to unauthorized")
       return NextResponse.redirect(new URL("/unauthorized", request.url))
     }
+
+    console.log("✅ Admin authentication successful")
   }
 
   // Handle PATIENT PORTAL routes with Supabase Auth

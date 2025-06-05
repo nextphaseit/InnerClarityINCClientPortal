@@ -23,6 +23,7 @@ export default function SignInPage() {
   const tab = searchParams?.get("tab")
   const callbackUrl = searchParams?.get("callbackUrl")
   const message = searchParams?.get("message")
+  const errorMsg = searchParams?.get("error")
 
   useEffect(() => {
     if (tab === "admin" || tab === "patient") {
@@ -34,7 +35,11 @@ export default function SignInPage() {
     if (message) {
       console.log("ℹ️ Message from URL:", message)
     }
-  }, [message])
+
+    if (errorMsg) {
+      setError(decodeURIComponent(errorMsg))
+    }
+  }, [message, errorMsg])
 
   const handlePatientSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,15 +104,21 @@ export default function SignInPage() {
       setError(null)
 
       console.log("🔑 Initiating Microsoft admin login...")
+      console.log("📍 Callback URL:", callbackUrl || "/admin/dashboard")
+
+      // Use the callbackUrl if provided, otherwise default to admin dashboard
+      const redirectUrl = callbackUrl || "/admin/dashboard"
 
       await signIn("azure-ad", {
-        callbackUrl: "/admin/dashboard",
+        callbackUrl: redirectUrl,
         redirect: true,
       })
+
+      // Note: The code below won't execute if redirect: true works properly
+      console.log("⚠️ Redirect didn't happen automatically")
     } catch (err) {
       console.error("❌ Microsoft sign-in exception:", err)
       setError("Microsoft sign-in failed. Please try again.")
-    } finally {
       setLoading(false)
     }
   }
