@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePatientAuth } from "@/components/patient-auth-provider"
 import { AlertCircle, CalendarIcon, Check, Clock, X } from "lucide-react"
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, isSameDay } from "date-fns"
+import { TelehealthSession } from "@/components/telehealth-session"
 
 interface TimeSlot {
   id: string
@@ -26,8 +27,9 @@ interface Appointment {
   date: string
   time: string
   provider: string
-  status: "confirmed" | "pending" | "cancelled"
+  status: "confirmed" | "pending" | "cancelled" | "no-show"
   type: string
+  meetingLink?: string
 }
 
 export default function AppointmentsPage() {
@@ -42,6 +44,29 @@ export default function AppointmentsPage() {
   const [error, setError] = useState("")
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const router = useRouter()
+
+  // Find the next upcoming appointment for telehealth
+  const upcomingAppointment =
+    appointments.length > 0
+      ? appointments.find(
+          (app) =>
+            app.status === "confirmed" && new Date(app.date) >= new Date() && app.type.toLowerCase().includes("video"),
+        )
+      : null
+
+  // Convert the upcoming appointment to the format expected by TelehealthSession
+  const telehealthAppointment = upcomingAppointment
+    ? {
+        id: upcomingAppointment.id,
+        date: upcomingAppointment.date,
+        startTime: upcomingAppointment.time.split(" - ")[0],
+        endTime: upcomingAppointment.time.split(" - ")[1],
+        provider: upcomingAppointment.provider,
+        type: "video",
+        status: upcomingAppointment.status,
+        meetingLink: upcomingAppointment.meetingLink || "https://teams.microsoft.com/l/meetup-join/sample-meeting-link",
+      }
+    : null
 
   useEffect(() => {
     if (!user) {
@@ -113,13 +138,30 @@ export default function AppointmentsPage() {
 
       setAvailableSlots(mockTimeSlots)
 
-      // Mock appointments
+      // Mock appointments - add a video appointment that's coming up soon
+      const today = new Date()
+      const fifteenMinutesFromNow = new Date(today.getTime() + 15 * 60000)
+      const formattedUpcomingDate = format(fifteenMinutesFromNow, "yyyy-MM-dd")
+      const upcomingHour = fifteenMinutesFromNow.getHours()
+      const upcomingMinute = fifteenMinutesFromNow.getMinutes() < 30 ? "00" : "30"
+      const nextHour = upcomingMinute === "00" ? upcomingHour : upcomingHour + 1
+      const nextMinute = upcomingMinute === "00" ? "30" : "00"
+
       const mockAppointments: Appointment[] = [
+        {
+          id: "video-soon",
+          date: formattedUpcomingDate,
+          time: `${upcomingHour}:${upcomingMinute} - ${nextHour}:${nextMinute}`,
+          provider: "Dr. Smith",
+          status: "confirmed",
+          type: "Video Consultation",
+          meetingLink: "https://teams.microsoft.com/l/meetup-join/sample-meeting-link",
+        },
         {
           id: "1",
           date: format(addDays(new Date(), 3), "yyyy-MM-dd"),
           time: "10:00 - 10:30",
-          provider: "Dr. Smith",
+          provider: "Dr. Johnson",
           status: "confirmed",
           type: "Check-up",
         },
@@ -127,7 +169,7 @@ export default function AppointmentsPage() {
           id: "2",
           date: format(addDays(new Date(), 10), "yyyy-MM-dd"),
           time: "14:30 - 15:00",
-          provider: "Dr. Johnson",
+          provider: "Dr. Williams",
           status: "pending",
           type: "Follow-up",
         },
@@ -207,6 +249,11 @@ export default function AppointmentsPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800">Appointments</h1>
           <p className="text-slate-600">Schedule and manage your appointments</p>
+        </div>
+
+        {/* Telehealth Session Card */}
+        <div className="mb-8">
+          <TelehealthSession appointment={telehealthAppointment} />
         </div>
 
         {error && (
@@ -395,6 +442,7 @@ export default function AppointmentsPage() {
                               ${appointment.status === "confirmed" ? "bg-green-500" : ""}
                               ${appointment.status === "pending" ? "bg-amber-500" : ""}
                               ${appointment.status === "cancelled" ? "bg-red-500" : ""}
+                              ${appointment.status === "no-show" ? "bg-red-500" : ""}
                             `}
                           >
                             {appointment.status === "confirmed" && <Check className="h-3 w-3 mr-1" />}
