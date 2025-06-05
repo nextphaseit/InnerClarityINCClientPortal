@@ -12,14 +12,11 @@ export async function middleware(request: NextRequest) {
     "/",
     "/auth/signin",
     "/auth/signup",
-    "/auth/login",
-    "/auth/reset-password",
-    "/auth/update-password",
     "/auth/error",
-    "/auth/callback",
-    "/admin/login", // Allow access to admin login page
-    "/portal/dashboard",
-    "/register",
+    "/auth/reset-password",
+    "/portal/auth/signin",
+    "/portal/auth/signup",
+    "/portal/auth/reset-password",
     "/unauthorized",
     "/not-found",
     "/privacy-policy",
@@ -28,7 +25,7 @@ export async function middleware(request: NextRequest) {
   ]
 
   // API paths that don't require authentication
-  const publicApiPaths = ["/api/auth", "/api/register", "/api/health", "/api/stripe/webhook"]
+  const publicApiPaths = ["/api/auth", "/api/health"]
 
   // Static files and Next.js internals - allow through
   if (
@@ -43,40 +40,22 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // Get the user's session token
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    })
-
-    console.log(`🔐 Token status: ${token ? "Present" : "Missing"} for ${pathname}`)
-    if (token) {
-      console.log(`👤 User: ${token.email}, Role: ${token.role}, Provider: ${token.provider}`)
-    }
-
-    // Create response with security headers
-    const response = NextResponse.next()
-
-    // Add HIPAA-compliant security headers
-    response.headers.set("X-Frame-Options", "DENY")
-    response.headers.set("X-Content-Type-Options", "nosniff")
-    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-    response.headers.set("X-XSS-Protection", "1; mode=block")
-    response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
-
-    if (process.env.NODE_ENV === "production") {
-      response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-    }
-
     // ADMIN ROUTE PROTECTION
-    if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+    if (pathname.startsWith("/admin")) {
       console.log(`🛡️ Protecting admin route: ${pathname}`)
+
+      // Get the user's session token for admin routes
+      const token = await getToken({
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET,
+      })
+
+      console.log(`🔐 Admin token status: ${token ? "Present" : "Missing"} for ${pathname}`)
 
       // Check if user is authenticated
       if (!token) {
         console.log(`🚫 Unauthenticated admin access attempt to: ${pathname}`)
-        return NextResponse.redirect(new URL("/admin/login?error=authentication_required", request.url))
+        return NextResponse.redirect(new URL("/auth/signin", request.url))
       }
 
       // Check if user has admin role
@@ -88,50 +67,36 @@ export async function middleware(request: NextRequest) {
       // Verify Microsoft authentication
       if (token.provider !== "azure-ad") {
         console.log(`❌ Non-Microsoft auth (${token.provider}) trying to access admin route: ${pathname}`)
-        return NextResponse.redirect(new URL("/admin/login?error=microsoft_required", request.url))
-      }
-
-      // Verify authorized email domain
-      const email = token.email?.toLowerCase() || ""
-      const authorizedDomains = ["innerclarity.org", "innerclarityinc.com", "nextphaseit.org"]
-      const domain = email.split("@")[1]
-
-      if (!authorizedDomains.includes(domain)) {
-        console.log(`❌ Unauthorized domain (${domain}) trying to access admin route: ${pathname}`)
-        return NextResponse.redirect(new URL("/unauthorized?reason=unauthorized_domain", request.url))
+        return NextResponse.redirect(new URL("/auth/signin?error=microsoft_required", request.url))
       }
 
       console.log(`✅ Admin access granted to ${token.email} for ${pathname}`)
-
-      // Add admin user information to headers for API routes
-      response.headers.set("X-Admin-User-ID", token.sub || "")
-      response.headers.set("X-Admin-User-Email", token.email || "")
-      response.headers.set("X-Admin-User-Role", "admin")
-      response.headers.set("X-Admin-Provider", "azure-ad")
-      if (token.tenantId) {
-        response.headers.set("X-Admin-Tenant-ID", token.tenantId as string)
-      }
     }
 
-    // Patient portal routes protection (if needed)
-    if (pathname.startsWith("/portal")) {
-      // Add patient-specific protection logic here
-      console.log(`🏥 Patient portal access to: ${pathname}`)
+    // PATIENT PORTAL ROUTE PROTECTION
+    if (pathname.startsWith("/portal") && !pathname.startsWith("/portal/auth")) {
+      console.log(`🏥 Protecting patient route: ${pathname}`)
+
+      // For patient routes, we'll let the client-side auth handle redirects
+      // since Supabase auth is client-side
+      // The PatientLayoutClient will handle authentication checks
     }
 
-    // Redirect authenticated admin users away from login page
-    if (pathname === "/admin/login" && token && token.role === "admin" && token.provider === "azure-ad") {
-      console.log(`✅ Redirecting authenticated admin to dashboard`)
-      return NextResponse.redirect(new URL("/admin/dashboard", request.url))
-    }
+    const response = NextResponse.next()
+
+    // Add security headers
+    response.headers.set("X-Frame-Options", "DENY")
+    response.headers.set("X-Content-Type-Options", "nosniff")
+    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.set("X-XSS-Protection", "1; mode=block")
 
     return response
   } catch (error) {
     console.error("❌ Middleware error:", error)
 
-    // On error, redirect admin routes to login with error
+    // On error, redirect admin routes to login
     if (pathname.startsWith("/admin")) {
-      return NextResponse.redirect(new URL("/admin/login?error=configuration_error", request.url))
+      return NextResponse.redirect(new URL("/auth/signin?error=configuration_error", request.url))
     }
 
     return NextResponse.next()

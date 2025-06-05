@@ -1,474 +1,321 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { supabase, isSupabaseConfigured } from "@/lib/supabase"
-import { Button } from "@/components/ui/button"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, DollarSign, MessageSquare, ArrowRight, Clock, AlertCircle, Activity } from "lucide-react"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
-
-interface Profile {
-  id: string
-  full_name: string
-  date_of_birth: string | null
-  created_at: string
-  updated_at: string
-}
-
-interface Appointment {
-  id: string
-  appointment_date: string
-  appointment_type: string
-  provider_name?: string
-  status: string
-}
-
-interface Invoice {
-  id: string
-  amount: number
-  status: string
-  due_date: string
-}
-
-interface Message {
-  id: string
-  content: string
-  created_at: string
-  read?: boolean
-}
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Calendar,
+  MessageSquare,
+  FileText,
+  CreditCard,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  User,
+  Activity,
+} from "lucide-react"
+import Link from "next/link"
+import { usePatientAuth } from "@/components/patient-auth-provider"
 
 export default function PatientDashboard() {
-  const router = useRouter()
-  const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [dashboardData, setDashboardData] = useState({
-    nextAppointment: null as Appointment | null,
-    unpaidBalance: 0,
-    messageCount: 0,
-    loadingAppointments: true,
-    loadingBilling: true,
-    loadingMessages: true,
+  const { user } = usePatientAuth()
+  const [stats, setStats] = useState({
+    upcomingAppointments: 2,
+    unreadMessages: 3,
+    pendingForms: 1,
+    outstandingBalance: 150.0,
   })
 
-  useEffect(() => {
-    checkAuthAndLoadData()
-  }, [])
+  const upcomingAppointments = [
+    {
+      id: "1",
+      date: "2024-01-15",
+      time: "10:00 AM",
+      type: "Therapy Session",
+      provider: "Dr. Sarah Johnson",
+      status: "confirmed",
+    },
+    {
+      id: "2",
+      date: "2024-01-22",
+      time: "2:00 PM",
+      type: "Follow-up",
+      provider: "Dr. Sarah Johnson",
+      status: "pending",
+    },
+  ]
 
-  const checkAuthAndLoadData = async () => {
-    try {
-      // Check if Supabase is configured
-      if (!isSupabaseConfigured()) {
-        // Use mock data for demo
-        setUser({ id: "demo-user", email: "patient@example.com" } as SupabaseUser)
-        setProfile({
-          id: "demo-user",
-          full_name: "Demo Patient",
-          date_of_birth: "1990-01-01",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-
-        // Set mock dashboard data
-        setDashboardData({
-          nextAppointment: {
-            id: "mock-1",
-            appointment_date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-            appointment_type: "Individual Therapy",
-            provider_name: "Dr. Sarah Johnson",
-            status: "scheduled",
-          },
-          unpaidBalance: 150,
-          messageCount: 3,
-          loadingAppointments: false,
-          loadingBilling: false,
-          loadingMessages: false,
-        })
-
-        setLoading(false)
-        return
-      }
-
-      // Real Supabase implementation
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser()
-
-      if (authError || !user) {
-        console.error("Authentication error:", authError)
-        router.push("/auth/login")
-        return
-      }
-
-      setUser(user)
-
-      // Fetch user profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError) {
-        console.error("Profile fetch error:", profileError)
-        // Continue even if profile doesn't exist
-      } else {
-        setProfile(profileData)
-      }
-
-      // Load dashboard data only after authentication is confirmed
-      await Promise.all([fetchNextAppointment(user.id), fetchUnpaidBalance(user.id), fetchMessageCount(user.id)])
-    } catch (error) {
-      console.error("Dashboard load error:", error)
-      router.push("/auth/login")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchNextAppointment = async (userId: string) => {
-    try {
-      setDashboardData((prev) => ({ ...prev, loadingAppointments: true }))
-
-      const { data, error } = await supabase
-        .from("appointments")
-        .select("id, appointment_date, appointment_type, provider_name, status")
-        .eq("patient_id", userId)
-        .gt("appointment_date", new Date().toISOString())
-        .order("appointment_date", { ascending: true })
-        .limit(1)
-
-      if (error) {
-        console.error("Error fetching appointments:", error)
-      } else if (data && data.length > 0) {
-        setDashboardData((prev) => ({ ...prev, nextAppointment: data[0] }))
-      }
-    } catch (error) {
-      console.error("Error fetching appointments:", error)
-    } finally {
-      setDashboardData((prev) => ({ ...prev, loadingAppointments: false }))
-    }
-  }
-
-  const fetchUnpaidBalance = async (userId: string) => {
-    try {
-      setDashboardData((prev) => ({ ...prev, loadingBilling: true }))
-
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("amount")
-        .eq("patient_id", userId)
-        .eq("status", "Unpaid")
-
-      if (error) {
-        console.error("Error fetching invoices:", error)
-      } else if (data) {
-        const total = data.reduce((sum, invoice) => sum + (invoice.amount || 0), 0)
-        setDashboardData((prev) => ({ ...prev, unpaidBalance: total }))
-      }
-    } catch (error) {
-      console.error("Error fetching invoices:", error)
-    } finally {
-      setDashboardData((prev) => ({ ...prev, loadingBilling: false }))
-    }
-  }
-
-  const fetchMessageCount = async (userId: string) => {
-    try {
-      setDashboardData((prev) => ({ ...prev, loadingMessages: true }))
-
-      const { data, error } = await supabase.from("messages").select("id, read").eq("patient_id", userId)
-
-      if (error) {
-        console.error("Error fetching messages:", error)
-      } else if (data) {
-        // Count total messages (or unread if read column exists)
-        const unreadCount = data.filter((msg) => msg.read === false).length
-        const totalCount = data.length
-
-        // Use unread count if available, otherwise total count
-        setDashboardData((prev) => ({
-          ...prev,
-          messageCount: unreadCount > 0 ? unreadCount : totalCount,
-        }))
-      }
-    } catch (error) {
-      console.error("Error fetching messages:", error)
-    } finally {
-      setDashboardData((prev) => ({ ...prev, loadingMessages: false }))
-    }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading your dashboard...</p>
-        </div>
-      </div>
-    )
-  }
+  const recentMessages = [
+    {
+      id: "1",
+      from: "Dr. Sarah Johnson",
+      subject: "Appointment Reminder",
+      preview: "Your appointment is scheduled for tomorrow at 10:00 AM...",
+      timestamp: "2 hours ago",
+      unread: true,
+    },
+    {
+      id: "2",
+      from: "Billing Department",
+      subject: "Payment Confirmation",
+      preview: "Thank you for your recent payment...",
+      timestamp: "1 day ago",
+      unread: false,
+    },
+  ]
 
   return (
     <div className="space-y-8">
-      {/* Welcome Section */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">
-          Welcome back, {profile?.full_name || user?.email || "Patient"}! 👋
-        </h1>
-        <p className="text-slate-600">Here's an overview of your account and upcoming activities.</p>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Upcoming Appointment Card */}
-        <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-teal-600" />
-              <span>Upcoming Appointment</span>
-            </CardTitle>
-            <CardDescription>Your next scheduled session</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {dashboardData.loadingAppointments ? (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600 mx-auto mb-2"></div>
-                <p className="text-sm text-slate-500">Loading...</p>
-              </div>
-            ) : dashboardData.nextAppointment ? (
-              <div className="space-y-2">
-                <div className="text-xl font-bold text-slate-900">{dashboardData.nextAppointment.appointment_type}</div>
-                <div className="text-sm text-slate-600">
-                  <div className="flex items-center gap-1 mb-1">
-                    <Clock className="h-3 w-3" />
-                    {formatDate(dashboardData.nextAppointment.appointment_date)}
-                  </div>
-                  {dashboardData.nextAppointment.provider_name && (
-                    <div>Provider: {dashboardData.nextAppointment.provider_name}</div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <AlertCircle className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-                <p className="text-slate-500">No upcoming appointments</p>
-              </div>
-            )}
-            <Button
-              variant="link"
-              className="p-0 h-auto mt-3 text-teal-600 hover:text-teal-700"
-              onClick={() => router.push("/portal/appointments")}
-            >
-              <span className="flex items-center gap-1">
-                View All <ArrowRight className="h-3 w-3" />
-              </span>
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Billing Summary Card */}
-        <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-600" />
-              <span>Billing Summary</span>
-            </CardTitle>
-            <CardDescription>Outstanding balance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {dashboardData.loadingBilling ? (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto mb-2"></div>
-                <p className="text-sm text-slate-500">Loading...</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="text-xl font-bold text-slate-900">{formatCurrency(dashboardData.unpaidBalance)}</div>
-                <div className="text-sm text-slate-600">
-                  {dashboardData.unpaidBalance > 0 ? (
-                    <span className="text-amber-600 font-medium">Payment due</span>
-                  ) : (
-                    <span className="text-green-600 font-medium">All caught up! ✓</span>
-                  )}
-                </div>
-              </div>
-            )}
-            <Button
-              variant="link"
-              className="p-0 h-auto mt-3 text-teal-600 hover:text-teal-700"
-              onClick={() => router.push("/portal/billing")}
-            >
-              <span className="flex items-center gap-1">
-                View All <ArrowRight className="h-3 w-3" />
-              </span>
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Messages Card */}
-        <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-blue-600" />
-              <span>Messages</span>
-            </CardTitle>
-            <CardDescription>Your communications</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {dashboardData.loadingMessages ? (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                <p className="text-sm text-slate-500">Loading...</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="text-xl font-bold text-slate-900">{dashboardData.messageCount}</div>
-                <div className="text-sm text-slate-600">
-                  {dashboardData.messageCount > 0 ? (
-                    <span className="text-blue-600 font-medium">
-                      {dashboardData.messageCount === 1 ? "Message" : "Messages"}
-                    </span>
-                  ) : (
-                    <span className="text-slate-500">No messages</span>
-                  )}
-                </div>
-              </div>
-            )}
-            <Button
-              variant="link"
-              className="p-0 h-auto mt-3 text-teal-600 hover:text-teal-700"
-              onClick={() => router.push("/portal/messages")}
-            >
-              <span className="flex items-center gap-1">
-                View All <ArrowRight className="h-3 w-3" />
-              </span>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg rounded-xl p-6">
-        <h3 className="text-xl font-semibold text-slate-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Button
-            variant="outline"
-            className="h-auto p-4 flex flex-col items-center space-y-2 border-slate-200 hover:bg-teal-50 hover:border-teal-300"
-            onClick={() => router.push("/portal/appointments")}
-          >
-            <Calendar className="h-6 w-6 text-teal-600" />
-            <span className="text-sm font-medium">Book Appointment</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto p-4 flex flex-col items-center space-y-2 border-slate-200 hover:bg-green-50 hover:border-green-300"
-            onClick={() => router.push("/portal/billing")}
-          >
-            <DollarSign className="h-6 w-6 text-green-600" />
-            <span className="text-sm font-medium">Pay Bills</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto p-4 flex flex-col items-center space-y-2 border-slate-200 hover:bg-blue-50 hover:border-blue-300"
-            onClick={() => router.push("/portal/messages")}
-          >
-            <MessageSquare className="h-6 w-6 text-blue-600" />
-            <span className="text-sm font-medium">Send Message</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto p-4 flex flex-col items-center space-y-2 border-slate-200 hover:bg-purple-50 hover:border-purple-300"
-            onClick={() => router.push("/portal/health-log")}
-          >
-            <Activity className="h-6 w-6 text-purple-600" />
-            <span className="text-sm font-medium">Health Log</span>
-          </Button>
+      {/* Welcome Header */}
+      <div className="bg-white rounded-xl shadow-sm border border-teal-100 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Welcome back, {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Patient"}!
+            </h1>
+            <p className="text-gray-600 mt-1">Here's what's happening with your care</p>
+          </div>
+          <div className="hidden md:flex items-center space-x-2">
+            <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-blue-600 rounded-full flex items-center justify-center">
+              <User className="h-6 w-6 text-white" />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Your latest interactions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <div>
-                  <p className="text-sm font-medium">Appointment Completed</p>
-                  <p className="text-xs text-slate-500">June 4, 2025 • 10:00 AM</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                <div>
-                  <p className="text-sm font-medium">Message Received</p>
-                  <p className="text-xs text-slate-500">June 3, 2025 • 2:15 PM</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                <div>
-                  <p className="text-sm font-medium">Form Submitted</p>
-                  <p className="text-xs text-slate-500">June 2, 2025 • 11:30 AM</p>
-                </div>
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="border-teal-100">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Calendar className="h-8 w-8 text-teal-500" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Upcoming Appointments</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.upcomingAppointments}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg">
+        <Card className="border-blue-100">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <MessageSquare className="h-8 w-8 text-blue-500" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Unread Messages</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.unreadMessages}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-purple-100">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <FileText className="h-8 w-8 text-purple-500" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Pending Forms</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.pendingForms}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-100">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <CreditCard className="h-8 w-8 text-orange-500" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Outstanding Balance</p>
+                <p className="text-2xl font-bold text-gray-900">${stats.outstandingBalance}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Upcoming Appointments */}
+        <Card className="border-teal-100">
           <CardHeader>
-            <CardTitle>Health Overview</CardTitle>
-            <CardDescription>Your wellness summary</CardDescription>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Calendar className="mr-2 h-5 w-5 text-teal-600" />
+                Upcoming Appointments
+              </div>
+              <Badge variant="outline" className="text-teal-600 border-teal-200">
+                {stats.upcomingAppointments} scheduled
+              </Badge>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Mood Score</span>
-                <span className="text-lg font-bold text-teal-600">7.5/10</span>
+              {upcomingAppointments.map((appointment) => (
+                <div
+                  key={appointment.id}
+                  className="flex items-center justify-between p-4 rounded-lg border border-teal-100 bg-teal-50/50"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">
+                      <Clock className="h-5 w-5 text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{appointment.type}</p>
+                      <p className="text-sm text-gray-600">
+                        {appointment.date} at {appointment.time}
+                      </p>
+                      <p className="text-sm text-gray-500">{appointment.provider}</p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={appointment.status === "confirmed" ? "default" : "secondary"}
+                    className={appointment.status === "confirmed" ? "bg-teal-500" : ""}
+                  >
+                    {appointment.status}
+                  </Badge>
+                </div>
+              ))}
+              <Button asChild variant="outline" className="w-full border-teal-200 text-teal-700 hover:bg-teal-50">
+                <Link href="/portal/appointments">View All Appointments</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Messages */}
+        <Card className="border-blue-100">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <MessageSquare className="mr-2 h-5 w-5 text-blue-600" />
+                Recent Messages
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Sleep Quality</span>
-                <span className="text-lg font-bold text-blue-600">Good</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Stress Level</span>
-                <span className="text-lg font-bold text-amber-600">Moderate</span>
-              </div>
+              <Badge variant="outline" className="text-blue-600 border-blue-200">
+                {stats.unreadMessages} unread
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {recentMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`p-4 rounded-lg border ${
+                    message.unread ? "border-blue-200 bg-blue-50/50" : "border-gray-200 bg-gray-50/50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-gray-900">{message.from}</p>
+                        {message.unread && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+                      </div>
+                      <p className="text-sm font-medium text-gray-700 mt-1">{message.subject}</p>
+                      <p className="text-sm text-gray-600 mt-1">{message.preview}</p>
+                      <p className="text-xs text-gray-500 mt-2">{message.timestamp}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <Button asChild variant="outline" className="w-full border-blue-200 text-blue-700 hover:bg-blue-50">
+                <Link href="/portal/messages">View All Messages</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card className="border-purple-100">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Activity className="mr-2 h-5 w-5 text-purple-600" />
+              Quick Actions
+            </CardTitle>
+            <CardDescription>Common tasks and shortcuts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
               <Button
-                variant="link"
-                className="p-0 h-auto text-teal-600 hover:text-teal-700"
-                onClick={() => router.push("/portal/health-log")}
+                asChild
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center space-y-2 border-teal-200 hover:bg-teal-50"
               >
-                <span className="flex items-center gap-1">
-                  Update Health Log <ArrowRight className="h-3 w-3" />
-                </span>
+                <Link href="/portal/appointments">
+                  <Calendar className="h-6 w-6 text-teal-600" />
+                  <span className="text-sm">Book Appointment</span>
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center space-y-2 border-blue-200 hover:bg-blue-50"
+              >
+                <Link href="/portal/messages">
+                  <MessageSquare className="h-6 w-6 text-blue-600" />
+                  <span className="text-sm">Send Message</span>
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center space-y-2 border-purple-200 hover:bg-purple-50"
+              >
+                <Link href="/portal/forms">
+                  <FileText className="h-6 w-6 text-purple-600" />
+                  <span className="text-sm">Complete Forms</span>
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center space-y-2 border-orange-200 hover:bg-orange-50"
+              >
+                <Link href="/portal/billing">
+                  <CreditCard className="h-6 w-6 text-orange-600" />
+                  <span className="text-sm">Pay Bill</span>
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Health Summary */}
+        <Card className="border-green-100">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <CheckCircle className="mr-2 h-5 w-5 text-green-600" />
+              Health Summary
+            </CardTitle>
+            <CardDescription>Your recent health activity</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium text-green-900">Last Session</p>
+                    <p className="text-xs text-green-700">Completed on Jan 8, 2024</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                <div className="flex items-center space-x-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                  <div>
+                    <p className="text-sm font-medium text-yellow-900">Pending Forms</p>
+                    <p className="text-xs text-yellow-700">1 form needs completion</p>
+                  </div>
+                </div>
+              </div>
+
+              <Button asChild variant="outline" className="w-full border-green-200 text-green-700 hover:bg-green-50">
+                <Link href="/portal/health-log">View Health Log</Link>
               </Button>
             </div>
           </CardContent>

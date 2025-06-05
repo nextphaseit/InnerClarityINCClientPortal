@@ -2,8 +2,8 @@ import type React from "react"
 import { getServerSession } from "next-auth/next"
 import { redirect } from "next/navigation"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import AdminAuthProvider from "@/components/admin-auth-provider"
 import { AdminLayoutClient } from "@/components/admin-layout-client"
-import SessionWrapper from "@/components/session-wrapper"
 
 export default async function AdminLayout({
   children,
@@ -26,8 +26,8 @@ export default async function AdminLayout({
   }
 
   return (
-    <SessionWrapper requireAuth={true} requireAdmin={true}>
+    <AdminAuthProvider session={session}>
       <AdminLayoutClient session={session}>{children}</AdminLayoutClient>
-    </SessionWrapper>
+    </AdminAuthProvider>
   )
 }
