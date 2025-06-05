@@ -11,20 +11,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Upload, FileText, Download, Trash2, Plus } from "lucide-react"
+import { Upload, FileText, Download, Trash2, Plus, Loader2 } from "lucide-react"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 interface Document {
   id: string
-  patient_id: string
-  filename: string
+  client_id: string
+  name: string
   original_name: string
   category: string
   file_size: number
   mime_type: string
-  upload_date: string
+  file_url?: string
   status: "uploaded" | "processing" | "approved" | "rejected"
-  notes?: string
+  uploaded_at: string
 }
 
 export default function DocumentsPage() {
@@ -41,64 +41,15 @@ export default function DocumentsPage() {
     file: null as File | null,
   })
 
-  // Mock documents data
-  const mockDocuments: Document[] = [
-    {
-      id: "1",
-      patient_id: "user-id",
-      filename: "insurance_card_front.jpg",
-      original_name: "Insurance Card - Front.jpg",
-      category: "Insurance",
-      file_size: 2048576,
-      mime_type: "image/jpeg",
-      upload_date: "2024-01-15T10:00:00Z",
-      status: "approved",
-      notes: "Insurance card front side - approved",
-    },
-    {
-      id: "2",
-      patient_id: "user-id",
-      filename: "insurance_card_back.jpg",
-      original_name: "Insurance Card - Back.jpg",
-      category: "Insurance",
-      file_size: 1876543,
-      mime_type: "image/jpeg",
-      upload_date: "2024-01-15T10:05:00Z",
-      status: "approved",
-    },
-    {
-      id: "3",
-      patient_id: "user-id",
-      filename: "drivers_license.jpg",
-      original_name: "Driver's License.jpg",
-      category: "Identification",
-      file_size: 1234567,
-      mime_type: "image/jpeg",
-      upload_date: "2024-01-20T14:30:00Z",
-      status: "processing",
-      notes: "Under review",
-    },
-    {
-      id: "4",
-      patient_id: "user-id",
-      filename: "medical_records.pdf",
-      original_name: "Previous Medical Records.pdf",
-      category: "Medical Records",
-      file_size: 5432109,
-      mime_type: "application/pdf",
-      upload_date: "2024-02-01T09:15:00Z",
-      status: "uploaded",
-    },
-  ]
+  const documentCategories = ["insurance", "id", "intake", "consent", "other"]
 
-  const documentCategories = [
-    "Insurance",
-    "Identification",
-    "Medical Records",
-    "Consent Forms",
-    "Referral Letters",
-    "Other",
-  ]
+  const categoryLabels = {
+    insurance: "Insurance",
+    id: "Identification",
+    intake: "Medical Records",
+    consent: "Consent Forms",
+    other: "Other",
+  }
 
   useEffect(() => {
     checkAuthAndLoadDocuments()
@@ -117,20 +68,31 @@ export default function DocumentsPage() {
       }
 
       setUser(user)
-
-      // In a real app, load from Supabase
-      // const { data, error } = await supabase
-      //   .from('uploads')
-      //   .select('*')
-      //   .eq('patient_id', user.id)
-      //   .order('upload_date', { ascending: false })
-
-      setDocuments(mockDocuments)
+      await loadDocuments(user.id)
     } catch (error) {
       console.error("Error:", error)
       router.push("/auth/login")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadDocuments = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("client_id", userId)
+        .order("uploaded_at", { ascending: false })
+
+      if (error) {
+        console.error("Error loading documents:", error)
+        return
+      }
+
+      setDocuments(data || [])
+    } catch (error) {
+      console.error("Error loading documents:", error)
     }
   }
 
@@ -142,49 +104,49 @@ export default function DocumentsPage() {
     setMessage("")
 
     try {
-      // In a real app, upload to Supabase Storage
-      // const fileExt = uploadForm.file.name.split('.').pop()
-      // const fileName = `${user.id}/${Date.now()}.${fileExt}`
+      // Generate unique filename
+      const fileExt = uploadForm.file.name.split(".").pop()
+      const fileName = `uploads/${user.id}/${Date.now()}.${fileExt}`
 
-      // const { data: uploadData, error: uploadError } = await supabase.storage
-      //   .from('documents')
-      //   .upload(fileName, uploadForm.file)
+      // Upload file to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(fileName, uploadForm.file)
 
-      // if (uploadError) throw uploadError
-
-      // const { error: dbError } = await supabase.from('uploads').insert({
-      //   patient_id: user.id,
-      //   filename: fileName,
-      //   original_name: uploadForm.file.name,
-      //   category: uploadForm.category,
-      //   file_size: uploadForm.file.size,
-      //   mime_type: uploadForm.file.type,
-      //   status: 'uploaded'
-      // })
-
-      console.log("File upload:", {
-        file: uploadForm.file.name,
-        category: uploadForm.category,
-        size: uploadForm.file.size,
-      })
-
-      // Mock adding to documents list
-      const newDoc: Document = {
-        id: Date.now().toString(),
-        patient_id: user.id,
-        filename: `${Date.now()}_${uploadForm.file.name}`,
-        original_name: uploadForm.file.name,
-        category: uploadForm.category,
-        file_size: uploadForm.file.size,
-        mime_type: uploadForm.file.type,
-        upload_date: new Date().toISOString(),
-        status: "uploaded",
+      if (uploadError) {
+        throw uploadError
       }
 
-      setDocuments([newDoc, ...documents])
+      // Get public URL
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("documents").getPublicUrl(fileName)
+
+      // Save metadata to database
+      const { data, error: dbError } = await supabase
+        .from("documents")
+        .insert({
+          client_id: user.id,
+          name: fileName,
+          original_name: uploadForm.file.name,
+          category: uploadForm.category,
+          file_size: uploadForm.file.size,
+          mime_type: uploadForm.file.type,
+          file_url: publicUrl,
+          status: "uploaded",
+        })
+        .select()
+
+      if (dbError) {
+        throw dbError
+      }
+
       setMessage("Document uploaded successfully!")
       setShowUploadForm(false)
       setUploadForm({ category: "", file: null })
+
+      // Reload documents
+      await loadDocuments(user.id)
     } catch (error) {
       console.error("Error uploading file:", error)
       setMessage("Error uploading file. Please try again.")
@@ -195,13 +157,16 @@ export default function DocumentsPage() {
 
   const handleDownload = async (document: Document) => {
     try {
-      // In a real app, get signed URL from Supabase Storage
-      // const { data, error } = await supabase.storage
-      //   .from('documents')
-      //   .createSignedUrl(document.filename, 60)
-
-      console.log("Downloading:", document.original_name)
-      alert(`Download would start for: ${document.original_name}`)
+      if (document.file_url) {
+        // Create a temporary link and click it to download
+        const link = document.createElement("a")
+        link.href = document.file_url
+        link.download = document.original_name
+        link.target = "_blank"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
     } catch (error) {
       console.error("Error downloading file:", error)
     }
@@ -211,15 +176,27 @@ export default function DocumentsPage() {
     if (!confirm("Are you sure you want to delete this document?")) return
 
     try {
-      // In a real app, delete from Supabase Storage and database
-      // const document = documents.find(d => d.id === documentId)
-      // if (document) {
-      //   await supabase.storage.from('documents').remove([document.filename])
-      //   await supabase.from('uploads').delete().eq('id', documentId)
-      // }
+      const document = documents.find((d) => d.id === documentId)
+      if (!document) return
 
-      setDocuments(documents.filter((doc) => doc.id !== documentId))
+      // Delete from storage
+      if (document.name) {
+        await supabase.storage.from("documents").remove([document.name])
+      }
+
+      // Delete from database
+      const { error } = await supabase.from("documents").delete().eq("id", documentId)
+
+      if (error) {
+        throw error
+      }
+
       setMessage("Document deleted successfully!")
+
+      // Reload documents
+      if (user) {
+        await loadDocuments(user.id)
+      }
     } catch (error) {
       console.error("Error deleting document:", error)
       setMessage("Error deleting document. Please try again.")
@@ -261,10 +238,11 @@ export default function DocumentsPage() {
 
   const groupedDocuments = documents.reduce(
     (acc, doc) => {
-      if (!acc[doc.category]) {
-        acc[doc.category] = []
+      const categoryLabel = categoryLabels[doc.category as keyof typeof categoryLabels] || doc.category
+      if (!acc[categoryLabel]) {
+        acc[categoryLabel] = []
       }
-      acc[doc.category].push(doc)
+      acc[categoryLabel].push(doc)
       return acc
     },
     {} as Record<string, Document[]>,
@@ -273,7 +251,7 @@ export default function DocumentsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
       </div>
     )
   }
@@ -298,7 +276,9 @@ export default function DocumentsPage() {
           {message && (
             <div
               className={`mb-6 p-4 rounded-lg ${
-                message.includes("Error") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                message.includes("Error")
+                  ? "bg-red-50 text-red-700 border border-red-200"
+                  : "bg-green-50 text-green-700 border border-green-200"
               }`}
             >
               {message}
@@ -315,7 +295,7 @@ export default function DocumentsPage() {
               <CardContent>
                 <form onSubmit={handleFileUpload} className="space-y-4">
                   <div>
-                    <Label htmlFor="category">Document Category</Label>
+                    <Label htmlFor="category">Document Category *</Label>
                     <select
                       id="category"
                       value={uploadForm.category}
@@ -326,13 +306,13 @@ export default function DocumentsPage() {
                       <option value="">Select a category</option>
                       {documentCategories.map((category) => (
                         <option key={category} value={category}>
-                          {category}
+                          {categoryLabels[category as keyof typeof categoryLabels]}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <Label htmlFor="file">Select File</Label>
+                    <Label htmlFor="file">Select File *</Label>
                     <Input
                       id="file"
                       type="file"
@@ -346,7 +326,7 @@ export default function DocumentsPage() {
                     <Button type="submit" disabled={uploading} className="bg-indigo-600 hover:bg-indigo-700">
                       {uploading ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Uploading...
                         </>
                       ) : (
@@ -398,8 +378,7 @@ export default function DocumentsPage() {
 
                           <div className="text-sm text-gray-500 space-y-1">
                             <p>Size: {formatFileSize(document.file_size)}</p>
-                            <p>Uploaded: {formatDate(document.upload_date)}</p>
-                            {document.notes && <p className="text-xs bg-gray-100 p-2 rounded mt-2">{document.notes}</p>}
+                            <p>Uploaded: {formatDate(document.uploaded_at)}</p>
                           </div>
 
                           <div className="flex space-x-2 mt-4">
@@ -443,7 +422,7 @@ export default function DocumentsPage() {
                     <li>• Insurance card (front and back)</li>
                     <li>• Photo identification (driver's license, passport)</li>
                     <li>• Previous medical records (if applicable)</li>
-                    <li>• Referral letters (if applicable)</li>
+                    <li>• Consent forms</li>
                   </ul>
                 </div>
                 <div>

@@ -13,71 +13,70 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import { FileText, CheckCircle, Clock, Send } from "lucide-react"
+import { FileText, CheckCircle, Send, Loader2 } from "lucide-react"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
-
-interface Form {
-  id: string
-  title: string
-  description: string
-  required: boolean
-  status: "pending" | "completed" | "expired"
-  due_date?: string
-  category: string
-}
 
 interface FormResponse {
   id: string
-  form_id: string
-  patient_id: string
+  client_id: string
+  form_type: string
+  form_title: string
   responses: Record<string, any>
+  status: "draft" | "submitted" | "reviewed"
   submitted_at: string
-  status: "draft" | "submitted"
+}
+
+interface FormTemplate {
+  id: string
+  title: string
+  description: string
+  type: string
+  required: boolean
+  category: string
 }
 
 export default function FormsPage() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [forms, setForms] = useState<Form[]>([])
-  const [selectedForm, setSelectedForm] = useState<Form | null>(null)
+  const [formResponses, setFormResponses] = useState<FormResponse[]>([])
+  const [selectedForm, setSelectedForm] = useState<FormTemplate | null>(null)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState("")
   const router = useRouter()
 
-  // Mock forms data
-  const mockForms: Form[] = [
+  // Available form templates
+  const formTemplates: FormTemplate[] = [
     {
-      id: "1",
+      id: "hipaa-consent",
       title: "HIPAA Privacy Notice Acknowledgment",
       description: "Acknowledge receipt and understanding of our HIPAA privacy practices",
+      type: "hipaa-consent",
       required: true,
-      status: "pending",
-      due_date: "2024-02-20",
       category: "Legal",
     },
     {
-      id: "2",
-      title: "Patient Intake Form",
-      description: "Comprehensive intake form for new patients",
-      required: true,
-      status: "completed",
-      category: "Medical",
-    },
-    {
-      id: "3",
+      id: "therapy-goals",
       title: "Therapy Goals Assessment",
       description: "Help us understand your therapy goals and expectations",
+      type: "therapy-goals",
       required: false,
-      status: "pending",
       category: "Assessment",
     },
     {
-      id: "4",
+      id: "intake-form",
+      title: "Patient Intake Form",
+      description: "Comprehensive intake form for new patients",
+      type: "intake-form",
+      required: true,
+      category: "Medical",
+    },
+    {
+      id: "emergency-contact",
       title: "Emergency Contact Update",
       description: "Update your emergency contact information",
+      type: "emergency-contact",
       required: false,
-      status: "pending",
       category: "Administrative",
     },
   ]
@@ -99,19 +98,31 @@ export default function FormsPage() {
       }
 
       setUser(user)
-
-      // In a real app, load from Supabase
-      // const { data, error } = await supabase
-      //   .from('forms')
-      //   .select('*')
-      //   .order('required', { ascending: false })
-
-      setForms(mockForms)
+      await loadFormResponses(user.id)
     } catch (error) {
       console.error("Error:", error)
       router.push("/auth/login")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadFormResponses = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("form_responses")
+        .select("*")
+        .eq("client_id", userId)
+        .order("submitted_at", { ascending: false })
+
+      if (error) {
+        console.error("Error loading form responses:", error)
+        return
+      }
+
+      setFormResponses(data || [])
+    } catch (error) {
+      console.error("Error loading form responses:", error)
     }
   }
 
@@ -123,22 +134,27 @@ export default function FormsPage() {
     setMessage("")
 
     try {
-      // In a real app, save to Supabase
-      // const { error } = await supabase.from('form_responses').insert({
-      //   form_id: selectedForm.id,
-      //   patient_id: user.id,
-      //   responses: formData,
-      //   status: 'submitted'
-      // })
+      const { data, error } = await supabase
+        .from("form_responses")
+        .insert({
+          client_id: user.id,
+          form_type: selectedForm.type,
+          form_title: selectedForm.title,
+          responses: formData,
+          status: "submitted",
+        })
+        .select()
 
-      console.log("Form submitted:", { form_id: selectedForm.id, responses: formData })
-
-      // Update form status
-      setForms(forms.map((form) => (form.id === selectedForm.id ? { ...form, status: "completed" as const } : form)))
+      if (error) {
+        throw error
+      }
 
       setMessage("Form submitted successfully!")
       setSelectedForm(null)
       setFormData({})
+
+      // Reload form responses
+      await loadFormResponses(user.id)
     } catch (error) {
       console.error("Error submitting form:", error)
       setMessage("Error submitting form. Please try again.")
@@ -147,17 +163,16 @@ export default function FormsPage() {
     }
   }
 
-  const getStatusBadge = (status: Form["status"]) => {
-    switch (status) {
-      case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
-      case "completed":
-        return <Badge className="bg-green-100 text-green-800">Completed</Badge>
-      case "expired":
-        return <Badge variant="destructive">Expired</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
-    }
+  const isFormCompleted = (formType: string) => {
+    return formResponses.some((response) => response.form_type === formType && response.status === "submitted")
+  }
+
+  const getStatusBadge = (completed: boolean) => {
+    return completed ? (
+      <Badge className="bg-green-100 text-green-800">Completed</Badge>
+    ) : (
+      <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
+    )
   }
 
   const renderHIPAAForm = () => (
@@ -207,7 +222,7 @@ export default function FormsPage() {
         </div>
 
         <div>
-          <Label htmlFor="signature">Digital Signature (Full Name)</Label>
+          <Label htmlFor="signature">Digital Signature (Full Name) *</Label>
           <Input
             id="signature"
             value={formData.signature || ""}
@@ -218,7 +233,7 @@ export default function FormsPage() {
         </div>
 
         <div>
-          <Label htmlFor="date">Date</Label>
+          <Label htmlFor="date">Date *</Label>
           <Input
             id="date"
             type="date"
@@ -286,17 +301,6 @@ export default function FormsPage() {
             rows={3}
           />
         </div>
-
-        <div>
-          <Label htmlFor="additional_info">Is there anything else you'd like us to know?</Label>
-          <Textarea
-            id="additional_info"
-            value={formData.additional_info || ""}
-            onChange={(e) => setFormData({ ...formData, additional_info: e.target.value })}
-            placeholder="Any additional information that might be helpful"
-            rows={3}
-          />
-        </div>
       </div>
     </div>
   )
@@ -304,10 +308,10 @@ export default function FormsPage() {
   const renderFormContent = () => {
     if (!selectedForm) return null
 
-    switch (selectedForm.id) {
-      case "1":
+    switch (selectedForm.type) {
+      case "hipaa-consent":
         return renderHIPAAForm()
-      case "3":
+      case "therapy-goals":
         return renderTherapyGoalsForm()
       default:
         return (
@@ -322,7 +326,7 @@ export default function FormsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
       </div>
     )
   }
@@ -341,7 +345,9 @@ export default function FormsPage() {
           {message && (
             <div
               className={`mb-6 p-4 rounded-lg ${
-                message.includes("Error") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                message.includes("Error")
+                  ? "bg-red-50 text-red-700 border border-red-200"
+                  : "bg-green-50 text-green-700 border border-green-200"
               }`}
             >
               {message}
@@ -372,7 +378,7 @@ export default function FormsPage() {
                     <Button type="submit" disabled={submitting} className="bg-teal-600 hover:bg-teal-700">
                       {submitting ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Submitting...
                         </>
                       ) : (
@@ -388,48 +394,43 @@ export default function FormsPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {forms.map((form) => (
-                <Card key={form.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <FileText className="h-8 w-8 text-teal-600" />
-                      <div className="flex items-center space-x-2">
-                        {form.required && <Badge variant="outline">Required</Badge>}
-                        {getStatusBadge(form.status)}
+              {formTemplates.map((form) => {
+                const completed = isFormCompleted(form.type)
+                return (
+                  <Card key={form.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <FileText className="h-8 w-8 text-teal-600" />
+                        <div className="flex items-center space-x-2">
+                          {form.required && <Badge variant="outline">Required</Badge>}
+                          {getStatusBadge(completed)}
+                        </div>
                       </div>
-                    </div>
-                    <CardTitle className="text-lg">{form.title}</CardTitle>
-                    <CardDescription>{form.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-500">
-                        Category: {form.category}
-                        {form.due_date && form.status === "pending" && (
-                          <div className="flex items-center mt-1 text-orange-600">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Due: {new Date(form.due_date).toLocaleDateString()}
+                      <CardTitle className="text-lg">{form.title}</CardTitle>
+                      <CardDescription>{form.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-500">Category: {form.category}</div>
+                        {!completed ? (
+                          <Button
+                            size="sm"
+                            onClick={() => setSelectedForm(form)}
+                            className="bg-teal-600 hover:bg-teal-700"
+                          >
+                            Complete
+                          </Button>
+                        ) : (
+                          <div className="flex items-center text-green-600 text-sm">
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Completed
                           </div>
                         )}
                       </div>
-                      {form.status === "pending" ? (
-                        <Button
-                          size="sm"
-                          onClick={() => setSelectedForm(form)}
-                          className="bg-teal-600 hover:bg-teal-700"
-                        >
-                          Complete
-                        </Button>
-                      ) : (
-                        <div className="flex items-center text-green-600 text-sm">
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Completed
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
         </div>
