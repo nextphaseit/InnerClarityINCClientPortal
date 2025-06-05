@@ -1,7 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
 import type React from "react"
-
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -22,6 +21,7 @@ export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false)
 
   const tab = searchParams?.get("tab")
+  const callbackUrl = searchParams?.get("callbackUrl")
   const message = searchParams?.get("message")
 
   useEffect(() => {
@@ -32,7 +32,6 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (message) {
-      // Display success message from registration
       console.log("ℹ️ Message from URL:", message)
     }
   }, [message])
@@ -59,7 +58,6 @@ export default function SignInPage() {
       if (signInError) {
         console.error("❌ Supabase sign-in error:", signInError)
 
-        // Handle specific Supabase errors
         switch (signInError.message) {
           case "Invalid login credentials":
             setError("Invalid email or password. Please check your credentials and try again.")
@@ -78,7 +76,14 @@ export default function SignInPage() {
 
       if (data.user) {
         console.log("✅ Patient login successful:", data.user.email)
-        router.push("/portal/dashboard")
+
+        // Redirect to callback URL or default dashboard
+        const redirectUrl = callbackUrl || "/portal/dashboard"
+
+        // Clean up the callback URL if it's from the preview environment
+        const cleanUrl = redirectUrl.includes("lite.vusercontent.net") ? "/portal/dashboard" : redirectUrl
+
+        router.push(cleanUrl)
       }
     } catch (error) {
       console.error("❌ Patient login exception:", error)

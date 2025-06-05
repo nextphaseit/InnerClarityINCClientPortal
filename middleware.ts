@@ -5,32 +5,64 @@ import { getToken } from "next-auth/jwt"
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Protect admin routes
+  // Public paths that don't require authentication
+  const publicPaths = [
+    "/",
+    "/auth/signin",
+    "/auth/signup",
+    "/auth/reset-password",
+    "/auth/error",
+    "/api/auth",
+    "/admin/login",
+  ]
+
+  // Allow public paths and static files
+  if (
+    publicPaths.some((path) => pathname.startsWith(path)) ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/images") ||
+    pathname.includes(".")
+  ) {
+    return NextResponse.next()
+  }
+
+  // Handle ADMIN routes with NextAuth
   if (pathname.startsWith("/admin")) {
     const token = await getToken({
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
     })
 
-    // If no token or not admin role, redirect to sign-in
-    if (!token || token.role !== "admin") {
+    if (!token) {
       const url = new URL("/auth/signin", request.url)
-      url.searchParams.set("callbackUrl", encodeURI(request.url))
+      url.searchParams.set("tab", "admin")
       return NextResponse.redirect(url)
+    }
+
+    // Check if user has admin role
+    if (token.role !== "admin") {
+      return NextResponse.redirect(new URL("/unauthorized", request.url))
     }
   }
 
-  // Protect patient portal routes
-  if (pathname.startsWith("/portal") || pathname.startsWith("/patient")) {
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    })
+  // Handle PATIENT PORTAL routes with Supabase Auth
+  if (pathname.startsWith("/portal")) {
+    // Get Supabase session from cookies
+    const supabaseToken =
+      request.cookies.get("sb-access-token")?.value || request.cookies.get("supabase-auth-token")?.value
 
-    // If no token, redirect to sign-in
-    if (!token) {
+    // Check for Supabase session in various cookie formats
+    const hasSupabaseSession = request.cookies
+      .getAll()
+      .some(
+        (cookie) =>
+          cookie.name.includes("supabase") || cookie.name.includes("sb-") || cookie.name === "supabase.auth.token",
+      )
+
+    if (!hasSupabaseSession && !supabaseToken) {
       const url = new URL("/auth/signin", request.url)
-      url.searchParams.set("callbackUrl", encodeURI(request.url))
+      url.searchParams.set("tab", "patient")
+      url.searchParams.set("callbackUrl", request.url)
       return NextResponse.redirect(url)
     }
   }
@@ -38,7 +70,6 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
-// Configure which paths the middleware runs on
 export const config = {
-  matcher: ["/admin/:path*", "/portal/:path*", "/patient/:path*"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 }
