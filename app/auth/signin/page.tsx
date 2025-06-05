@@ -1,135 +1,125 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { signIn, getSession } from "next-auth/react"
+import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Loader2, AlertCircle, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Shield, AlertCircle } from "lucide-react"
 
-export default function SignInPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export default function SignIn() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const callbackUrl = searchParams.get("callbackUrl") || "/admin/dashboard"
-  const errorParam = searchParams.get("error")
-
+  // Get error from URL if present
   useEffect(() => {
-    // Check if user is already signed in
-    const checkSession = async () => {
-      const session = await getSession()
-      if (session) {
-        console.log("✅ User already authenticated, redirecting...")
-        router.push(callbackUrl)
-      }
-    }
-
-    checkSession()
-  }, [router, callbackUrl])
-
-  useEffect(() => {
-    // Handle error from URL params
+    const errorParam = searchParams?.get("error")
     if (errorParam) {
+      console.error("Authentication error:", errorParam)
+
+      // Map error codes to user-friendly messages
       switch (errorParam) {
-        case "Configuration":
-          setError("There is a problem with the server configuration.")
-          break
         case "AccessDenied":
-          setError("Access denied. You do not have permission to sign in.")
+          setError("Access denied. Your email domain is not authorized for this portal.")
+          break
+        case "Configuration":
+          setError("There is a server configuration issue. Please contact support.")
           break
         case "Verification":
-          setError("The verification token has expired or has already been used.")
+          setError("The verification link has expired or is invalid.")
           break
         case "OAuthSignin":
-          setError("Error in constructing an authorization URL.")
+          setError("Error starting the sign-in process. Please try again.")
           break
         case "OAuthCallback":
-          setError("Error in handling the response from an OAuth provider.")
+          setError("Error completing the sign-in process. Please try again.")
           break
         case "OAuthCreateAccount":
-          setError("Could not create OAuth account in the database.")
+          setError("Error creating your account. Please contact support.")
           break
         case "EmailCreateAccount":
-          setError("Could not create email account in the database.")
+          setError("Error creating your account. Please contact support.")
           break
         case "Callback":
-          setError("Error in the OAuth callback handler route.")
+          setError("Authentication callback error. Please try again.")
           break
         case "OAuthAccountNotLinked":
-          setError("The email on the account is already linked, but not with this OAuth account.")
+          setError("Your email is already associated with another account.")
           break
         case "EmailSignin":
-          setError("Sending the e-mail with the verification token failed.")
+          setError("Error sending the verification email. Please try again.")
           break
         case "CredentialsSignin":
-          setError("The authorize callback returned null in the Credentials provider.")
+          setError("Invalid credentials. Please check your email and password.")
           break
         case "SessionRequired":
-          setError("The content of this page requires you to be signed in at all times.")
+          setError("Please sign in to access this page.")
           break
         default:
-          setError("An error occurred during authentication. Please try again.")
+          setError(`Authentication error: ${errorParam}. Please try again.`)
       }
     }
-  }, [errorParam])
+  }, [searchParams])
 
   const handleMicrosoftSignIn = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      console.log("🔐 Initiating Microsoft sign-in...")
+      // Get the callback URL or default to home
+      const callbackUrl = searchParams?.get("callbackUrl") || "/"
 
-      const result = await signIn("azure-ad", {
+      console.log("🔑 Initiating Microsoft sign-in...")
+
+      // Trigger Microsoft sign-in
+      await signIn("azure-ad", {
         callbackUrl,
-        redirect: false,
+        redirect: true,
       })
 
-      if (result?.error) {
-        console.error("❌ Sign-in error:", result.error)
-        setError("Failed to sign in with Microsoft. Please try again.")
-      } else if (result?.url) {
-        console.log("✅ Sign-in successful, redirecting...")
-        router.push(result.url)
-      }
-    } catch (error) {
-      console.error("❌ Sign-in exception:", error)
+      // Note: With redirect: true, the code below won't execute
+      // as the browser will be redirected by NextAuth
+    } catch (err) {
+      console.error("❌ Sign-in error:", err)
       setError("An unexpected error occurred. Please try again.")
-    } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
-            <Shield className="w-8 h-8 text-white" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-purple-100 p-4">
+      <Card className="w-full max-w-md shadow-lg border-purple-100">
+        <CardHeader className="space-y-6 items-center text-center pb-6">
+          {/* Logo */}
+          <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center shadow-md">
+            <Shield className="h-8 w-8 text-white" />
           </div>
-          <div>
-            <CardTitle className="text-2xl font-bold text-gray-900">Inner Clarity Admin</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">
-              Sign in with your Microsoft account to access the admin portal
-            </CardDescription>
+
+          {/* Title and description */}
+          <div className="space-y-2">
+            <CardTitle className="text-2xl font-bold text-gray-900">Welcome to Inner Clarity</CardTitle>
+            <CardDescription className="text-gray-600">Sign in with your Microsoft account to continue</CardDescription>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Error alert */}
           {error && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="text-sm">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
+          {/* Microsoft sign-in button */}
           <Button
             onClick={handleMicrosoftSignIn}
             disabled={isLoading}
-            className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="w-full h-12 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium transition-all duration-200 shadow-md hover:shadow-lg"
+            size="lg"
           >
             {isLoading ? (
               <>
@@ -138,24 +128,28 @@ export default function SignInPage() {
               </>
             ) : (
               <>
-                <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zM24 11.4H12.6V0H24v11.4z"
-                  />
+                <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zM24 11.4H12.6V0H24v11.4z" />
                 </svg>
                 Sign in with Microsoft
               </>
             )}
           </Button>
 
-          <div className="text-center text-sm text-gray-500">
-            <p>Authorized personnel only</p>
-            <p className="mt-1">
-              Access restricted to <span className="font-medium">@innerclarity.org</span>,{" "}
-              <span className="font-medium">@innerclarityinc.com</span>, and{" "}
-              <span className="font-medium">@nextphaseit.org</span> domains
-            </p>
+          {/* Authorized domains info */}
+          <div className="text-center text-sm text-gray-500 pt-4 border-t border-gray-100">
+            <p>Authorized email domains:</p>
+            <div className="mt-1 space-y-1">
+              <p className="font-medium">@innerclarity.org</p>
+              <p className="font-medium">@innerclarityinc.com</p>
+              <p className="font-medium">@nextphaseit.org</p>
+            </div>
+          </div>
+
+          {/* Support info */}
+          <div className="text-center text-xs text-gray-400 pt-4">
+            <p>Need help? Contact support at:</p>
+            <p className="font-medium">support@innerclarity.org</p>
           </div>
         </CardContent>
       </Card>
