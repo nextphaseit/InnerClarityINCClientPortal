@@ -5,11 +5,11 @@ import AzureADProvider from "next-auth/providers/azure-ad"
 // Force dynamic rendering for Vercel deployment
 export const dynamic = "force-dynamic"
 
-// Validate required environment variables
-const validateEnvVars = () => {
+// Environment variable validation
+const validateEnvironment = () => {
   const requiredVars = {
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL || "https://patients.nextphaseit.org",
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID,
     MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET,
     MICROSOFT_TENANT_ID: process.env.MICROSOFT_TENANT_ID,
@@ -20,24 +20,22 @@ const validateEnvVars = () => {
     .map(([key]) => key)
 
   if (missingVars.length > 0) {
-    const errorMsg = `Missing required environment variables: ${missingVars.join(", ")}`
-    console.error("❌", errorMsg)
-    throw new Error(errorMsg)
+    throw new Error(`Missing environment variables: ${missingVars.join(", ")}`)
   }
 
-  console.log("✅ All Microsoft authentication environment variables are present")
   return requiredVars
 }
 
-// Initialize environment variables
-const envVars = validateEnvVars()
+// Initialize and validate environment
+const env = validateEnvironment()
 
+// NextAuth configuration
 export const authOptions: NextAuthOptions = {
   providers: [
     AzureADProvider({
-      clientId: envVars.MICROSOFT_CLIENT_ID!,
-      clientSecret: envVars.MICROSOFT_CLIENT_SECRET!,
-      tenantId: envVars.MICROSOFT_TENANT_ID!,
+      clientId: env.MICROSOFT_CLIENT_ID!,
+      clientSecret: env.MICROSOFT_CLIENT_SECRET!,
+      tenantId: env.MICROSOFT_TENANT_ID!,
       authorization: {
         params: {
           scope: "openid email profile User.Read",
@@ -49,12 +47,6 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-
-  // Custom pages
-  pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error",
-  },
 
   // Session configuration
   session: {
@@ -68,93 +60,121 @@ export const authOptions: NextAuthOptions = {
     maxAge: 24 * 60 * 60, // 24 hours
   },
 
+  // Custom pages
+  pages: {
+    signIn: "/auth/signin",
+    error: "/auth/error",
+  },
+
+  // Callbacks
   callbacks: {
     async signIn({ user, account, profile }) {
       try {
+        // Ensure we have required data
         if (!account || !user.email) {
-          console.error("❌ Missing account or email in signIn callback")
+          console.error("Missing account or email in signIn")
           return false
         }
 
-        // Validate that this is a Microsoft login
+        // Only allow Microsoft provider
         if (account.provider !== "azure-ad") {
-          console.error("❌ Only Microsoft authentication is allowed")
+          console.error("Invalid provider:", account.provider)
           return false
         }
 
-        // Optional: Add domain validation for admin access
+        // Domain validation for authorized users
         const email = user.email.toLowerCase()
         const authorizedDomains = ["innerclarity.org", "innerclarityinc.com", "nextphaseit.org"]
 
         const domain = email.split("@")[1]
         if (!authorizedDomains.includes(domain)) {
-          console.error(`❌ Unauthorized domain: ${domain}`)
+          console.error("Unauthorized domain:", domain)
           return false
         }
 
-        console.log(`✅ Successful Microsoft login for: ${user.email}`)
+        console.log("Successful sign-in:", user.email)
         return true
       } catch (error) {
-        console.error("❌ SignIn callback error:", error)
+        console.error("SignIn callback error:", error)
         return false
       }
     },
 
     async jwt({ token, user, account }) {
-      // Initial sign in
-      if (account && user) {
-        return {
-          ...token,
-          accessToken: account.access_token,
-          refreshToken: account.refresh_token,
-          expiresAt: account.expires_at,
-          provider: account.provider,
-          role: "admin",
+      try {
+        // Initial sign in
+        if (account && user) {
+          return {
+            ...token,
+            accessToken: account.access_token,
+            refreshToken: account.refresh_token,
+            expiresAt: account.expires_at,
+            role: "admin",
+            provider: account.provider,
+          }
         }
-      }
 
-      // Return previous token if the access token has not expired yet
-      return token
+        // Return previous token if still valid
+        return token
+      } catch (error) {
+        console.error("JWT callback error:", error)
+        return token
+      }
     },
 
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.sub!
-        session.user.role = token.role as string
-        session.accessToken = token.accessToken as string
-        session.provider = token.provider as string
+      try {
+        // Add custom properties to session
+        if (token && session.user) {
+          session.user.id = token.sub!
+          session.user.role = token.role as string
+          session.accessToken = token.accessToken as string
+          session.provider = token.provider as string
+        }
+
+        return session
+      } catch (error) {
+        console.error("Session callback error:", error)
+        return session
       }
-      return session
     },
 
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`
+      try {
+        // Handle relative URLs
+        if (url.startsWith("/")) {
+          return `${baseUrl}${url}`
+        }
 
-      // Allows callback URLs on the same origin
-      if (new URL(url).origin === baseUrl) return url
+        // Handle same origin URLs
+        if (new URL(url).origin === baseUrl) {
+          return url
+        }
 
-      // Default redirect to admin dashboard
-      return `${baseUrl}/admin/dashboard`
+        // Default redirect
+        return `${baseUrl}/admin/dashboard`
+      } catch (error) {
+        console.error("Redirect callback error:", error)
+        return `${baseUrl}/admin/dashboard`
+      }
     },
   },
 
+  // Event handlers
   events: {
     async signIn({ user, account }) {
-      console.log(`✅ User signed in: ${user.email} via ${account?.provider}`)
+      console.log(`User signed in: ${user.email} via ${account?.provider}`)
     },
     async signOut({ session }) {
-      console.log(`👋 User signed out: ${session?.user?.email}`)
+      console.log(`User signed out: ${session?.user?.email}`)
     },
   },
 
-  // Secret for JWT encryption
-  secret: envVars.NEXTAUTH_SECRET,
+  // Security
+  secret: env.NEXTAUTH_SECRET,
 
-  // Enable debug in development
+  // Logging
   debug: process.env.NODE_ENV === "development",
-
-  // Custom logger for production safety
   logger: {
     error(code, metadata) {
       console.error(`NextAuth Error [${code}]:`, metadata)
@@ -170,7 +190,7 @@ export const authOptions: NextAuthOptions = {
   },
 }
 
-// Create the NextAuth handler
+// Create NextAuth handler
 const handler = NextAuth(authOptions)
 
 // Export for App Router
