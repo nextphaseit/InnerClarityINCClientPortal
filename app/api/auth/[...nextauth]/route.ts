@@ -2,45 +2,50 @@ import NextAuth from "next-auth"
 import type { NextAuthOptions } from "next-auth"
 import AzureADProvider from "next-auth/providers/azure-ad"
 
-// Force dynamic rendering to ensure auth state is always current
+// Force dynamic rendering for Vercel deployment
 export const dynamic = "force-dynamic"
 
-// Validate required environment variables for Microsoft authentication
-const requiredEnvVars = {
-  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL || "https://patients.portal.nextphaseit.org",
-  MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID,
-  MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET,
-  MICROSOFT_TENANT_ID: process.env.MICROSOFT_TENANT_ID,
+// Validate required environment variables
+const validateEnvVars = () => {
+  const requiredVars = {
+    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL || "https://patients.nextphaseit.org",
+    MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID,
+    MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET,
+    MICROSOFT_TENANT_ID: process.env.MICROSOFT_TENANT_ID,
+  }
+
+  const missingVars = Object.entries(requiredVars)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key)
+
+  if (missingVars.length > 0) {
+    const errorMsg = `Missing required environment variables: ${missingVars.join(", ")}`
+    console.error("❌", errorMsg)
+    throw new Error(errorMsg)
+  }
+
+  console.log("✅ All Microsoft authentication environment variables are present")
+  return requiredVars
 }
 
-// Check for missing environment variables
-const missingVars = Object.entries(requiredEnvVars)
-  .filter(([key, value]) => !value)
-  .map(([key]) => key)
-
-if (missingVars.length > 0) {
-  console.error("❌ Missing required environment variables:", missingVars.join(", "))
-  throw new Error(`Missing required environment variables: ${missingVars.join(", ")}`)
-}
-
-console.log("✅ Microsoft authentication environment variables are present")
+// Initialize environment variables
+const envVars = validateEnvVars()
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    // Microsoft Entra ID Provider (Azure AD)
     AzureADProvider({
-      clientId: requiredEnvVars.MICROSOFT_CLIENT_ID!,
-      clientSecret: requiredEnvVars.MICROSOFT_CLIENT_SECRET!,
-      tenantId: requiredEnvVars.MICROSOFT_TENANT_ID!,
+      clientId: envVars.MICROSOFT_CLIENT_ID!,
+      clientSecret: envVars.MICROSOFT_CLIENT_SECRET!,
+      tenantId: envVars.MICROSOFT_TENANT_ID!,
       authorization: {
         params: {
-          scope: "openid email profile User.Read offline_access",
+          scope: "openid email profile User.Read",
           prompt: "select_account",
         },
       },
       httpOptions: {
-        timeout: 10000, // 10 seconds timeout for API calls
+        timeout: 10000,
       },
     }),
   ],
@@ -49,30 +54,45 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/auth/signin",
     error: "/auth/error",
-    signOut: "/auth/signout",
+  },
+
+  // Session configuration
+  session: {
+    strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 hours
+    updateAge: 60 * 60, // Update every hour
+  },
+
+  // JWT configuration
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 hours
   },
 
   callbacks: {
     async signIn({ user, account, profile }) {
       try {
-        console.log(`🔑 Admin SignIn attempt - User: ${user.email}`)
-
         if (!account || !user.email) {
           console.error("❌ Missing account or email in signIn callback")
           return false
         }
 
-        // Check if email domain is authorized for admin access
-        const email = user.email.toLowerCase()
-        const authorizedDomains = ["innerclarity.org", "innerclarityinc.com", "nextphaseit.org"]
-        const domain = email.split("@")[1]
-
-        if (!authorizedDomains.includes(domain)) {
-          console.error(`❌ Unauthorized domain for admin access: ${domain}`)
+        // Validate that this is a Microsoft login
+        if (account.provider !== "azure-ad") {
+          console.error("❌ Only Microsoft authentication is allowed")
           return false
         }
 
-        console.log(`✅ Admin access authorized for: ${user.email}`)
+        // Optional: Add domain validation for admin access
+        const email = user.email.toLowerCase()
+        const authorizedDomains = ["innerclarity.org", "innerclarityinc.com", "nextphaseit.org"]
+
+        const domain = email.split("@")[1]
+        if (!authorizedDomains.includes(domain)) {
+          console.error(`❌ Unauthorized domain: ${domain}`)
+          return false
+        }
+
+        console.log(`✅ Successful Microsoft login for: ${user.email}`)
         return true
       } catch (error) {
         console.error("❌ SignIn callback error:", error)
@@ -81,112 +101,77 @@ export const authOptions: NextAuthOptions = {
     },
 
     async jwt({ token, user, account }) {
-      try {
-        // Initial sign in
-        if (account && user) {
-          console.log(`👤 Processing admin JWT for: ${user.email}`)
-
-          return {
-            ...token,
-            accessToken: account.access_token,
-            refreshToken: account.refresh_token,
-            expiresAt: account.expires_at,
-            role: "admin",
-          }
+      // Initial sign in
+      if (account && user) {
+        return {
+          ...token,
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          expiresAt: account.expires_at,
+          provider: account.provider,
+          role: "admin",
         }
-
-        // Return previous token if not expired
-        return token
-      } catch (error) {
-        console.error("❌ JWT callback error:", error)
-        return token
       }
+
+      // Return previous token if the access token has not expired yet
+      return token
     },
 
     async session({ session, token }) {
-      try {
-        if (token && session.user) {
-          // Add admin role and tokens to the session
-          session.user.role = "admin"
-          session.user.id = token.sub!
-          session.accessToken = token.accessToken as string
-          session.refreshToken = token.refreshToken as string
-          session.expiresAt = token.expiresAt as number
-
-          console.log(`📱 Admin session created for ${session.user.email}`)
-        }
-
-        return session
-      } catch (error) {
-        console.error("❌ Session callback error:", error)
-        return session
+      if (token) {
+        session.user.id = token.sub!
+        session.user.role = token.role as string
+        session.accessToken = token.accessToken as string
+        session.provider = token.provider as string
       }
+      return session
     },
 
     async redirect({ url, baseUrl }) {
-      try {
-        // Handle relative URLs
-        if (url.startsWith("/")) {
-          return `${baseUrl}${url}`
-        }
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`
 
-        // Handle same origin URLs
-        if (new URL(url).origin === baseUrl) {
-          return url
-        }
+      // Allows callback URLs on the same origin
+      if (new URL(url).origin === baseUrl) return url
 
-        // Default redirect to admin dashboard
-        return `${baseUrl}/admin/dashboard`
-      } catch (error) {
-        console.error("❌ Redirect callback error:", error)
-        return `${baseUrl}/admin/dashboard`
-      }
+      // Default redirect to admin dashboard
+      return `${baseUrl}/admin/dashboard`
     },
   },
 
   events: {
-    async signIn({ user }) {
-      console.log(`✅ Admin signed in: ${user.email}`)
+    async signIn({ user, account }) {
+      console.log(`✅ User signed in: ${user.email} via ${account?.provider}`)
     },
     async signOut({ session }) {
-      console.log(`👋 Admin signed out: ${session?.user?.email || "Unknown"}`)
+      console.log(`👋 User signed out: ${session?.user?.email}`)
     },
-  },
-
-  // Session configuration
-  session: {
-    strategy: "jwt",
-    maxAge: 8 * 60 * 60, // 8 hours
-    updateAge: 60 * 60, // Update session every hour
-  },
-
-  // JWT configuration
-  jwt: {
-    maxAge: 8 * 60 * 60, // 8 hours
   },
 
   // Secret for JWT encryption
-  secret: requiredEnvVars.NEXTAUTH_SECRET,
+  secret: envVars.NEXTAUTH_SECRET,
 
-  // Enable debug mode in development
+  // Enable debug in development
   debug: process.env.NODE_ENV === "development",
 
-  // Custom logger
+  // Custom logger for production safety
   logger: {
     error(code, metadata) {
-      console.error(`❌ NextAuth Error [${code}]:`, metadata)
+      console.error(`NextAuth Error [${code}]:`, metadata)
     },
     warn(code) {
-      console.warn(`⚠️ NextAuth Warning [code]`)
+      console.warn(`NextAuth Warning [${code}]`)
     },
     debug(code, metadata) {
       if (process.env.NODE_ENV === "development") {
-        console.log(`🐛 NextAuth Debug [code]:`, metadata)
+        console.log(`NextAuth Debug [${code}]:`, metadata)
       }
     },
   },
 }
 
-// Create and export the NextAuth handler
+// Create the NextAuth handler
 const handler = NextAuth(authOptions)
+
+// Export for App Router
 export { handler as GET, handler as POST }
