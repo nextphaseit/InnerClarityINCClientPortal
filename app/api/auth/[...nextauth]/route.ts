@@ -6,13 +6,9 @@ import AzureADProvider from "next-auth/providers/azure-ad"
 export const dynamic = "force-dynamic"
 
 // Check if we're on the admin domain
-function isAdminDomain(request?: Request): boolean {
-  if (typeof window !== "undefined") {
-    return window.location.hostname.includes("admin")
-  }
-
+function isAdminDomain(): boolean {
   const url = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || "http://localhost:3000"
-  return url.includes("admin")
+  return url.includes("admin.nextphaseit.org") || url.includes("admin")
 }
 
 // Validate required environment variables for Microsoft authentication (admin only)
@@ -35,7 +31,7 @@ if (isAdminDomain()) {
     throw new Error(`Missing required environment variables for admin portal: ${missingVars.join(", ")}`)
   }
 
-  console.log("✅ Microsoft authentication environment variables are present for admin portal")
+  console.log("✅ Microsoft authentication environment variables validated for admin portal")
 }
 
 export const authOptions: NextAuthOptions = {
@@ -60,7 +56,7 @@ export const authOptions: NextAuthOptions = {
     : [],
 
   pages: {
-    signIn: isAdminDomain() ? "/admin/login" : "/portal/auth/signin",
+    signIn: "/admin/login",
     error: "/auth/error",
     signOut: "/auth/signout",
   },
@@ -165,12 +161,8 @@ export const authOptions: NextAuthOptions = {
           return url
         }
 
-        // Default redirect to admin dashboard for admin domain
-        if (isAdminDomain()) {
-          return `${baseUrl}/admin/dashboard`
-        }
-
-        return baseUrl
+        // Default redirect to admin dashboard
+        return `${baseUrl}/admin/dashboard`
       } catch (error) {
         console.error("❌ Redirect callback error:", error)
         return `${baseUrl}/admin/dashboard`
