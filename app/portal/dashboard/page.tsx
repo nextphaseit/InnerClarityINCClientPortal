@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { supabase, isSupabaseConfigured } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, DollarSign, MessageSquare, ArrowRight, Clock, AlertCircle, Activity } from "lucide-react"
@@ -58,7 +58,39 @@ export default function PatientDashboard() {
 
   const checkAuthAndLoadData = async () => {
     try {
-      // Check authentication first
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured()) {
+        // Use mock data for demo
+        setUser({ id: "demo-user", email: "patient@example.com" } as SupabaseUser)
+        setProfile({
+          id: "demo-user",
+          full_name: "Demo Patient",
+          date_of_birth: "1990-01-01",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        // Set mock dashboard data
+        setDashboardData({
+          nextAppointment: {
+            id: "mock-1",
+            appointment_date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+            appointment_type: "Individual Therapy",
+            provider_name: "Dr. Sarah Johnson",
+            status: "scheduled",
+          },
+          unpaidBalance: 150,
+          messageCount: 3,
+          loadingAppointments: false,
+          loadingBilling: false,
+          loadingMessages: false,
+        })
+
+        setLoading(false)
+        return
+      }
+
+      // Real Supabase implementation
       const {
         data: { user },
         error: authError,
@@ -189,7 +221,7 @@ export default function PatientDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
           <p className="text-slate-600">Loading your dashboard...</p>

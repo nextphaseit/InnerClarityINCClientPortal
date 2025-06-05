@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import {
@@ -22,8 +22,7 @@ import {
   Bell,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { supabase } from "@/lib/supabase"
-import { useUnreadMessages } from "@/hooks/use-unread-messages"
+import { supabase, isSupabaseConfigured } from "@/lib/supabase"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 const navigationItems = [
@@ -89,21 +88,36 @@ export function PortalLayout({ children }: PortalLayoutProps) {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [userProfile, setUserProfile] = useState<{ full_name?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const mainContentRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const pathname = usePathname()
 
-  // Get unread message count
-  const { unreadCount } = useUnreadMessages({
-    user,
-    userRole: "patient",
-  })
+  // Scroll to top on route change
+  useEffect(() => {
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTop = 0
+    }
+  }, [pathname])
 
   useEffect(() => {
     checkAuth()
+
+    // Mock unread count for demo
+    setUnreadCount(3)
   }, [])
 
   const checkAuth = async () => {
     try {
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured()) {
+        // Use mock user for demo
+        setUser({ id: "demo-user", email: "patient@example.com" } as SupabaseUser)
+        setUserProfile({ full_name: "Demo Patient" })
+        setIsLoading(false)
+        return
+      }
+
       const {
         data: { user },
         error,
@@ -130,7 +144,9 @@ export function PortalLayout({ children }: PortalLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut()
+      if (isSupabaseConfigured()) {
+        await supabase.auth.signOut()
+      }
       router.push("/auth/login")
     } catch (error) {
       console.error("Logout error:", error)
@@ -148,13 +164,16 @@ export function PortalLayout({ children }: PortalLayoutProps) {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading your portal...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Mobile menu button */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <Button
@@ -168,12 +187,17 @@ export function PortalLayout({ children }: PortalLayoutProps) {
       </div>
 
       {/* Mobile backdrop */}
-      {isMobileMenuOpen && <div className="lg:hidden fixed inset-0 bg-black/50 z-40" onClick={closeMobileMenu} />}
+      {isMobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+          onClick={closeMobileMenu}
+        />
+      )}
 
       {/* Sidebar */}
       <div
         className={`
-          fixed top-0 left-0 z-40 h-full w-64 bg-white/95 backdrop-blur-sm border-r border-slate-200 shadow-xl
+          fixed top-0 left-0 z-40 h-full w-64 bg-white border-r border-slate-200 shadow-lg
           transform transition-transform duration-300 ease-in-out
           lg:translate-x-0 lg:static lg:z-auto
           ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
@@ -251,7 +275,10 @@ export function PortalLayout({ children }: PortalLayoutProps) {
       </div>
 
       {/* Main content */}
-      <main className="lg:pl-64 min-h-screen">
+      <main
+        ref={mainContentRef}
+        className="flex-1 overflow-auto bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100"
+      >
         {/* Top bar for mobile */}
         <div className="lg:hidden h-16 bg-white/80 backdrop-blur-sm border-b border-slate-200 flex items-center justify-between px-16">
           <h2 className="text-lg font-semibold text-slate-900">Patient Portal</h2>
@@ -268,7 +295,7 @@ export function PortalLayout({ children }: PortalLayoutProps) {
         </div>
 
         {/* Page content */}
-        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+        <div className="p-6 min-h-screen">{children}</div>
       </main>
     </div>
   )
