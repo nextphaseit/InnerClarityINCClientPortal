@@ -25,6 +25,13 @@ const createMockClient = () => ({
     upsert: () => ({ data: null, error: new Error("Supabase not configured") }),
     delete: () => ({ data: null, error: new Error("Supabase not configured") }),
   }),
+  storage: {
+    from: () => ({
+      upload: async () => ({ data: null, error: new Error("Supabase not configured") }),
+      getPublicUrl: () => ({ data: { publicUrl: "" } }),
+      remove: async () => ({ data: null, error: new Error("Supabase not configured") }),
+    }),
+  },
   channel: () => ({
     on: () => ({ subscribe: () => {} }),
     unsubscribe: () => {},

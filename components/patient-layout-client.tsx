@@ -5,6 +5,7 @@ import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import {
   LayoutDashboard,
   User,
@@ -20,9 +21,10 @@ import {
   Menu,
   X,
   Bell,
+  Circle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { usePatientAuth } from "@/components/patient-auth-provider"
+import { usePatientAuth } from "@/hooks/use-patient-auth"
 
 const navigationItems = [
   {
@@ -84,18 +86,11 @@ interface PatientLayoutClientProps {
 
 export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(3) // Mock unread count
+  const [unreadCount, setUnreadCount] = useState(0)
   const mainContentRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const pathname = usePathname()
-  const { user, loading, signOut } = usePatientAuth()
-
-  // Redirect to signin if not authenticated
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/portal/auth/signin")
-    }
-  }, [user, loading, router])
+  const { user, profile, loading, isOnline, signOut } = usePatientAuth()
 
   // Scroll to top on route change
   useEffect(() => {
@@ -103,6 +98,20 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
       mainContentRef.current.scrollTop = 0
     }
   }, [pathname])
+
+  useEffect(() => {
+    // Mock unread count for demo
+    setUnreadCount(3)
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      await signOut()
+      router.push("/portal/auth/signin")
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
+  }
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -112,15 +121,11 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
     setIsMobileMenuOpen(false)
   }
 
-  const handleLogout = async () => {
-    await signOut()
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-slate-600">Loading your portal...</p>
         </div>
       </div>
@@ -128,7 +133,8 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
   }
 
   if (!user) {
-    return null // Will redirect to signin
+    router.push("/portal/auth/signin")
+    return null
   }
 
   return (
@@ -168,7 +174,19 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
             <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
               <div className="w-5 h-5 bg-gradient-to-br from-teal-500 to-blue-600 rounded"></div>
             </div>
-            <h1 className="text-lg font-bold text-white">Patient Portal</h1>
+            <h1 className="text-lg font-bold text-white">Inner Clarity</h1>
+          </div>
+        </div>
+
+        {/* Online Status */}
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+          <div className="flex items-center space-x-2">
+            <Circle
+              className={`h-2 w-2 ${isOnline ? "fill-green-500 text-green-500" : "fill-gray-400 text-gray-400"}`}
+            />
+            <span className="text-sm text-slate-600">
+              {isOnline ? `Online as ${profile?.full_name || "Patient"}` : "Offline"}
+            </span>
           </div>
         </div>
 
@@ -213,13 +231,23 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
         {/* User section */}
         <div className="border-t border-slate-200 p-4">
           <div className="flex items-center space-x-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-blue-600 rounded-full flex items-center justify-center">
-              <User className="h-5 w-5 text-white" />
+            <div className="relative w-10 h-10">
+              {profile?.avatar_url ? (
+                <Image
+                  src={profile.avatar_url || "/placeholder.svg"}
+                  alt={profile.full_name || "Profile"}
+                  width={40}
+                  height={40}
+                  className="rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-blue-600 rounded-full flex items-center justify-center">
+                  <User className="h-5 w-5 text-white" />
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 truncate">
-                {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Patient"}
-              </p>
+              <p className="text-sm font-medium text-slate-900 truncate">{profile?.full_name || "Patient"}</p>
               <p className="text-xs text-slate-500 truncate">Patient Portal</p>
             </div>
           </div>
@@ -244,6 +272,9 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
         <div className="lg:hidden h-16 bg-white/80 backdrop-blur-sm border-b border-slate-200 flex items-center justify-between px-16">
           <h2 className="text-lg font-semibold text-slate-900">Patient Portal</h2>
           <div className="flex items-center space-x-2">
+            <Circle
+              className={`h-2 w-2 ${isOnline ? "fill-green-500 text-green-500" : "fill-gray-400 text-gray-400"}`}
+            />
             {unreadCount > 0 && (
               <div className="relative">
                 <Bell className="h-4 w-4 text-slate-600" />
@@ -256,7 +287,7 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
         </div>
 
         {/* Page content */}
-        <div className="p-6 min-h-screen">{children}</div>
+        <div className="min-h-screen">{children}</div>
       </main>
     </div>
   )
