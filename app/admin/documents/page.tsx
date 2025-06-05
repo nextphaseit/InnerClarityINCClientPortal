@@ -10,7 +10,7 @@ import { FileText, User, Loader2, Download, CheckCircle, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { StatusBadge } from "@/components/status-badge"
 
-export const dynamic = "force_dynamic"
+export const dynamic = "force-dynamic"
 
 interface Document {
   id: string
