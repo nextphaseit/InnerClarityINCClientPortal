@@ -76,11 +76,17 @@ export async function middleware(request: NextRequest) {
 
     // PATIENT PORTAL ROUTE PROTECTION
     if (pathname.startsWith("/portal") && !pathname.startsWith("/portal/auth")) {
-      console.log(`🏥 Protecting patient route: ${pathname}`)
+      console.log(`🏥 Patient route accessed: ${pathname}`)
 
       // For patient routes, we'll let the client-side auth handle redirects
-      // since Supabase auth is client-side
-      // The PatientLayoutClient will handle authentication checks
+      // since Supabase auth is client-side. The middleware won't block these routes.
+      // The PatientLayoutClient will handle authentication checks and redirects.
+
+      // Just add security headers and continue
+      const response = NextResponse.next()
+      response.headers.set("X-Frame-Options", "DENY")
+      response.headers.set("X-Content-Type-Options", "nosniff")
+      return response
     }
 
     const response = NextResponse.next()

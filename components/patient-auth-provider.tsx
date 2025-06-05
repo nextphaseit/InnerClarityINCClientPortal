@@ -46,21 +46,51 @@ export default function PatientAuthProvider({ children }: PatientAuthProviderPro
         email: "patient@example.com",
         user_metadata: { full_name: "Demo Patient" },
       } as User)
+      setSession({
+        user: {
+          id: "demo-user",
+          email: "patient@example.com",
+          user_metadata: { full_name: "Demo Patient" },
+        },
+        access_token: "demo-token",
+        refresh_token: "demo-refresh",
+        expires_in: 3600,
+        expires_at: Date.now() + 3600000,
+        token_type: "bearer",
+      } as Session)
       setLoading(false)
       return
     }
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    const getInitialSession = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error("Session error:", error)
+        }
+
+        console.log("Initial session:", session ? "Found" : "Not found")
+        setSession(session)
+        setUser(session?.user ?? null)
+        setLoading(false)
+      } catch (error) {
+        console.error("Error getting initial session:", error)
+        setLoading(false)
+      }
+    }
+
+    getInitialSession()
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session ? "Session exists" : "No session")
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
@@ -70,15 +100,37 @@ export default function PatientAuthProvider({ children }: PatientAuthProviderPro
   }, [])
 
   const signIn = async (email: string, password: string) => {
+    console.log("Attempting sign in for:", email)
+
     if (!isSupabaseConfigured()) {
-      // Mock sign in for demo
+      console.log("Using demo mode sign in")
+      // Mock sign in for demo - set the demo user state
+      setUser({
+        id: "demo-user",
+        email: email,
+        user_metadata: { full_name: "Demo Patient" },
+      } as User)
+      setSession({
+        user: {
+          id: "demo-user",
+          email: email,
+          user_metadata: { full_name: "Demo Patient" },
+        },
+        access_token: "demo-token",
+        refresh_token: "demo-refresh",
+        expires_in: 3600,
+        expires_at: Date.now() + 3600000,
+        token_type: "bearer",
+      } as Session)
       return { error: null }
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
+
+    console.log("Sign in result:", { data: !!data, error: !!error })
     return { error }
   }
 

@@ -24,7 +24,7 @@ import {
   Circle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { usePatientAuth } from "@/hooks/use-patient-auth"
+import { usePatientAuth } from "@/components/patient-auth-provider"
 
 const navigationItems = [
   {
@@ -90,7 +90,8 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
   const mainContentRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const pathname = usePathname()
-  const { user, profile, loading, isOnline, signOut } = usePatientAuth()
+  const { user, session, loading, signOut } = usePatientAuth()
+  const [isOnline, setIsOnline] = useState(false)
 
   // Scroll to top on route change
   useEffect(() => {
@@ -103,6 +104,10 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
     // Mock unread count for demo
     setUnreadCount(3)
   }, [])
+
+  useEffect(() => {
+    setIsOnline(!!user && !!session)
+  }, [user, session])
 
   const handleLogout = async () => {
     try {
@@ -121,6 +126,14 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
     setIsMobileMenuOpen(false)
   }
 
+  // Redirect to signin if not authenticated (but only after loading is complete)
+  useEffect(() => {
+    if (!loading && !user && !session) {
+      console.log("No user found, redirecting to signin")
+      router.push("/portal/auth/signin")
+    }
+  }, [user, session, loading, router])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
@@ -132,9 +145,8 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
     )
   }
 
-  if (!user) {
-    router.push("/portal/auth/signin")
-    return null
+  if (!user && !session) {
+    return null // Will redirect to signin
   }
 
   return (
@@ -185,7 +197,9 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
               className={`h-2 w-2 ${isOnline ? "fill-green-500 text-green-500" : "fill-gray-400 text-gray-400"}`}
             />
             <span className="text-sm text-slate-600">
-              {isOnline ? `Online as ${profile?.full_name || "Patient"}` : "Offline"}
+              {isOnline
+                ? `Online as ${user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Patient"}`
+                : "Offline"}
             </span>
           </div>
         </div>
@@ -232,10 +246,10 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
         <div className="border-t border-slate-200 p-4">
           <div className="flex items-center space-x-3 mb-4">
             <div className="relative w-10 h-10">
-              {profile?.avatar_url ? (
+              {user?.user_metadata?.avatar_url ? (
                 <Image
-                  src={profile.avatar_url || "/placeholder.svg"}
-                  alt={profile.full_name || "Profile"}
+                  src={user.user_metadata.avatar_url || "/placeholder.svg"}
+                  alt={user?.user_metadata?.full_name || "Profile"}
                   width={40}
                   height={40}
                   className="rounded-full object-cover"
@@ -247,7 +261,9 @@ export function PatientLayoutClient({ children }: PatientLayoutClientProps) {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 truncate">{profile?.full_name || "Patient"}</p>
+              <p className="text-sm font-medium text-slate-900 truncate">
+                {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Patient"}
+              </p>
               <p className="text-xs text-slate-500 truncate">Patient Portal</p>
             </div>
           </div>

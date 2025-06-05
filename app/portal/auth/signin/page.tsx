@@ -31,11 +31,17 @@ export default function PatientSignInPage() {
       const { error } = await signIn(email, password)
 
       if (error) {
+        console.error("Sign in error:", error)
         setError(error.message || "Failed to sign in")
       } else {
-        router.push("/portal/dashboard")
+        console.log("Sign in successful, redirecting...")
+        // Small delay to ensure auth state is updated
+        setTimeout(() => {
+          router.push("/portal/dashboard")
+        }, 100)
       }
     } catch (err) {
+      console.error("Unexpected error:", err)
       setError("An unexpected error occurred")
     } finally {
       setIsLoading(false)
@@ -109,6 +115,20 @@ export default function PatientSignInPage() {
                 "Sign In"
               )}
             </Button>
+
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setEmail("demo@patient.com")
+                  setPassword("demo123")
+                }}
+              >
+                Use Demo Credentials
+              </Button>
+            </div>
           </form>
 
           <div className="mt-6 space-y-4">
