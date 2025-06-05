@@ -1,14 +1,33 @@
 import type React from "react"
-import { requireAdminAuth } from "@/lib/auth-server"
+import { getServerSession } from "next-auth/next"
+import { redirect } from "next/navigation"
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { AdminLayoutClient } from "@/components/admin-layout-client"
+import SessionWrapper from "@/components/session-wrapper"
 
-interface AdminLayoutProps {
+export default async function AdminLayout({
+  children,
+}: {
   children: React.ReactNode
-}
+}) {
+  // Get session on the server side
+  const session = await getServerSession(authOptions)
 
-export default async function AdminLayout({ children }: AdminLayoutProps) {
-  // Server-side authentication check - will redirect if not authenticated
-  const session = await requireAdminAuth()
+  // Redirect if no session
+  if (!session) {
+    console.log("🔒 No admin session found, redirecting to signin...")
+    redirect("/auth/signin")
+  }
 
-  return <AdminLayoutClient session={session}>{children}</AdminLayoutClient>
+  // Check if user has admin role
+  if (!session.user?.role?.includes("admin")) {
+    console.log("🚫 User is not admin, redirecting to unauthorized...")
+    redirect("/unauthorized")
+  }
+
+  return (
+    <SessionWrapper requireAuth={true} requireAdmin={true}>
+      <AdminLayoutClient session={session}>{children}</AdminLayoutClient>
+    </SessionWrapper>
+  )
 }
