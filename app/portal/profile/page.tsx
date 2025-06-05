@@ -16,6 +16,8 @@ import { usePatientAuth } from "@/components/patient-auth-provider"
 
 interface Profile {
   id: string
+  user_id?: string
+  client_id?: string
   full_name: string
   phone: string
   address: string
@@ -59,6 +61,7 @@ export default function ProfilePage() {
         // Create mock profile for demo
         const mockProfile: Profile = {
           id: user.id,
+          user_id: user.id,
           full_name: user.user_metadata?.full_name || "Demo Patient",
           phone: "",
           address: "",
@@ -79,40 +82,43 @@ export default function ProfilePage() {
         return
       }
 
+      // Try multiple column variations for compatibility
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
+        .or(`id.eq.${user.id},user_id.eq.${user.id},client_id.eq.${user.id}`)
         .single()
 
       if (profileError) {
         if (profileError.code === "PGRST116") {
           // No profile found, create default
-          createDefaultProfile()
+          await createDefaultProfile()
         } else {
           console.error("Error loading profile:", profileError)
           setError("Unable to load profile data.")
-          createDefaultProfile()
+          await createDefaultProfile()
         }
       } else if (profileData) {
         setProfile(profileData)
       } else {
-        createDefaultProfile()
+        await createDefaultProfile()
       }
     } catch (error) {
       console.error("Error:", error)
       setError("Unable to connect to database.")
-      createDefaultProfile()
+      await createDefaultProfile()
     } finally {
       setLoading(false)
     }
   }
 
-  const createDefaultProfile = () => {
+  const createDefaultProfile = async () => {
     if (!user) return
 
     const defaultProfile: Profile = {
       id: user.id,
+      user_id: user.id,
+      client_id: user.id,
       full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
       phone: "",
       address: "",
@@ -128,6 +134,20 @@ export default function ProfilePage() {
       avatar_url: user.user_metadata?.avatar_url,
       updated_at: new Date().toISOString(),
     }
+
+    if (isSupabaseConfigured()) {
+      try {
+        // Try to insert the default profile
+        const { error: insertError } = await supabase.from("profiles").insert(defaultProfile)
+
+        if (insertError) {
+          console.error("Error creating default profile:", insertError)
+        }
+      } catch (error) {
+        console.error("Error inserting profile:", error)
+      }
+    }
+
     setProfile(defaultProfile)
   }
 
@@ -149,21 +169,41 @@ export default function ProfilePage() {
         return
       }
 
-      // Upload to Supabase Storage
-      const fileExt = file.name.split(".").pop()
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error("File size must be less than 5MB")
+      }
 
-      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file)
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        throw new Error("File must be an image")
+      }
+
+      // Upload to Supabase Storage with user ID in path
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`
+      const filePath = fileName
+
+      console.log("🔄 Uploading file to:", filePath)
+
+      const { data: uploadData, error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: true, // Allow overwriting existing files
+      })
 
       if (uploadError) {
+        console.error("❌ Upload error:", uploadError)
         throw uploadError
       }
+
+      console.log("✅ Upload successful:", uploadData)
 
       // Get public URL
       const {
         data: { publicUrl },
       } = supabase.storage.from("avatars").getPublicUrl(filePath)
+
+      console.log("🔗 Public URL:", publicUrl)
 
       // Update profile with new avatar URL
       const updatedProfile = { ...profile, avatar_url: publicUrl }
@@ -176,14 +216,16 @@ export default function ProfilePage() {
       })
 
       if (updateError) {
+        console.error("❌ Profile update error:", updateError)
         throw updateError
       }
 
+      console.log("✅ Profile updated successfully")
       setMessage("Profile picture uploaded successfully!")
       setTimeout(() => setMessage(""), 3000)
-    } catch (error) {
-      console.error("Error uploading image:", error)
-      setError("Error uploading image. Please try again.")
+    } catch (error: any) {
+      console.error("❌ Error uploading image:", error)
+      setError(`Error uploading image: ${error.message || "Please try again."}`)
     } finally {
       setUploading(false)
     }
@@ -215,9 +257,9 @@ export default function ProfilePage() {
 
       setMessage("Profile updated successfully!")
       setTimeout(() => setMessage(""), 3000)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving profile:", error)
-      setError("Error saving profile. Please try again.")
+      setError(`Error saving profile: ${error.message || "Please try again."}`)
     } finally {
       setSaving(false)
     }
@@ -245,9 +287,9 @@ export default function ProfilePage() {
         </div>
 
         {error && (
-          <Alert className="mb-6 border-amber-200 bg-amber-50">
-            <AlertCircle className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-800">{error}</AlertDescription>
+          <Alert className="mb-6 border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">{error}</AlertDescription>
           </Alert>
         )}
 
@@ -275,6 +317,10 @@ export default function ProfilePage() {
                       width={100}
                       height={100}
                       className="rounded-full object-cover border-4 border-white shadow-lg"
+                      onError={() => {
+                        // Fallback if image fails to load
+                        setProfile((prev) => (prev ? { ...prev, avatar_url: undefined } : null))
+                      }}
                     />
                   ) : (
                     <div className="w-24 h-24 bg-gradient-to-br from-teal-500 to-blue-600 rounded-full flex items-center justify-center border-4 border-white shadow-lg">
