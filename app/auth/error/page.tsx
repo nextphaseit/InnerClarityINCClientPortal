@@ -1,16 +1,24 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { AlertTriangle, Home, RefreshCw } from "lucide-react"
 
-export default function AuthErrorPage() {
+function ErrorContent() {
   const searchParams = useSearchParams()
   const [errorMessage, setErrorMessage] = useState<string>("An authentication error occurred")
+  const [errorDetails, setErrorDetails] = useState<string>("")
 
   useEffect(() => {
     const error = searchParams?.get("error")
+    const errorDescription = searchParams?.get("error_description")
+
+    if (errorDescription) {
+      setErrorDetails(errorDescription)
+    }
 
     if (error) {
       switch (error) {
@@ -50,6 +58,9 @@ export default function AuthErrorPage() {
         case "SessionRequired":
           setErrorMessage("Authentication required. Please sign in to access this page.")
           break
+        case "AuthError":
+          setErrorMessage("An authentication error occurred. Please try again.")
+          break
         default:
           setErrorMessage(`Authentication error: ${error}`)
       }
@@ -60,49 +71,60 @@ export default function AuthErrorPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="bg-white shadow-lg rounded-xl p-8 max-w-md w-full text-center">
         <div className="mx-auto mb-6">
-          <Image src="/images/inner-clarity-logo.png" alt="NextPhase IT" width={120} height={40} className="mx-auto" />
+          <Image src="/images/inner-clarity-logo.png" alt="Inner Clarity" width={120} height={40} className="mx-auto" />
         </div>
 
-        <div className="text-red-600 mb-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-12 w-12 mx-auto"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
+        <div className="text-red-600 mb-4">
+          <AlertTriangle className="h-12 w-12 mx-auto" />
         </div>
 
-        <h1 className="text-2xl font-semibold mb-2">Authentication Error</h1>
-        <p className="text-gray-600 mb-6">{errorMessage}</p>
+        <h1 className="text-2xl font-semibold mb-2 text-gray-900">Authentication Error</h1>
+        <p className="text-gray-600 mb-4">{errorMessage}</p>
+
+        {errorDetails && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
+            <p className="text-sm text-red-700">{errorDetails}</p>
+          </div>
+        )}
 
         <div className="space-y-3">
-          <Link
-            href="/auth/signin"
-            className="block w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Try Again
-          </Link>
+          <Button asChild className="w-full">
+            <Link href="/auth/signin">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try Again
+            </Link>
+          </Button>
 
-          <Link
-            href="/"
-            className="block w-full bg-gray-200 text-gray-800 py-2.5 rounded-lg hover:bg-gray-300 transition-colors"
-          >
-            Return to Home
-          </Link>
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/">
+              <Home className="mr-2 h-4 w-4" />
+              Return to Home
+            </Link>
+          </Button>
         </div>
 
         <div className="mt-6 text-xs text-gray-500">
-          <p>If this problem persists, please contact support at support@nextphaseit.org</p>
+          <p>If this problem persists, please contact support at:</p>
+          <p className="font-medium">support@nextphaseit.org</p>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <ErrorContent />
+    </Suspense>
   )
 }
