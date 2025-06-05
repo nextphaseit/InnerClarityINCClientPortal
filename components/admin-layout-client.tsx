@@ -26,6 +26,16 @@ const navigationItems = [
     icon: Calendar,
   },
   {
+    name: "Forms",
+    href: "/admin/forms",
+    icon: FileText,
+  },
+  {
+    name: "Documents",
+    href: "/admin/documents",
+    icon: FileText,
+  },
+  {
     name: "Messages",
     href: "/admin/messages",
     icon: MessageSquare,

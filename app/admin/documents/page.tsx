@@ -4,13 +4,13 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { FileText, User, Loader2, Download, CheckCircle, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { StatusBadge } from "@/components/status-badge"
 
-export const dynamic = "force-dynamic"
+export const dynamic = "force_dynamic"
 
 interface Document {
   id: string
@@ -128,21 +128,6 @@ export default function AdminDocumentsPage() {
       }
     } catch (error) {
       console.error("Error downloading file:", error)
-    }
-  }
-
-  const getStatusBadge = (status: Document["status"]) => {
-    switch (status) {
-      case "uploaded":
-        return <Badge className="bg-blue-100 text-blue-800">Uploaded</Badge>
-      case "processing":
-        return <Badge className="bg-yellow-100 text-yellow-800">Processing</Badge>
-      case "approved":
-        return <Badge className="bg-green-100 text-green-800">Approved</Badge>
-      case "rejected":
-        return <Badge variant="destructive">Rejected</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
     }
   }
 
@@ -326,7 +311,7 @@ export default function AdminDocumentsPage() {
                     </div>
 
                     <div className="flex items-center space-x-3">
-                      {getStatusBadge(document.status)}
+                      <StatusBadge status={document.status} type="document" />
                       <Button size="sm" variant="outline" onClick={() => handleDownload(document)}>
                         <Download className="h-3 w-3 mr-1" />
                         Download

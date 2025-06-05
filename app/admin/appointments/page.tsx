@@ -6,12 +6,12 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/components/auth-provider"
-import { Calendar, Clock, Plus, Filter, Users, Video, MapPin, Shield, Loader2 } from "lucide-react"
-import { formatDate } from "@/lib/utils"
+import { Calendar, Clock, Plus, Filter, Users, Video, Shield, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { supabase } from "@/lib/supabaseClient"
+import { StatusBadge } from "@/components/status-badge"
 
 // Mark as dynamic to prevent static rendering issues
 export const dynamic = "force-dynamic"
@@ -30,6 +30,11 @@ export default function AdminAppointmentsPage() {
 
   // Use our custom auth hook with proper error handling
   const { user, loading, error } = useAuth()
+
+  const [appointments, setAppointments] = useState<any[]>([])
+  const [filteredAppointments, setFilteredAppointments] = useState<any[]>([])
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [dateFilter, setDateFilter] = useState<string>("")
 
   useEffect(() => {
     try {
@@ -52,6 +57,72 @@ export default function AdminAppointmentsPage() {
       console.error("❌ Error in admin appointments auth check:", err)
     }
   }, [user, loading, router])
+
+  const loadAppointments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(`
+        *,
+        patient_profile:profiles!appointments_patient_id_fkey(
+          full_name,
+          email
+        )
+      `)
+        .order("appointment_date", { ascending: true })
+
+      if (error) {
+        console.error("Error loading appointments:", error)
+        return
+      }
+
+      setAppointments(data || [])
+      setFilteredAppointments(data || [])
+    } catch (error) {
+      console.error("Error loading appointments:", error)
+    }
+  }
+
+  useEffect(() => {
+    if (user && user.role === "admin") {
+      loadAppointments()
+    }
+  }, [user])
+
+  useEffect(() => {
+    let filtered = appointments
+
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((apt) => apt.status === statusFilter)
+    }
+
+    if (dateFilter) {
+      filtered = filtered.filter((apt) => apt.appointment_date.startsWith(dateFilter))
+    }
+
+    setFilteredAppointments(filtered)
+  }, [appointments, statusFilter, dateFilter])
+
+  const updateAppointmentStatus = async (appointmentId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("appointments")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", appointmentId)
+
+      if (error) {
+        throw error
+      }
+
+      // Reload appointments
+      await loadAppointments()
+    } catch (error) {
+      console.error("Error updating appointment status:", error)
+    }
+  }
 
   // Show loading state while checking authentication
   if (loading) {
@@ -91,50 +162,6 @@ export default function AdminAppointmentsPage() {
     )
   }
 
-  // Mock appointments data
-  const appointments = [
-    {
-      id: "1",
-      time: "09:00 AM",
-      client: "John Smith",
-      provider: "Dr. Sarah Johnson",
-      type: "Therapy Session",
-      status: "confirmed",
-      location: "Virtual",
-      duration: 50,
-    },
-    {
-      id: "2",
-      time: "10:30 AM",
-      client: "Jane Doe",
-      provider: "Dr. Michael Chen",
-      type: "Initial Consultation",
-      status: "confirmed",
-      location: "Office - Room 201",
-      duration: 60,
-    },
-    {
-      id: "3",
-      time: "02:00 PM",
-      client: "Robert Wilson",
-      provider: "Dr. Sarah Johnson",
-      type: "Follow-up",
-      status: "pending",
-      location: "Virtual",
-      duration: 30,
-    },
-    {
-      id: "4",
-      time: "03:30 PM",
-      client: "Lisa Anderson",
-      provider: "Dr. Emily Rodriguez",
-      type: "Assessment",
-      status: "confirmed",
-      location: "Office - Room 103",
-      duration: 90,
-    },
-  ]
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
@@ -151,10 +178,12 @@ export default function AdminAppointmentsPage() {
   }
 
   const stats = {
-    totalToday: appointments.length,
-    confirmed: appointments.filter((apt) => apt.status === "confirmed").length,
-    pending: appointments.filter((apt) => apt.status === "pending").length,
-    virtual: appointments.filter((apt) => apt.location === "Virtual").length,
+    totalToday: filteredAppointments.filter((apt) =>
+      apt.appointment_date.startsWith(new Date().toISOString().split("T")[0]),
+    ).length,
+    confirmed: filteredAppointments.filter((apt) => apt.status === "confirmed").length,
+    pending: filteredAppointments.filter((apt) => apt.status === "pending").length,
+    virtual: filteredAppointments.filter((apt) => apt.appointment_type === "virtual").length,
   }
 
   const handleScheduleAppointment = async (e: React.FormEvent) => {
@@ -254,24 +283,35 @@ export default function AdminAppointmentsPage() {
           </Card>
         </div>
 
-        {/* Date Selector and Filters */}
+        {/* Date and Status Filters */}
         <Card className="mb-6">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <input
                   type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
                   className="px-3 py-2 border rounded-md"
                 />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border rounded-md"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="completed">Completed</option>
+                </select>
                 <Button variant="outline">
                   <Filter className="mr-2 h-4 w-4" />
                   Filter
                 </Button>
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Showing appointments for {formatDate(selectedDate)}
+                Showing {filteredAppointments.length} appointments
               </div>
             </div>
           </CardContent>
@@ -284,41 +324,59 @@ export default function AdminAppointmentsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {appointments.map((appointment) => (
+              {filteredAppointments.map((appointment) => (
                 <div
                   key={appointment.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
                   <div className="flex items-center space-x-4">
                     <div className="text-center">
-                      <p className="font-semibold text-gray-900 dark:text-white">{appointment.time}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        {new Date(appointment.appointment_date).toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
                       <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.duration}min</p>
                     </div>
                     <div className="h-12 w-px bg-gray-200 dark:bg-gray-700"></div>
                     <div>
-                      <h4 className="font-medium text-gray-900 dark:text-white">{appointment.client}</h4>
+                      <h4 className="font-medium text-gray-900 dark:text-white">
+                        {appointment.patient_profile?.full_name || "Unknown Patient"}
+                      </h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {appointment.type} with {appointment.provider}
+                        {appointment.appointment_type} - {appointment.reason}
                       </p>
-                      <div className="flex items-center space-x-2 mt-1">
-                        {appointment.location === "Virtual" ? (
-                          <Video className="h-3 w-3 text-gray-400" />
-                        ) : (
-                          <MapPin className="h-3 w-3 text-gray-400" />
-                        )}
-                        <span className="text-xs text-gray-500 dark:text-gray-500">{appointment.location}</span>
-                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-500">{appointment.patient_profile?.email}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(appointment.appointment_date).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex items-center space-x-3">
-                    <Badge className={getStatusColor(appointment.status)}>{appointment.status}</Badge>
+                    <StatusBadge status={appointment.status} type="appointment" />
                     <div className="flex space-x-1">
+                      {appointment.status === "pending" && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateAppointmentStatus(appointment.id, "confirmed")}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateAppointmentStatus(appointment.id, "cancelled")}
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
                       <Button variant="outline" size="sm">
                         Edit
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        Reschedule
                       </Button>
                     </div>
                   </div>

@@ -4,11 +4,11 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { FileText, User, Loader2, Eye } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { StatusBadge } from "@/components/status-badge"
 
 export const dynamic = "force-dynamic"
 
@@ -97,19 +97,6 @@ export default function AdminFormsPage() {
       await loadFormResponses()
     } catch (error) {
       console.error("Error marking as reviewed:", error)
-    }
-  }
-
-  const getStatusBadge = (status: FormResponse["status"]) => {
-    switch (status) {
-      case "submitted":
-        return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>
-      case "reviewed":
-        return <Badge className="bg-green-100 text-green-800">Reviewed</Badge>
-      case "draft":
-        return <Badge className="bg-gray-100 text-gray-800">Draft</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
     }
   }
 
@@ -291,7 +278,7 @@ export default function AdminFormsPage() {
                     </div>
 
                     <div className="flex items-center space-x-3">
-                      {getStatusBadge(response.status)}
+                      <StatusBadge status={response.status} type="form" />
                       <Button size="sm" variant="outline" onClick={() => setSelectedResponse(response)}>
                         <Eye className="h-3 w-3 mr-1" />
                         View
@@ -335,7 +322,7 @@ export default function AdminFormsPage() {
                   <strong>Submitted:</strong> {formatDate(selectedResponse.submitted_at)}
                 </p>
                 <p className="text-sm text-gray-600">
-                  <strong>Status:</strong> {getStatusBadge(selectedResponse.status)}
+                  <strong>Status:</strong> <StatusBadge status={selectedResponse.status} type="form" />
                 </p>
               </div>
 
