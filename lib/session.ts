@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 
 export async function getSession() {
@@ -31,7 +31,18 @@ export async function requireAdminAuth() {
   return user
 }
 
-// Remove patient auth since this is admin-only
+// Add the missing requirePatientAuth export
+export async function requirePatientAuth() {
+  const user = await requireAuth("/auth/signin")
+
+  if (user.role !== "patient" && user.role !== "admin") {
+    redirect("/unauthorized?reason=patient_required")
+  }
+
+  return user
+}
+
+// Microsoft-specific auth requirement
 export async function requireMicrosoftAuth() {
   const session = await getSession()
 
