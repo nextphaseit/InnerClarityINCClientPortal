@@ -1,37 +1,21 @@
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { redirect } from "next/navigation"
-import type { Session } from "next-auth"
 
-export interface AdminSession extends Session {
-  user: {
-    id: string
-    email: string
-    name?: string | null
-    image?: string | null
-    role: "admin"
-    tenantId: string
-  }
-  provider: string
-  accessToken: string
-}
-
-export async function requireAuth() {
+export async function getRequiredServerSession() {
   const session = await getServerSession(authOptions)
 
-  if (!session) {
-    redirect("/admin/login")
+  if (!session || !session.user) {
+    redirect("/auth/signin")
   }
 
-  return session
-}
-
-export async function requireAdminAuth() {
-  const session = await requireAuth()
-
-  if (session.user?.role !== "admin") {
+  if (session.user.role !== "admin") {
     redirect("/unauthorized")
   }
 
   return session
+}
+
+export async function getOptionalServerSession() {
+  return await getServerSession(authOptions)
 }

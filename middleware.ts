@@ -6,13 +6,27 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public paths that don't require authentication
-  const publicPaths = ["/", "/auth/signin", "/auth/signup", "/auth/reset-password", "/auth/error", "/api/auth"]
+  const publicPaths = [
+    "/",
+    "/auth/signin",
+    "/auth/signup",
+    "/auth/reset-password",
+    "/auth/error",
+    "/api/auth",
+    "/about",
+    "/services",
+    "/contact",
+    "/privacy-policy",
+    "/terms-of-service",
+    "/hipaa-notice",
+  ]
 
   // Allow public paths and static files
   if (
     publicPaths.some((path) => pathname.startsWith(path)) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/images") ||
+    pathname.startsWith("/favicon") ||
     pathname.includes(".")
   ) {
     return NextResponse.next()
@@ -30,7 +44,6 @@ export async function middleware(request: NextRequest) {
     if (!token) {
       console.log("❌ No admin token found, redirecting to signin")
       const url = new URL("/auth/signin", request.url)
-      url.searchParams.set("tab", "admin")
       url.searchParams.set("callbackUrl", request.url)
       return NextResponse.redirect(url)
     }
@@ -41,7 +54,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/unauthorized", request.url))
     }
 
-    console.log("✅ Admin authentication successful")
+    console.log("✅ Admin authentication successful for:", token.email)
   }
 
   // Handle PATIENT PORTAL routes with Supabase Auth
@@ -60,7 +73,6 @@ export async function middleware(request: NextRequest) {
 
     if (!hasSupabaseSession && !supabaseToken) {
       const url = new URL("/auth/signin", request.url)
-      url.searchParams.set("tab", "patient")
       url.searchParams.set("callbackUrl", request.url)
       return NextResponse.redirect(url)
     }
