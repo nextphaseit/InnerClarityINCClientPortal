@@ -1,13 +1,11 @@
 "use client"
 
+import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Navigation } from "@/components/navigation"
-import { useAuth } from "@/components/auth-provider"
-import { useToast } from "@/hooks/use-toast"
 import {
   CreditCard,
   Download,
@@ -19,7 +17,6 @@ import {
   FileText,
   Loader2,
 } from "lucide-react"
-import { formatCurrency, formatDate } from "@/lib/utils"
 
 interface Invoice {
   id: string
@@ -34,42 +31,56 @@ interface Invoice {
 }
 
 export default function BillingPage() {
-  const { user, loading } = useAuth()
+  const { data: session, status } = useSession()
   const router = useRouter()
-  const { toast } = useToast()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [payingInvoice, setPayingInvoice] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (status === "loading") return // Still loading
+
+    if (status === "unauthenticated") {
       router.push("/auth/signin")
       return
     }
 
-    if (user) {
+    if (session?.user) {
       fetchInvoices()
     }
-  }, [user, loading, router])
+  }, [session, status, router])
 
   const fetchInvoices = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch("/api/billing", {
-        headers: {
-          "Content-Type": "application/json",
+      // Mock data for now - replace with actual API call
+      const mockInvoices: Invoice[] = [
+        {
+          id: "1",
+          invoiceNumber: "INV-2024-001",
+          date: "2024-01-15",
+          amount: 150.0,
+          description: "Therapy Session - January 2024",
+          status: "paid",
+          dueDate: "2024-01-30",
+          paidDate: "2024-01-20",
+          downloadUrl: "/invoices/inv-2024-001.pdf",
         },
-      })
+        {
+          id: "2",
+          invoiceNumber: "INV-2024-002",
+          date: "2024-02-15",
+          amount: 150.0,
+          description: "Therapy Session - February 2024",
+          status: "unpaid",
+          dueDate: "2024-02-28",
+        },
+      ]
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch invoices")
-      }
-
-      const data = await response.json()
-      setInvoices(data.invoices || [])
+      setInvoices(mockInvoices)
     } catch (err) {
       console.error("Error fetching invoices:", err)
       setError("Failed to load billing information. Please try again.")
@@ -100,21 +111,31 @@ export default function BillingPage() {
       const { url } = await response.json()
 
       if (url) {
-        // Redirect to Stripe Checkout
         window.location.href = url
       } else {
         throw new Error("No checkout URL received")
       }
     } catch (err) {
       console.error("Error creating payment session:", err)
-      toast({
-        title: "Payment Error",
-        description: "Unable to process payment. Please try again.",
-        variant: "destructive",
-      })
+      alert("Unable to process payment. Please try again.")
     } finally {
       setPayingInvoice(null)
     }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount)
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
   }
 
   const getStatusColor = (status: string) => {
@@ -143,20 +164,14 @@ export default function BillingPage() {
     }
   }
 
-  const totalUnpaid = invoices
-    .filter((invoice) => invoice.status === "unpaid" || invoice.status === "overdue")
-    .reduce((sum, invoice) => sum + invoice.amount, 0)
-
-  const overdueCount = invoices.filter((invoice) => invoice.status === "overdue").length
-
-  if (loading || isLoading) {
+  // Show loading state while session is loading
+  if (status === "loading" || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <Navigation />
         <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-clarity-blue-500" />
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500" />
               <p className="mt-2 text-gray-600 dark:text-gray-400">Loading billing information...</p>
             </div>
           </div>
@@ -165,10 +180,32 @@ export default function BillingPage() {
     )
   }
 
+  // Show sign-in prompt if not authenticated
+  if (status === "unauthenticated") {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Authentication Required</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to view your billing information.</p>
+              <Button onClick={() => router.push("/auth/signin")}>Sign In</Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  const totalUnpaid = invoices
+    .filter((invoice) => invoice.status === "unpaid" || invoice.status === "overdue")
+    .reduce((sum, invoice) => sum + invoice.amount, 0)
+
+  const overdueCount = invoices.filter((invoice) => invoice.status === "overdue").length
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navigation />
-
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Billing & Payments</h1>
@@ -194,17 +231,13 @@ export default function BillingPage() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-clarity-blue-50 to-clarity-blue-100 dark:from-clarity-blue-900/20 dark:to-clarity-blue-800/20">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
             <CardContent className="p-6">
               <div className="flex items-center">
-                <DollarSign className="h-8 w-8 text-clarity-blue-600" />
+                <DollarSign className="h-8 w-8 text-blue-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-clarity-blue-700 dark:text-clarity-blue-300">
-                    Outstanding Balance
-                  </p>
-                  <p className="text-2xl font-bold text-clarity-blue-900 dark:text-clarity-blue-100">
-                    {formatCurrency(totalUnpaid)}
-                  </p>
+                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Outstanding Balance</p>
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{formatCurrency(totalUnpaid)}</p>
                 </div>
               </div>
             </CardContent>
@@ -223,7 +256,11 @@ export default function BillingPage() {
           </Card>
 
           <Card
-            className={`bg-gradient-to-br ${overdueCount > 0 ? "from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20" : "from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20"}`}
+            className={`bg-gradient-to-br ${
+              overdueCount > 0
+                ? "from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20"
+                : "from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20"
+            }`}
           >
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -234,12 +271,16 @@ export default function BillingPage() {
                 )}
                 <div className="ml-4">
                   <p
-                    className={`text-sm font-medium ${overdueCount > 0 ? "text-red-700 dark:text-red-300" : "text-green-700 dark:text-green-300"}`}
+                    className={`text-sm font-medium ${
+                      overdueCount > 0 ? "text-red-700 dark:text-red-300" : "text-green-700 dark:text-green-300"
+                    }`}
                   >
                     Overdue Invoices
                   </p>
                   <p
-                    className={`text-2xl font-bold ${overdueCount > 0 ? "text-red-900 dark:text-red-100" : "text-green-900 dark:text-green-100"}`}
+                    className={`text-2xl font-bold ${
+                      overdueCount > 0 ? "text-red-900 dark:text-red-100" : "text-green-900 dark:text-green-100"
+                    }`}
                   >
                     {overdueCount}
                   </p>
@@ -269,148 +310,73 @@ export default function BillingPage() {
                 </p>
               </div>
             ) : (
-              <>
-                {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Invoice ID</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Date</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Description</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Amount</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Status</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invoices.map((invoice) => (
-                        <tr
-                          key={invoice.id}
-                          className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                        >
-                          <td className="py-4 px-4">
-                            <span className="font-medium text-gray-900 dark:text-white">{invoice.invoiceNumber}</span>
-                          </td>
-                          <td className="py-4 px-4 text-gray-600 dark:text-gray-400">{formatDate(invoice.date)}</td>
-                          <td className="py-4 px-4 text-gray-600 dark:text-gray-400">{invoice.description}</td>
-                          <td className="py-4 px-4">
-                            <span className="font-semibold text-gray-900 dark:text-white">
-                              {formatCurrency(invoice.amount)}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4">
-                            <Badge className={getStatusColor(invoice.status)}>
-                              {getStatusIcon(invoice.status)}
-                              <span className="ml-1 capitalize">{invoice.status}</span>
-                            </Badge>
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="flex space-x-2">
-                              {(invoice.status === "unpaid" || invoice.status === "overdue") && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handlePayNow(invoice.id, invoice.amount)}
-                                  disabled={payingInvoice === invoice.id}
-                                  className="bg-clarity-blue-600 hover:bg-clarity-blue-700"
-                                >
-                                  {payingInvoice === invoice.id ? (
-                                    <>
-                                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                                      Processing...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <CreditCard className="h-4 w-4 mr-1" />
-                                      Pay Now
-                                    </>
-                                  )}
-                                </Button>
-                              )}
-                              {invoice.downloadUrl && (
-                                <Button variant="outline" size="sm" asChild>
-                                  <a href={invoice.downloadUrl} download>
-                                    <Download className="h-4 w-4" />
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile Cards */}
-                <div className="md:hidden space-y-4">
-                  {invoices.map((invoice) => (
-                    <Card key={invoice.id} className="border border-gray-200 dark:border-gray-700">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h4 className="font-medium text-gray-900 dark:text-white">{invoice.invoiceNumber}</h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">{formatDate(invoice.date)}</p>
-                          </div>
-                          <Badge className={getStatusColor(invoice.status)}>
-                            {getStatusIcon(invoice.status)}
-                            <span className="ml-1 capitalize">{invoice.status}</span>
-                          </Badge>
+              <div className="space-y-4">
+                {invoices.map((invoice) => (
+                  <Card key={invoice.id} className="border border-gray-200 dark:border-gray-700">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="font-medium text-gray-900 dark:text-white">{invoice.invoiceNumber}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{formatDate(invoice.date)}</p>
                         </div>
+                        <Badge className={getStatusColor(invoice.status)}>
+                          {getStatusIcon(invoice.status)}
+                          <span className="ml-1 capitalize">{invoice.status}</span>
+                        </Badge>
+                      </div>
 
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{invoice.description}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{invoice.description}</p>
 
-                        <div className="flex justify-between items-center">
-                          <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {formatCurrency(invoice.amount)}
-                          </span>
-                          <div className="flex space-x-2">
-                            {(invoice.status === "unpaid" || invoice.status === "overdue") && (
-                              <Button
-                                size="sm"
-                                onClick={() => handlePayNow(invoice.id, invoice.amount)}
-                                disabled={payingInvoice === invoice.id}
-                                className="bg-clarity-blue-600 hover:bg-clarity-blue-700"
-                              >
-                                {payingInvoice === invoice.id ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                                    Processing...
-                                  </>
-                                ) : (
-                                  <>
-                                    <CreditCard className="h-4 w-4 mr-1" />
-                                    Pay Now
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                            {invoice.downloadUrl && (
-                              <Button variant="outline" size="sm" asChild>
-                                <a href={invoice.downloadUrl} download>
-                                  <Download className="h-4 w-4" />
-                                </a>
-                              </Button>
-                            )}
-                          </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {formatCurrency(invoice.amount)}
+                        </span>
+                        <div className="flex space-x-2">
+                          {(invoice.status === "unpaid" || invoice.status === "overdue") && (
+                            <Button
+                              size="sm"
+                              onClick={() => handlePayNow(invoice.id, invoice.amount)}
+                              disabled={payingInvoice === invoice.id}
+                              className="bg-blue-600 hover:bg-blue-700"
+                            >
+                              {payingInvoice === invoice.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="h-4 w-4 mr-1" />
+                                  Pay Now
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {invoice.downloadUrl && (
+                            <Button variant="outline" size="sm" asChild>
+                              <a href={invoice.downloadUrl} download>
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          )}
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
 
         {/* HIPAA Notice */}
-        <Card className="mt-8 hipaa-secure border-clarity-blue-200 bg-clarity-blue-50 dark:border-clarity-blue-800 dark:bg-clarity-blue-900/20">
+        <Card className="mt-8 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Shield className="h-5 w-5 text-clarity-blue-600" />
+              <Shield className="h-5 w-5 text-blue-600" />
               <div>
-                <p className="text-sm font-medium text-clarity-blue-900 dark:text-clarity-blue-100">Secure Billing</p>
-                <p className="text-xs text-clarity-blue-700 dark:text-clarity-blue-300">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Secure Billing</p>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
                   All payment information is encrypted and processed securely through Stripe. Billing records are
                   maintained according to HIPAA requirements.
                 </p>
