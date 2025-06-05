@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Save, User, Phone, MapPin, Shield, AlertCircle, Camera, Upload } from "lucide-react"
-import { usePatientAuth } from "@/hooks/use-patient-auth"
+import { usePatientAuth } from "@/components/patient-auth-provider"
 
 interface Profile {
   id: string
@@ -33,7 +33,7 @@ interface Profile {
 }
 
 export default function ProfilePage() {
-  const { user, profile: userProfile, refreshProfile } = usePatientAuth()
+  const { user } = usePatientAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -59,7 +59,7 @@ export default function ProfilePage() {
         // Create mock profile for demo
         const mockProfile: Profile = {
           id: user.id,
-          full_name: userProfile?.full_name || "Demo Patient",
+          full_name: user.user_metadata?.full_name || "Demo Patient",
           phone: "",
           address: "",
           city: "",
@@ -71,7 +71,7 @@ export default function ProfilePage() {
           emergency_contact_phone: "",
           emergency_contact_relationship: "",
           date_of_birth: "",
-          avatar_url: userProfile?.avatar_url,
+          avatar_url: user.user_metadata?.avatar_url,
           updated_at: new Date().toISOString(),
         }
         setProfile(mockProfile)
@@ -125,7 +125,7 @@ export default function ProfilePage() {
       emergency_contact_phone: "",
       emergency_contact_relationship: "",
       date_of_birth: "",
-      avatar_url: userProfile?.avatar_url,
+      avatar_url: user.user_metadata?.avatar_url,
       updated_at: new Date().toISOString(),
     }
     setProfile(defaultProfile)
@@ -179,7 +179,6 @@ export default function ProfilePage() {
         throw updateError
       }
 
-      await refreshProfile()
       setMessage("Profile picture uploaded successfully!")
       setTimeout(() => setMessage(""), 3000)
     } catch (error) {
@@ -214,7 +213,6 @@ export default function ProfilePage() {
         throw saveError
       }
 
-      await refreshProfile()
       setMessage("Profile updated successfully!")
       setTimeout(() => setMessage(""), 3000)
     } catch (error) {
