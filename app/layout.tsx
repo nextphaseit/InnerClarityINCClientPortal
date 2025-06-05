@@ -1,13 +1,16 @@
 import type React from "react"
-import type { Metadata } from "next/metadata"
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/components/auth-provider"
+import { ToastProvider } from "@/components/toast-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Inner Clarity | Mental Health Services",
-  description: "Professional mental health services and patient portal",
+  title: "Inner Clarity - Mental Health Portal",
+  description: "Secure patient portal for mental health services",
     generator: 'v0.dev'
 }
 
@@ -17,8 +20,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AuthProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

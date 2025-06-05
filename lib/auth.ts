@@ -1,160 +1,222 @@
 import type { NextAuthOptions } from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import Auth0Provider from "next-auth/providers/auth0"
 import AzureADProvider from "next-auth/providers/azure-ad"
+import bcrypt from "bcryptjs"
 
-// Validate required environment variables
-const requiredEnvVars = {
-  MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID,
-  MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET,
-  MICROSOFT_TENANT_ID: process.env.MICROSOFT_TENANT_ID,
-  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-}
-
-// Check for missing environment variables
-const missingVars = Object.entries(requiredEnvVars)
-  .filter(([_, value]) => !value)
-  .map(([key]) => key)
-
-if (missingVars.length > 0) {
-  throw new Error(`Missing required environment variables: ${missingVars.join(", ")}`)
-}
-
-// Authorized email domains for admin access
-const AUTHORIZED_DOMAINS = ["@innerclarity.org", "@innerclarityinc.com", "@nextphaseit.org"]
+// Mock user database with multi-tenant support
+const users = [
+  // Admin users with tenant assignments
+  {
+    id: "admin-1",
+    name: "Adrian Knight",
+    email: "admin@innerclarityinc.com",
+    passwordHash: "$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // Admin@1234
+    role: "admin",
+    tenantId: "inner-clarity-main",
+    tenantName: "Inner Clarity - Main Office",
+    authProvider: "microsoft",
+  },
+  {
+    id: "admin-2",
+    name: "Dr. Michael Chen",
+    email: "michael.chen@nextphaseit.org",
+    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "password123"
+    role: "admin",
+    tenantId: "inner-clarity-north",
+    tenantName: "Inner Clarity - North Branch",
+    authProvider: "microsoft",
+  },
+  // Patient users
+  {
+    id: "patient-1",
+    name: "John Smith",
+    email: "patient@example.com",
+    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "password123"
+    role: "patient",
+    authProvider: "auth0",
+  },
+]
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    // Auth0 Provider for Patients
+    Auth0Provider({
+      clientId: process.env.AUTH0_CLIENT_ID!,
+      clientSecret: process.env.AUTH0_CLIENT_SECRET!,
+      issuer: process.env.AUTH0_DOMAIN,
+    }),
+
+    // Microsoft Entra ID Provider for Admins
     AzureADProvider({
       clientId: process.env.MICROSOFT_CLIENT_ID!,
       clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
-      tenantId: process.env.MICROSOFT_TENANT_ID!,
-      authorization: {
-        params: {
-          scope: "openid email profile User.Read offline_access",
-        },
+      tenantId: process.env.MICROSOFT_TENANT_ID,
+    }),
+
+    // Credentials Provider (for development/testing)
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
-      httpOptions: {
-        timeout: 10000,
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required")
+        }
+
+        // Find user by email
+        const user = users.find((u) => u.email.toLowerCase() === credentials.email.toLowerCase())
+
+        if (!user) {
+          throw new Error("No account found with this email address")
+        }
+
+        // Verify password
+        const isValidPassword = await bcrypt.compare(credentials.password, user.passwordHash)
+
+        if (!isValidPassword) {
+          throw new Error("Invalid password")
+        }
+
+        // Return user object (exclude password)
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          tenantId: user.tenantId || null,
+          tenantName: user.tenantName || null,
+          authProvider: user.authProvider,
+        }
       },
     }),
   ],
-
-  session: {
-    strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 24 hours
-    updateAge: 60 * 60, // 1 hour
-  },
-
   pages: {
     signIn: "/auth/signin",
     error: "/auth/error",
-    signOut: "/auth/signout",
   },
-
   callbacks: {
-    async signIn({ account, profile, email }) {
-      try {
-        // Only allow Microsoft provider
-        if (account?.provider !== "azure-ad") {
-          console.log("❌ Sign-in rejected: Invalid provider", account?.provider)
-          return false
-        }
-
-        // Validate email exists
-        if (!email && !profile?.email) {
-          console.log("❌ Sign-in rejected: No email provided")
-          return false
-        }
-
-        const userEmail = email || profile?.email || ""
-
-        // Check if email domain is authorized
-        const isAuthorized = AUTHORIZED_DOMAINS.some((domain) => userEmail.toLowerCase().endsWith(domain.toLowerCase()))
-
-        if (!isAuthorized) {
-          console.log("❌ Sign-in rejected: Unauthorized domain", userEmail)
-          return false
-        }
-
-        console.log("✅ Sign-in approved for:", userEmail)
-        return true
-      } catch (error) {
-        console.error("❌ Sign-in error:", error)
-        return false
-      }
-    },
-
-    async jwt({ token, account, profile }) {
-      try {
-        // Store additional user info on first sign in
-        if (account && profile) {
-          token.accessToken = account.access_token
-          token.refreshToken = account.refresh_token
-          token.role = "admin" // All authorized users are admins
-          token.provider = account.provider
-          token.name = profile.name
-          token.email = profile.email
-        }
-
-        return token
-      } catch (error) {
-        console.error("❌ JWT callback error:", error)
-        return token
-      }
-    },
-
-    async session({ session, token }) {
-      try {
-        // Add custom fields to session
-        if (token && session.user) {
-          session.user.role = token.role as string
-          session.user.id = token.sub as string
-          session.accessToken = token.accessToken as string
-          session.provider = token.provider as string
-        }
-
-        return session
-      } catch (error) {
-        console.error("❌ Session callback error:", error)
-        return session
-      }
-    },
-
-    async redirect({ url, baseUrl }) {
-      try {
-        // Handle redirects securely
-        if (url.startsWith("/")) return `${baseUrl}${url}`
-        if (new URL(url).origin === baseUrl) return url
-        return `${baseUrl}/admin/dashboard`
-      } catch (error) {
-        console.error("❌ Redirect error:", error)
-        return `${baseUrl}/admin/dashboard`
-      }
-    },
-  },
-
-  events: {
     async signIn({ user, account, profile }) {
-      console.log("🔑 User signed in:", user.email, "via", account?.provider)
-    },
-    async signOut({ session, token }) {
-      console.log("🚪 User signed out:", session?.user?.email || token?.email)
-    },
-  },
+      // For Microsoft login, restrict to specific domains
+      if (account?.provider === "azure-ad") {
+        const email = user.email?.toLowerCase() || ""
+        const allowedDomains = ["innerclarityinc.com", "nextphaseit.org"]
+        const domain = email.split("@")[1]
 
-  logger: {
-    error(code, metadata) {
-      console.error("❌ NextAuth Error:", code, metadata)
-    },
-    warn(code) {
-      console.warn("⚠️ NextAuth Warning:", code)
-    },
-    debug(code, metadata) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("🐛 NextAuth Debug:", code, metadata)
+        if (!allowedDomains.includes(domain)) {
+          return false // Reject sign in
+        }
+
+        // Set role to admin for Microsoft logins
+        user.role = "admin"
       }
+
+      // For Auth0 login, set role to patient
+      if (account?.provider === "auth0") {
+        user.role = "patient"
+      }
+
+      return true
+    },
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.role = user.role
+        token.id = user.id
+        token.tenantId = user.tenantId
+        token.tenantName = user.tenantName
+        token.authProvider = account?.provider || user.authProvider
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.role = token.role as string
+        session.user.id = token.id as string
+        session.user.tenantId = token.tenantId as string
+        session.user.tenantName = token.tenantName as string
+        session.user.authProvider = token.authProvider as string
+      }
+      return session
+    },
+    async redirect({ url, baseUrl }) {
+      // Handle role-based redirects after login
+      if (url.startsWith("/api/auth/signin") || url.startsWith("/auth/signin")) {
+        // We'll handle this in the middleware based on role
+        return baseUrl
+      }
+
+      // Allow relative URLs
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`
+      }
+
+      // Allow same-origin URLs
+      if (new URL(url).origin === baseUrl) {
+        return url
+      }
+
+      return baseUrl
     },
   },
+  events: {
+    async signIn({ user, account, isNewUser }) {
+      // Log successful sign-in for audit purposes
+      console.log(`User signed in: ${user.email} via ${account?.provider} (${user.role})`)
+
+      // Here you would store the user in your database if they don't exist
+      // and update their last login timestamp
+    },
+    async createUser({ user }) {
+      console.log(`New user created: ${user.email}`)
+    },
+  },
+  session: {
+    strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 }
 
-// Default export for backward compatibility
-export default authOptions
+// Helper function to get tenant-filtered data
+export function getTenantFilteredData<T extends { tenantId?: string }>(data: T[], userTenantId?: string): T[] {
+  if (!userTenantId) return data
+  return data.filter((item) => item.tenantId === userTenantId)
+}
+
+// Helper function to check tenant access
+export function checkTenantAccess(userTenantId?: string, resourceTenantId?: string): boolean {
+  if (!userTenantId) return true // Patients can access their own data
+  return userTenantId === resourceTenantId
+}
+
+// Helper function to seed admin user if none exists
+export async function seedAdminUser() {
+  // Check if admin exists
+  const adminExists = users.some((user) => user.role === "admin")
+
+  if (!adminExists) {
+    // Hash password
+    const passwordHash = await bcrypt.hash("Admin@1234", 12)
+
+    // Create default admin
+    const defaultAdmin = {
+      id: "admin-default",
+      name: "Adrian Knight",
+      email: "admin@innerclarityinc.com",
+      passwordHash,
+      role: "admin" as const,
+      tenantId: "inner-clarity-main",
+      tenantName: "Inner Clarity - Main Office",
+      authProvider: "microsoft",
+    }
+
+    users.push(defaultAdmin)
+    console.log("Default admin user created:", defaultAdmin.email)
+    return true
+  }
+
+  return false
+}

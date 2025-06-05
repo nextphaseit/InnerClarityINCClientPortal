@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Navigation } from "@/components/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { FileText, User, Loader2, Download, CheckCircle, X } from "lucide-react"
-import { supabase } from "@/lib/supabaseClient"
+import { supabase } from "@/lib/supabase"
 import { StatusBadge } from "@/components/status-badge"
 
-export const dynamic = "force-dynamic"
+export const dynamic = "force_dynamic"
 
 interface Document {
   id: string
@@ -161,7 +161,7 @@ export default function AdminDocumentsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-500" />
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-clarity-blue-500" />
           <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
@@ -194,7 +194,7 @@ export default function AdminDocumentsPage() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-clarity-blue-500 focus:border-transparent"
             >
               <option value="all">All Categories</option>
               {uniqueCategories.map((category) => (
@@ -206,7 +206,7 @@ export default function AdminDocumentsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-clarity-blue-500 focus:border-transparent"
             >
               <option value="all">All Statuses</option>
               <option value="uploaded">Uploaded</option>
@@ -221,7 +221,7 @@ export default function AdminDocumentsPage() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <FileText className="h-8 w-8 text-blue-500" />
+                <FileText className="h-8 w-8 text-clarity-blue-500" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Documents</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">{documents.length}</p>
@@ -233,7 +233,7 @@ export default function AdminDocumentsPage() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <FileText className="h-8 w-8 text-yellow-500" />
+                <FileText className="h-8 w-8 text-blue-500" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Review</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -292,7 +292,7 @@ export default function AdminDocumentsPage() {
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
                     <div className="flex items-center space-x-4">
-                      <FileText className="h-8 w-8 text-blue-500" />
+                      <FileText className="h-8 w-8 text-clarity-blue-500" />
                       <div>
                         <h4 className="font-medium text-gray-900 dark:text-white">{document.original_name}</h4>
                         <p className="text-sm text-gray-600 dark:text-gray-400">

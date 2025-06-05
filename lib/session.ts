@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { redirect } from "next/navigation"
 
 export async function getSession() {
@@ -22,7 +22,7 @@ export async function requireAuth(redirectTo = "/auth/signin") {
 }
 
 export async function requireAdminAuth() {
-  const user = await requireAuth("/auth/signin")
+  const user = await requireAuth("/unauthorized?reason=admin_required")
 
   if (user.role !== "admin") {
     redirect("/unauthorized?reason=admin_required")
@@ -31,32 +31,12 @@ export async function requireAdminAuth() {
   return user
 }
 
-// Add the missing requirePatientAuth export
 export async function requirePatientAuth() {
-  const user = await requireAuth("/auth/signin")
+  const user = await requireAuth("/unauthorized?reason=patient_required")
 
-  if (user.role !== "patient" && user.role !== "admin") {
+  if (user.role !== "patient") {
     redirect("/unauthorized?reason=patient_required")
   }
 
   return user
-}
-
-// Microsoft-specific auth requirement
-export async function requireMicrosoftAuth() {
-  const session = await getSession()
-
-  if (!session?.user) {
-    redirect("/auth/signin")
-  }
-
-  if (session.provider !== "azure-ad") {
-    redirect("/auth/signin?error=microsoft_required")
-  }
-
-  if (session.user.role !== "admin") {
-    redirect("/unauthorized?reason=admin_required")
-  }
-
-  return session.user
 }

@@ -1,5 +1,5 @@
-import type React from "react"
-import type { Metadata } from "next/metadata"
+import type { ReactNode } from "react"
+import type { Metadata } from "next"
 import PatientAuthProvider from "@/components/patient-auth-provider"
 import { PatientLayoutClient } from "@/components/patient-layout-client"
 
@@ -8,11 +8,7 @@ export const metadata: Metadata = {
   description: "Access your mental health resources and appointments",
 }
 
-export default function PatientLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function PatientLayout({ children }: { children: ReactNode }) {
   return (
     <PatientAuthProvider>
       <PatientLayoutClient>{children}</PatientLayoutClient>

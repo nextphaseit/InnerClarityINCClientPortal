@@ -17,6 +17,7 @@ export async function middleware(request: NextRequest) {
     "/portal/auth/signin",
     "/portal/auth/signup",
     "/portal/auth/reset-password",
+    "/admin/login",
     "/unauthorized",
     "/not-found",
     "/privacy-policy",
@@ -55,7 +56,7 @@ export async function middleware(request: NextRequest) {
       // Check if user is authenticated
       if (!token) {
         console.log(`🚫 Unauthenticated admin access attempt to: ${pathname}`)
-        return NextResponse.redirect(new URL("/auth/signin", request.url))
+        return NextResponse.redirect(new URL("/admin/login?error=authentication_required", request.url))
       }
 
       // Check if user has admin role
@@ -67,7 +68,7 @@ export async function middleware(request: NextRequest) {
       // Verify Microsoft authentication
       if (token.provider !== "azure-ad") {
         console.log(`❌ Non-Microsoft auth (${token.provider}) trying to access admin route: ${pathname}`)
-        return NextResponse.redirect(new URL("/auth/signin?error=microsoft_required", request.url))
+        return NextResponse.redirect(new URL("/admin/login?error=microsoft_required", request.url))
       }
 
       console.log(`✅ Admin access granted to ${token.email} for ${pathname}`)
@@ -96,7 +97,7 @@ export async function middleware(request: NextRequest) {
 
     // On error, redirect admin routes to login
     if (pathname.startsWith("/admin")) {
-      return NextResponse.redirect(new URL("/auth/signin?error=configuration_error", request.url))
+      return NextResponse.redirect(new URL("/admin/login?error=configuration_error", request.url))
     }
 
     return NextResponse.next()
