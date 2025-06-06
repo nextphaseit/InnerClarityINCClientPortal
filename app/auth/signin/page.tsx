@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Mail, Lock, Shield, AlertCircle, Users, Eye, EyeOff } from "lucide-react"
+import { Loader2, Mail, Lock, Shield, AlertCircle, Users, Eye, EyeOff, TestTube } from "lucide-react"
 
 export default function SignInPage() {
   const router = useRouter()
@@ -27,6 +27,11 @@ export default function SignInPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+
+  // Admin demo form state
+  const [adminDemoEmail, setAdminDemoEmail] = useState("")
+  const [adminDemoPassword, setAdminDemoPassword] = useState("")
+  const [showAdminDemoPassword, setShowAdminDemoPassword] = useState(false)
 
   const callbackUrl = searchParams?.get("callbackUrl")
   const errorMsg = searchParams?.get("error")
@@ -43,7 +48,7 @@ export default function SignInPage() {
       try {
         // Check for admin session
         const adminSession = await getSession()
-        if (adminSession?.user?.role === "admin") {
+        if (adminSession?.user?.role === "admin" || adminSession?.user?.role === "super_admin") {
           router.push("/admin/dashboard")
           return
         }
@@ -140,12 +145,12 @@ export default function SignInPage() {
     }
   }
 
-  const handleDemoSignIn = async () => {
+  const handlePatientDemoSignIn = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      console.log("🔄 Attempting demo sign-in")
+      console.log("🔄 Attempting patient demo sign-in")
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: "demo@patient.com",
@@ -153,18 +158,59 @@ export default function SignInPage() {
       })
 
       if (signInError) {
-        console.error("❌ Demo sign-in error:", signInError.message)
-        setError("Demo sign-in failed. Please try manual sign-in.")
+        console.error("❌ Patient demo sign-in error:", signInError.message)
+        setError("Patient demo sign-in failed. Please try manual sign-in.")
       } else if (data.user) {
-        console.log("✅ Demo sign-in successful")
+        console.log("✅ Patient demo sign-in successful")
         router.push("/portal/dashboard")
       }
     } catch (error) {
-      console.error("❌ Demo sign-in error:", error)
-      setError("Demo sign-in failed. Please try manual sign-in.")
+      console.error("❌ Patient demo sign-in error:", error)
+      setError("Patient demo sign-in failed. Please try manual sign-in.")
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleAdminDemoSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!adminDemoEmail || !adminDemoPassword) {
+      setError("Please enter demo credentials")
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      console.log("🔄 Attempting admin demo sign-in with NextAuth")
+
+      const result = await signIn("demo-admin", {
+        email: adminDemoEmail,
+        password: adminDemoPassword,
+        callbackUrl: callbackUrl || "/admin/dashboard",
+        redirect: false,
+      })
+
+      if (result?.error) {
+        console.error("❌ Admin demo sign-in error:", result.error)
+        setError("Invalid demo credentials. Please check and try again.")
+      } else if (result?.ok) {
+        console.log("✅ Admin demo sign-in successful")
+        router.push(callbackUrl || "/admin/dashboard")
+      }
+    } catch (error) {
+      console.error("❌ Admin demo sign-in exception:", error)
+      setError("Admin demo sign-in failed. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fillDemoCredentials = () => {
+    setAdminDemoEmail("demo@admin.nextphaseit.org")
+    setAdminDemoPassword("DemoAdmin123!")
   }
 
   if (isCheckingSession) {
@@ -301,8 +347,8 @@ export default function SignInPage() {
                   </div>
                 </div>
 
-                <Button onClick={handleDemoSignIn} disabled={isLoading} variant="outline" className="w-full">
-                  Use Demo Account
+                <Button onClick={handlePatientDemoSignIn} disabled={isLoading} variant="outline" className="w-full">
+                  Use Patient Demo Account
                 </Button>
 
                 <div className="text-center text-sm">
@@ -362,6 +408,112 @@ export default function SignInPage() {
                     </>
                   )}
                 </Button>
+
+                {/* Demo Admin Login Section */}
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-gray-200" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-gray-500">Demo Access</span>
+                  </div>
+                </div>
+
+                <Card className="border-amber-200 bg-amber-50">
+                  <CardContent className="pt-4">
+                    <div className="text-center mb-4">
+                      <div className="flex justify-center mb-2">
+                        <TestTube className="h-6 w-6 text-amber-600" />
+                      </div>
+                      <h4 className="text-sm font-medium text-amber-800">Demo Admin Access</h4>
+                      <p className="text-xs text-amber-700">Test the admin portal with full Super Admin privileges</p>
+                    </div>
+
+                    <form onSubmit={handleAdminDemoSignIn} className="space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-demo-email" className="text-xs">
+                          Demo Email
+                        </Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-2.5 h-3 w-3 text-amber-500" />
+                          <Input
+                            id="admin-demo-email"
+                            type="email"
+                            placeholder="Demo admin email"
+                            value={adminDemoEmail}
+                            onChange={(e) => setAdminDemoEmail(e.target.value)}
+                            className="pl-9 text-sm h-9 border-amber-200 focus:border-amber-400"
+                            disabled={isLoading}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-demo-password" className="text-xs">
+                          Demo Password
+                        </Label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-2.5 h-3 w-3 text-amber-500" />
+                          <Input
+                            id="admin-demo-password"
+                            type={showAdminDemoPassword ? "text" : "password"}
+                            placeholder="Demo admin password"
+                            value={adminDemoPassword}
+                            onChange={(e) => setAdminDemoPassword(e.target.value)}
+                            className="pl-9 pr-9 text-sm h-9 border-amber-200 focus:border-amber-400"
+                            disabled={isLoading}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAdminDemoPassword(!showAdminDemoPassword)}
+                            className="absolute right-3 top-2.5 text-amber-500 hover:text-amber-600"
+                            disabled={isLoading}
+                          >
+                            {showAdminDemoPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          onClick={fillDemoCredentials}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs h-8 border-amber-300 text-amber-700 hover:bg-amber-100"
+                          disabled={isLoading}
+                        >
+                          Fill Demo
+                        </Button>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          className="flex-1 text-xs h-8 bg-amber-600 hover:bg-amber-700 text-white"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                              Signing in...
+                            </>
+                          ) : (
+                            "Demo Login"
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+
+                    <div className="mt-3 text-xs text-amber-700 bg-amber-100 rounded p-2">
+                      <p className="font-medium mb-1">Demo Account Features:</p>
+                      <ul className="space-y-0.5 text-xs">
+                        <li>• Full Super Admin access</li>
+                        <li>• User management capabilities</li>
+                        <li>• All admin portal features</li>
+                        <li>• Safe testing environment</li>
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </CardContent>
