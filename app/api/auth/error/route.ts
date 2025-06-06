@@ -1,26 +1,40 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
-export async function GET(request: NextRequest) {
-  // Get error parameters from URL
-  const searchParams = new URL(request.url).searchParams
-  const error = searchParams.get("error")
-  const errorDescription = searchParams.get("error_description")
+// This is a simple API route that redirects to the error page
+export async function GET(request: Request) {
+  try {
+    // Get the URL and search parameters
+    const url = new URL(request.url)
+    const error = url.searchParams.get("error")
+    const errorDescription = url.searchParams.get("error_description")
 
-  // Log the error for debugging
-  console.error("Auth error:", { error, errorDescription, url: request.url })
+    // Log the error for debugging
+    console.log("Auth error redirect:", { error, errorDescription })
 
-  // Create redirect URL to the error page
-  const baseUrl = new URL(request.url).origin
-  const redirectUrl = new URL("/auth/error", baseUrl)
+    // Build the redirect URL
+    const baseUrl = url.origin
+    const redirectUrl = new URL("/auth/error", baseUrl)
 
-  // Add error parameters to the redirect URL
-  if (error) redirectUrl.searchParams.set("error", error)
-  if (errorDescription) redirectUrl.searchParams.set("error_description", errorDescription)
+    // Add the error parameters to the redirect URL
+    if (error) {
+      redirectUrl.searchParams.set("error", error)
+    }
+    if (errorDescription) {
+      redirectUrl.searchParams.set("error_description", errorDescription)
+    }
 
-  // Redirect to the error page
-  return NextResponse.redirect(redirectUrl)
+    // Return a redirect response
+    return NextResponse.redirect(redirectUrl.toString())
+  } catch (err) {
+    console.error("Error in auth error handler:", err)
+
+    // Fallback redirect to the error page without parameters
+    const baseUrl = new URL(request.url).origin
+    return NextResponse.redirect(`${baseUrl}/auth/error?error=UnknownError`)
+  }
 }
 
-export async function POST(request: NextRequest) {
+// Handle POST requests the same way
+export async function POST(request: Request) {
   return GET(request)
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, Home, RefreshCw } from "lucide-react"
 
@@ -12,6 +13,12 @@ export default function AuthErrorPage() {
 
   useEffect(() => {
     const error = searchParams?.get("error")
+    const errorDescription = searchParams?.get("error_description")
+
+    if (errorDescription) {
+      setErrorMessage(errorDescription)
+      return
+    }
 
     if (error) {
       switch (error) {
@@ -51,6 +58,9 @@ export default function AuthErrorPage() {
         case "SessionRequired":
           setErrorMessage("Authentication required. Please sign in to access this page.")
           break
+        case "UnknownError":
+          setErrorMessage("An unknown error occurred during authentication.")
+          break
         default:
           setErrorMessage(`Authentication error: ${error}`)
       }
@@ -60,11 +70,22 @@ export default function AuthErrorPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="bg-white shadow-lg rounded-xl p-8 max-w-md w-full text-center">
-        <div className="text-red-600 mb-6">
+        <div className="mx-auto mb-6">
+          <Image
+            src="/images/inner-clarity-logo.png"
+            alt="Inner Clarity"
+            width={120}
+            height={40}
+            className="mx-auto"
+            priority
+          />
+        </div>
+
+        <div className="text-red-600 mb-4">
           <AlertTriangle className="h-12 w-12 mx-auto" />
         </div>
 
-        <h1 className="text-2xl font-semibold mb-4">Authentication Error</h1>
+        <h1 className="text-2xl font-semibold mb-2 text-gray-900">Authentication Error</h1>
         <p className="text-gray-600 mb-6">{errorMessage}</p>
 
         <div className="space-y-3">

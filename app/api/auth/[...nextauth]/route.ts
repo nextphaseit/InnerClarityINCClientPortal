@@ -61,7 +61,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/auth/signin",
-    error: "/auth/error",
+    error: "/auth/error", // Use the page directly, not the API route
   },
   callbacks: {
     async signIn({ user, account }) {
@@ -69,12 +69,10 @@ export const authOptions: NextAuthOptions = {
         console.log("Sign-in attempt:", {
           provider: account?.provider,
           email: user.email,
-          timestamp: new Date().toISOString(),
         })
 
         // Allow demo admin login
         if (account?.provider === "demo-admin") {
-          console.log("✅ Demo admin sign-in allowed")
           return true
         }
 
@@ -96,7 +94,6 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
-        console.log("✅ Successful admin sign-in:", user.email)
         return true
       } catch (error) {
         console.error("Sign-in callback error:", error)
@@ -105,60 +102,40 @@ export const authOptions: NextAuthOptions = {
     },
 
     async jwt({ token, account, user }) {
-      try {
-        if (account && user) {
-          // Store user info in token
-          token.email = user.email
-          token.name = user.name
-          token.picture = user.image
-          token.role = user.role || "admin"
-          token.provider = account.provider
-
-          console.log("JWT token created for:", token.email)
-        }
-        return token
-      } catch (error) {
-        console.error("JWT callback error:", error)
-        return token
+      if (account && user) {
+        token.email = user.email
+        token.name = user.name
+        token.picture = user.image
+        token.role = user.role || "admin"
+        token.provider = account.provider
       }
+      return token
     },
 
     async session({ session, token }) {
-      try {
-        if (token && session.user) {
-          session.user.email = token.email as string
-          session.user.name = token.name as string
-          session.user.image = token.picture as string
-          session.user.role = token.role as string
-          session.user.provider = token.provider as string
-        }
-        return session
-      } catch (error) {
-        console.error("Session callback error:", error)
-        return session
+      if (token && session.user) {
+        session.user.email = token.email as string
+        session.user.name = token.name as string
+        session.user.image = token.picture as string
+        session.user.role = token.role as string
+        session.user.provider = token.provider as string
       }
+      return session
     },
 
     async redirect({ url, baseUrl }) {
-      try {
-        console.log("Redirect callback:", { url, baseUrl })
-
-        // Handle redirects after sign in
-        if (url.startsWith("/")) {
-          return `${baseUrl}${url}`
-        }
-
-        // Allow callback URLs on same origin
-        if (new URL(url).origin === baseUrl) {
-          return url
-        }
-
-        // Default redirect to admin dashboard
-        return `${baseUrl}/admin/dashboard`
-      } catch (error) {
-        console.error("Redirect callback error:", error)
-        return `${baseUrl}/admin/dashboard`
+      // Handle redirects after sign in
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`
       }
+
+      // Allow callback URLs on same origin
+      if (new URL(url).origin === baseUrl) {
+        return url
+      }
+
+      // Default redirect to admin dashboard
+      return `${baseUrl}/admin/dashboard`
     },
   },
   debug: process.env.NODE_ENV === "development",
