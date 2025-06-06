@@ -1,13 +1,11 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, Home, RefreshCw } from "lucide-react"
 import Link from "next/link"
 
-function ErrorContent() {
-  const searchParams = useSearchParams()
+export default function AuthErrorPage() {
   const [errorInfo, setErrorInfo] = useState({
     error: "Unknown Error",
     description: "An authentication error occurred",
@@ -15,39 +13,34 @@ function ErrorContent() {
 
   useEffect(() => {
     try {
-      const error = searchParams?.get("error") || "Unknown Error"
-      const description = searchParams?.get("error_description") || "An authentication error occurred"
+      // Get URL parameters safely
+      const urlParams = new URLSearchParams(window.location.search)
+      const error = urlParams.get("error") || "Unknown Error"
+      const description = urlParams.get("error_description") || "An authentication error occurred"
 
       setErrorInfo({
         error: String(error),
         description: String(description),
       })
     } catch (err) {
-      console.error("Error parsing search params:", err)
-      setErrorInfo({
-        error: "Unknown Error",
-        description: "An authentication error occurred",
-      })
+      console.error("Error parsing URL params:", err)
+      // Keep default values
     }
-  }, [searchParams])
+  }, [])
 
   const getErrorMessage = (error: string) => {
-    if (!error || typeof error !== "string") {
-      return "An unexpected authentication error occurred."
-    }
+    const errorLower = (error || "").toLowerCase()
 
-    switch (error.toLowerCase()) {
-      case "configuration":
-        return "There's an issue with the authentication configuration."
-      case "accessdenied":
-        return "Access was denied. You may not have permission to sign in."
-      case "verification":
-        return "The verification link is invalid or has expired."
-      case "default":
-        return "An error occurred during authentication."
-      default:
-        return "An unexpected authentication error occurred."
+    if (errorLower.includes("configuration")) {
+      return "There's an issue with the authentication configuration."
     }
+    if (errorLower.includes("access") || errorLower.includes("denied")) {
+      return "Access was denied. You may not have permission to sign in."
+    }
+    if (errorLower.includes("verification")) {
+      return "The verification link is invalid or has expired."
+    }
+    return "An unexpected authentication error occurred."
   }
 
   return (
@@ -63,10 +56,10 @@ function ErrorContent() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <h2 className="text-lg font-semibold text-red-800 mb-2">Error Details</h2>
           <p className="text-sm text-red-700 mb-2">
-            <strong>Error:</strong> {errorInfo.error || "Unknown"}
+            <strong>Error:</strong> {errorInfo.error}
           </p>
           <p className="text-sm text-red-700">
-            <strong>Description:</strong> {errorInfo.description || "No description available"}
+            <strong>Description:</strong> {errorInfo.description}
           </p>
         </div>
 
@@ -92,19 +85,5 @@ function ErrorContent() {
         </div>
       </div>
     </div>
-  )
-}
-
-export default function AuthErrorPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        </div>
-      }
-    >
-      <ErrorContent />
-    </Suspense>
   )
 }
