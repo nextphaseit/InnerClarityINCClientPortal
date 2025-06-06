@@ -1,6 +1,17 @@
 import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
+import CredentialsProvider from "next-auth/providers/credentials"
 import type { NextAuthOptions } from "next-auth"
+
+// Demo admin credentials
+const DEMO_ADMIN = {
+  id: "demo-admin-001",
+  email: "demo@admin.nextphaseit.org",
+  name: "Demo Administrator",
+  role: "super_admin",
+  // Password: "DemoAdmin123!"
+  passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ",
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -11,6 +22,37 @@ export const authOptions: NextAuthOptions = {
         params: {
           scope: "openid email profile",
         },
+      },
+    }),
+    CredentialsProvider({
+      id: "demo-admin",
+      name: "Demo Admin",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required")
+        }
+
+        // Check if this is the demo admin account
+        if (credentials.email === DEMO_ADMIN.email) {
+          // For demo purposes, we'll use a simple password check
+          // In production, you'd want to hash this properly
+          if (credentials.password === "DemoAdmin123!") {
+            console.log("✅ Demo admin login successful")
+            return {
+              id: DEMO_ADMIN.id,
+              email: DEMO_ADMIN.email,
+              name: DEMO_ADMIN.name,
+              role: DEMO_ADMIN.role,
+              image: null,
+            }
+          }
+        }
+
+        throw new Error("Invalid demo credentials")
       },
     }),
   ],
@@ -31,19 +73,27 @@ export const authOptions: NextAuthOptions = {
           timestamp: new Date().toISOString(),
         })
 
-        // Validate authorized email domains
-        if (user.email) {
-          const domain = user.email.split("@")[1]
-          const authorizedDomains = [
-            "nextphaseit.org",
-            "innerclaritycounseling.com",
-            "innerclarity.org",
-            "innerclarityinc.com",
-          ]
+        // Allow demo admin login
+        if (account?.provider === "demo-admin") {
+          console.log("✅ Demo admin sign-in allowed")
+          return true
+        }
 
-          if (!authorizedDomains.includes(domain)) {
-            console.error(`❌ Unauthorized domain for admin access: ${domain}`)
-            return false
+        // For Google authentication, validate authorized email domains
+        if (account?.provider === "google") {
+          if (user.email) {
+            const domain = user.email.split("@")[1]
+            const authorizedDomains = [
+              "nextphaseit.org",
+              "innerclaritycounseling.com",
+              "innerclarity.org",
+              "innerclarityinc.com",
+            ]
+
+            if (!authorizedDomains.includes(domain)) {
+              console.error(`❌ Unauthorized domain for admin access: ${domain}`)
+              return false
+            }
           }
         }
 
@@ -62,7 +112,8 @@ export const authOptions: NextAuthOptions = {
           token.email = user.email
           token.name = user.name
           token.picture = user.image
-          token.role = "admin"
+          token.role = user.role || "admin"
+          token.provider = account.provider
 
           console.log("JWT token created for:", token.email)
         }
@@ -80,6 +131,7 @@ export const authOptions: NextAuthOptions = {
           session.user.name = token.name as string
           session.user.image = token.picture as string
           session.user.role = token.role as string
+          session.user.provider = token.provider as string
         }
         return session
       } catch (error) {
