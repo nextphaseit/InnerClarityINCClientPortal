@@ -1,4 +1,4 @@
-import { supabase } from "./supabase"
+import { supabase, isSupabaseConfigured } from "./supabase"
 import { redirect } from "next/navigation"
 
 export interface UserProfile {
@@ -12,6 +12,10 @@ export interface UserProfile {
 }
 
 export async function getCurrentUser(): Promise<UserProfile | null> {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
   try {
     const {
       data: { session },
@@ -35,6 +39,10 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
 }
 
 export async function requireAuth(requiredRole?: "admin" | "super_admin") {
+  if (!isSupabaseConfigured()) {
+    redirect("/")
+  }
+
   const user = await getCurrentUser()
 
   if (!user) {
@@ -53,6 +61,10 @@ export async function requireAuth(requiredRole?: "admin" | "super_admin") {
 }
 
 export async function logAuditEvent(action: string, resource: string, resourceId?: string, details?: any) {
+  if (!isSupabaseConfigured()) {
+    return
+  }
+
   try {
     const user = await getCurrentUser()
     if (!user) return

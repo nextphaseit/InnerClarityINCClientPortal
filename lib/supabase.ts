@@ -1,8 +1,9 @@
 import { createClient } from "@supabase/supabase-js"
 
 // Get environment variables with fallbacks
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 
 // Check if Supabase is configured
 export const isSupabaseConfigured = () => {
@@ -13,13 +14,22 @@ export const isSupabaseConfigured = () => {
 const createMockClient = () => ({
   auth: {
     getUser: async () => ({ data: { user: null }, error: new Error("Supabase not configured") }),
+    getSession: async () => ({ data: { session: null }, error: new Error("Supabase not configured") }),
     signUp: async () => ({ data: { user: null }, error: new Error("Supabase not configured") }),
     signInWithPassword: async () => ({ data: { user: null }, error: new Error("Supabase not configured") }),
     signOut: async () => ({ error: new Error("Supabase not configured") }),
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
   },
   from: () => ({
-    select: () => ({ data: [], error: new Error("Supabase not configured") }),
+    select: () => ({
+      eq: () => ({
+        single: async () => ({ data: null, error: new Error("Supabase not configured") }),
+        data: [],
+        error: new Error("Supabase not configured"),
+      }),
+      data: [],
+      error: new Error("Supabase not configured"),
+    }),
     insert: () => ({ data: null, error: new Error("Supabase not configured") }),
     update: () => ({ data: null, error: new Error("Supabase not configured") }),
     upsert: () => ({ data: null, error: new Error("Supabase not configured") }),
@@ -42,15 +52,20 @@ const createMockClient = () => ({
 export { createClient }
 
 // Create and export the main Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = isSupabaseConfigured()
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : (createMockClient() as any)
 
 // Admin client for server-side operations
-export const supabaseAdmin = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
+export const supabaseAdmin =
+  isSupabaseConfigured() && supabaseServiceKey
+    ? createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      })
+    : (createMockClient() as any)
 
 // Client-side Supabase client (singleton pattern)
 let supabaseClient: any = null
