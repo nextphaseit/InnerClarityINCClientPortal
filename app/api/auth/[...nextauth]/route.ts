@@ -88,7 +88,8 @@ export const authOptions: NextAuthOptions = {
         return token
       } catch (error) {
         console.error("JWT callback error:", error)
-        throw error
+        // Return token even if there's an error to prevent auth failure
+        return token
       }
     },
 
@@ -104,7 +105,8 @@ export const authOptions: NextAuthOptions = {
         return session
       } catch (error) {
         console.error("Session callback error:", error)
-        throw error
+        // Return session even if there's an error to prevent auth failure
+        return session
       }
     },
 

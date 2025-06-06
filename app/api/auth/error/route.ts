@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
+    const { searchParams } = new URL(request.url)
     const error = searchParams.get("error")
     const errorDescription = searchParams.get("error_description")
 
@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
     })
 
     // Create the redirect URL to the error page
-    const redirectUrl = new URL("/auth/error", request.url)
+    const baseUrl = new URL(request.url).origin
+    const redirectUrl = new URL("/auth/error", baseUrl)
 
     if (error) {
       redirectUrl.searchParams.set("error", error)
@@ -30,7 +31,8 @@ export async function GET(request: NextRequest) {
     console.error("Error in auth error handler:", err)
 
     // Fallback redirect to sign-in page
-    const fallbackUrl = new URL("/auth/signin", request.url)
+    const baseUrl = new URL(request.url).origin
+    const fallbackUrl = new URL("/auth/signin", baseUrl)
     fallbackUrl.searchParams.set("error", "AuthError")
 
     return NextResponse.redirect(fallbackUrl)
