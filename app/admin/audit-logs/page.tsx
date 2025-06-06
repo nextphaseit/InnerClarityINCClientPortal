@@ -1,333 +1,271 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AdminLayout } from "@/components/admin/admin-layout"
-import { AuthProtection } from "@/components/auth-protection"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Input } from "@/components/ui/input"
-import { Shield, Search, Download, Eye, AlertCircle } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { Search, Download, Shield, AlertTriangle, Eye, Activity } from "lucide-react"
+import { AuthProtection } from "@/components/auth-protection"
 
 interface AuditLog {
   id: string
-  user_id: string
-  user_name: string
+  userId: string
+  userEmail: string
   action: string
   resource: string
-  resource_id?: string
-  details?: any
-  ip_address: string
-  user_agent: string
-  created_at: string
+  details: string
+  ipAddress: string
+  userAgent: string
+  timestamp: string
   severity: "low" | "medium" | "high" | "critical"
 }
 
-export default function AuditLogsPage() {
+export default function AdminAuditLogsPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
-  const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [actionFilter, setActionFilter] = useState<string>("all")
-  const [severityFilter, setSeverityFilter] = useState<string>("all")
-  const { toast } = useToast()
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadAuditLogs()
+    // Mock data - replace with actual API call
+    const mockAuditLogs: AuditLog[] = [
+      {
+        id: "AUDIT-001",
+        userId: "user-123",
+        userEmail: "admin@innerclarityinc.com",
+        action: "LOGIN",
+        resource: "admin_portal",
+        details: "Successful admin login",
+        ipAddress: "192.168.1.100",
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        timestamp: "2024-01-15T09:00:00Z",
+        severity: "low",
+      },
+      {
+        id: "AUDIT-002",
+        userId: "user-456",
+        userEmail: "john.doe@email.com",
+        action: "VIEW_PATIENT_RECORD",
+        resource: "patient_data",
+        details: "Accessed patient medical records",
+        ipAddress: "192.168.1.101",
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        timestamp: "2024-01-15T10:30:00Z",
+        severity: "medium",
+      },
+      {
+        id: "AUDIT-003",
+        userId: "user-789",
+        userEmail: "admin@innerclarityinc.com",
+        action: "DELETE_USER",
+        resource: "user_management",
+        details: "Deleted user account: jane.smith@email.com",
+        ipAddress: "192.168.1.100",
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        timestamp: "2024-01-15T11:15:00Z",
+        severity: "high",
+      },
+      {
+        id: "AUDIT-004",
+        userId: "unknown",
+        userEmail: "unknown",
+        action: "FAILED_LOGIN",
+        resource: "authentication",
+        details: "Multiple failed login attempts detected",
+        ipAddress: "203.0.113.1",
+        userAgent: "curl/7.68.0",
+        timestamp: "2024-01-15T12:00:00Z",
+        severity: "critical",
+      },
+    ]
+
+    setTimeout(() => {
+      setAuditLogs(mockAuditLogs)
+      setLoading(false)
+    }, 1000)
   }, [])
 
-  useEffect(() => {
-    filterLogs()
-  }, [auditLogs, searchTerm, actionFilter, severityFilter])
+  const filteredLogs = auditLogs.filter(
+    (log) =>
+      log.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.resource.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.details.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
-  const loadAuditLogs = async () => {
-    try {
-      setLoading(true)
+  const todayLogs = auditLogs.filter((log) => {
+    const logDate = new Date(log.timestamp).toDateString()
+    const today = new Date().toDateString()
+    return logDate === today
+  })
 
-      // Mock data for demo
-      const mockLogs: AuditLog[] = [
-        {
-          id: "AL-001",
-          user_id: "admin-1",
-          user_name: "Adrian Knight",
-          action: "user_signin",
-          resource: "auth",
-          ip_address: "192.168.1.100",
-          user_agent: "Mozilla/5.0...",
-          created_at: "2024-02-15T10:30:00Z",
-          severity: "low",
-        },
-        {
-          id: "AL-002",
-          user_id: "admin-1",
-          user_name: "Adrian Knight",
-          action: "update",
-          resource: "patient",
-          resource_id: "patient-123",
-          details: { changes: { status: "active" }, patient_name: "John Smith" },
-          ip_address: "192.168.1.100",
-          user_agent: "Mozilla/5.0...",
-          created_at: "2024-02-15T11:15:00Z",
-          severity: "medium",
-        },
-        {
-          id: "AL-003",
-          user_id: "admin-2",
-          user_name: "Demo Admin",
-          action: "delete",
-          resource: "document",
-          resource_id: "doc-456",
-          details: { document_name: "sensitive_file.pdf" },
-          ip_address: "192.168.1.101",
-          user_agent: "Mozilla/5.0...",
-          created_at: "2024-02-15T14:45:00Z",
-          severity: "high",
-        },
-        {
-          id: "AL-004",
-          user_id: "admin-1",
-          user_name: "Adrian Knight",
-          action: "failed_login",
-          resource: "auth",
-          details: { reason: "invalid_password", attempts: 3 },
-          ip_address: "192.168.1.200",
-          user_agent: "Mozilla/5.0...",
-          created_at: "2024-02-15T16:20:00Z",
-          severity: "critical",
-        },
-      ]
-
-      setAuditLogs(mockLogs)
-    } catch (error) {
-      console.error("Error loading audit logs:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load audit logs",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const filterLogs = () => {
-    let filtered = auditLogs
-
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (log) =>
-          log.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.resource.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.ip_address.includes(searchTerm),
-      )
-    }
-
-    if (actionFilter !== "all") {
-      filtered = filtered.filter((log) => log.action === actionFilter)
-    }
-
-    if (severityFilter !== "all") {
-      filtered = filtered.filter((log) => log.severity === severityFilter)
-    }
-
-    setFilteredLogs(filtered)
-  }
+  const criticalLogs = auditLogs.filter((log) => log.severity === "critical")
+  const highSeverityLogs = auditLogs.filter((log) => log.severity === "high")
+  const uniqueUsers = new Set(auditLogs.map((log) => log.userEmail)).size
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case "low":
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Low</Badge>
+        return <Badge className="bg-green-100 text-green-800">Low</Badge>
       case "medium":
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Medium</Badge>
+        return <Badge className="bg-yellow-100 text-yellow-800">Medium</Badge>
       case "high":
-        return <Badge className="bg-orange-100 text-orange-800 border-orange-200">High</Badge>
+        return <Badge className="bg-orange-100 text-orange-800">High</Badge>
       case "critical":
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Critical</Badge>
+        return <Badge className="bg-red-100 text-red-800">Critical</Badge>
       default:
-        return <Badge variant="outline">{severity}</Badge>
+        return <Badge>{severity}</Badge>
     }
   }
 
-  const getActionBadge = (action: string) => {
-    const actionColors: Record<string, string> = {
-      user_signin: "bg-blue-100 text-blue-800 border-blue-200",
-      user_signout: "bg-gray-100 text-gray-800 border-gray-200",
-      create: "bg-green-100 text-green-800 border-green-200",
-      update: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      delete: "bg-red-100 text-red-800 border-red-200",
-      failed_login: "bg-red-100 text-red-800 border-red-200",
+  const getActionIcon = (action: string) => {
+    if (action.includes("LOGIN") || action.includes("LOGOUT")) {
+      return <Shield className="h-4 w-4" />
     }
-
-    return (
-      <Badge className={actionColors[action] || "bg-gray-100 text-gray-800 border-gray-200"}>
-        {action.replace(/_/g, " ").toUpperCase()}
-      </Badge>
-    )
-  }
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    })
-  }
-
-  const exportLogs = () => {
-    toast({
-      title: "Export Started",
-      description: "Audit logs export will be available shortly",
-    })
+    if (action.includes("VIEW") || action.includes("ACCESS")) {
+      return <Eye className="h-4 w-4" />
+    }
+    if (action.includes("FAILED") || action.includes("ERROR")) {
+      return <AlertTriangle className="h-4 w-4" />
+    }
+    return <Activity className="h-4 w-4" />
   }
 
   if (loading) {
     return (
-      <AuthProtection requiredRole="super_admin">
-        <AdminLayout>
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        </AdminLayout>
-      </AuthProtection>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
     )
   }
 
   return (
-    <AuthProtection requiredRole="super_admin">
-      <AdminLayout>
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
-                <Shield className="h-8 w-8 mr-3 text-red-600" />
-                Audit Logs
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
-                Security audit trail and system activity monitoring
-              </p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Button variant="outline" onClick={exportLogs}>
-                <Download className="h-4 w-4 mr-2" />
-                Export Logs
-              </Button>
-            </div>
+    <AuthProtection requiredRole="admin">
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Audit Logs</h1>
+            <p className="text-gray-600">Security monitoring and compliance tracking</p>
           </div>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export Logs
+          </Button>
+        </div>
 
-          {/* Security Warning */}
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-              <div>
-                <h3 className="text-sm font-medium text-red-800">Restricted Access</h3>
-                <p className="text-sm text-red-700 mt-1">
-                  This page contains sensitive security information. Access is logged and monitored.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Filters */}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search by user, action, resource, or IP address..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <select
-                  value={actionFilter}
-                  onChange={(e) => setActionFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Actions</option>
-                  <option value="user_signin">Sign In</option>
-                  <option value="user_signout">Sign Out</option>
-                  <option value="create">Create</option>
-                  <option value="update">Update</option>
-                  <option value="delete">Delete</option>
-                  <option value="failed_login">Failed Login</option>
-                </select>
-                <select
-                  value={severityFilter}
-                  onChange={(e) => setSeverityFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Severity</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{"Today's Events"}</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{todayLogs.length}</div>
+              <p className="text-xs text-muted-foreground">Logged today</p>
             </CardContent>
           </Card>
 
-          {/* Audit Logs Table */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shield className="h-5 w-5 mr-2" />
-                Audit Trail ({filteredLogs.length} entries)
-              </CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Critical Alerts</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Resource</TableHead>
-                    <TableHead>IP Address</TableHead>
-                    <TableHead>Severity</TableHead>
-                    <TableHead className="text-right">Details</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="font-mono text-sm">{formatDateTime(log.created_at)}</TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{log.user_name}</p>
-                          <p className="text-sm text-gray-600 font-mono">{log.user_id}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getActionBadge(log.action)}</TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{log.resource}</p>
-                          {log.resource_id && <p className="text-sm text-gray-600 font-mono">{log.resource_id}</p>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{log.ip_address}</TableCell>
-                      <TableCell>{getSeverityBadge(log.severity)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="text-2xl font-bold text-red-600">{criticalLogs.length}</div>
+              <p className="text-xs text-muted-foreground">Require immediate attention</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">High Severity</CardTitle>
+              <Shield className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{highSeverityLogs.length}</div>
+              <p className="text-xs text-muted-foreground">Security events</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{uniqueUsers}</div>
+              <p className="text-xs text-muted-foreground">Unique users tracked</p>
             </CardContent>
           </Card>
         </div>
-      </AdminLayout>
+
+        {/* Search and Filters */}
+        <div className="flex justify-between items-center">
+          <div className="relative w-64">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search audit logs..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline">Filter by Severity</Button>
+            <Button variant="outline">Filter by Date</Button>
+          </div>
+        </div>
+
+        {/* Audit Logs Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Security Audit Trail</CardTitle>
+            <CardDescription>Comprehensive logging of all system activities and security events</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Timestamp</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Resource</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>IP Address</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLogs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="font-mono text-sm">{new Date(log.timestamp).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{log.userEmail}</span>
+                        <span className="text-xs text-gray-500">{log.userId}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getActionIcon(log.action)}
+                        <span className="font-mono text-sm">{log.action}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{log.resource}</Badge>
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate">{log.details}</TableCell>
+                    <TableCell>{getSeverityBadge(log.severity)}</TableCell>
+                    <TableCell className="font-mono text-sm">{log.ipAddress}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
     </AuthProtection>
   )
 }

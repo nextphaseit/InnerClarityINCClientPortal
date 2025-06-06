@@ -1,238 +1,217 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AdminLayout } from "@/components/admin/admin-layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Activity, Heart, TrendingUp, Users, Filter, Download, Eye } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { Search, Activity, Heart, Thermometer, Weight, TrendingUp } from "lucide-react"
+import { AuthProtection } from "@/components/auth-protection"
 
 interface HealthLog {
   id: string
-  patient_name: string
-  patient_email: string
-  metric_type: string
+  patientName: string
+  metricType: "blood_pressure" | "heart_rate" | "temperature" | "weight" | "glucose"
   value: string
   unit: string
-  recorded_at: string
+  recordedAt: string
+  status: "normal" | "high" | "low" | "critical"
   notes?: string
-  status: "normal" | "attention" | "critical"
 }
 
 export default function AdminHealthLogsPage() {
   const [healthLogs, setHealthLogs] = useState<HealthLog[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    totalLogs: 0,
-    activePatients: 0,
-    criticalAlerts: 0,
-    todayLogs: 0,
-  })
-  const { toast } = useToast()
 
   useEffect(() => {
-    loadHealthLogsData()
+    // Mock data - replace with actual API call
+    const mockHealthLogs: HealthLog[] = [
+      {
+        id: "HL-001",
+        patientName: "John Doe",
+        metricType: "blood_pressure",
+        value: "120/80",
+        unit: "mmHg",
+        recordedAt: "2024-01-15T08:00:00Z",
+        status: "normal",
+      },
+      {
+        id: "HL-002",
+        patientName: "Jane Smith",
+        metricType: "heart_rate",
+        value: "95",
+        unit: "bpm",
+        recordedAt: "2024-01-15T09:30:00Z",
+        status: "high",
+        notes: "Patient reported feeling anxious",
+      },
+      {
+        id: "HL-003",
+        patientName: "Bob Johnson",
+        metricType: "temperature",
+        value: "98.6",
+        unit: "°F",
+        recordedAt: "2024-01-15T10:15:00Z",
+        status: "normal",
+      },
+      {
+        id: "HL-004",
+        patientName: "Alice Brown",
+        metricType: "glucose",
+        value: "180",
+        unit: "mg/dL",
+        recordedAt: "2024-01-15T11:00:00Z",
+        status: "high",
+        notes: "Post-meal reading",
+      },
+    ]
+
+    setTimeout(() => {
+      setHealthLogs(mockHealthLogs)
+      setLoading(false)
+    }, 1000)
   }, [])
 
-  const loadHealthLogsData = async () => {
-    try {
-      setLoading(true)
+  const filteredLogs = healthLogs.filter(
+    (log) =>
+      log.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.metricType.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
-      // Mock data for demo
-      const mockLogs: HealthLog[] = [
-        {
-          id: "HL-001",
-          patient_name: "John Smith",
-          patient_email: "john.smith@email.com",
-          metric_type: "Blood Pressure",
-          value: "120/80",
-          unit: "mmHg",
-          recorded_at: "2024-02-15T10:30:00Z",
-          notes: "Normal reading, patient feeling well",
-          status: "normal",
-        },
-        {
-          id: "HL-002",
-          patient_name: "Jane Doe",
-          patient_email: "jane.doe@email.com",
-          metric_type: "Heart Rate",
-          value: "95",
-          unit: "bpm",
-          recorded_at: "2024-02-15T14:15:00Z",
-          notes: "Slightly elevated, monitor closely",
-          status: "attention",
-        },
-        {
-          id: "HL-003",
-          patient_name: "Robert Wilson",
-          patient_email: "robert.wilson@email.com",
-          metric_type: "Weight",
-          value: "175",
-          unit: "lbs",
-          recorded_at: "2024-02-15T09:00:00Z",
-          status: "normal",
-        },
-        {
-          id: "HL-004",
-          patient_name: "Mary Johnson",
-          patient_email: "mary.johnson@email.com",
-          metric_type: "Blood Sugar",
-          value: "180",
-          unit: "mg/dL",
-          recorded_at: "2024-02-15T16:45:00Z",
-          notes: "High reading, contact patient immediately",
-          status: "critical",
-        },
-      ]
-
-      setHealthLogs(mockLogs)
-
-      // Calculate stats
-      const today = new Date().toISOString().split("T")[0]
-      const todayLogs = mockLogs.filter((log) => log.recorded_at.startsWith(today)).length
-
-      setStats({
-        totalLogs: mockLogs.length,
-        activePatients: new Set(mockLogs.map((log) => log.patient_email)).size,
-        criticalAlerts: mockLogs.filter((log) => log.status === "critical").length,
-        todayLogs,
-      })
-    } catch (error) {
-      console.error("Error loading health logs data:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load health logs data",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  const criticalLogs = healthLogs.filter((log) => log.status === "critical")
+  const abnormalLogs = healthLogs.filter((log) => log.status === "high" || log.status === "low")
+  const todayLogs = healthLogs.filter((log) => {
+    const logDate = new Date(log.recordedAt).toDateString()
+    const today = new Date().toDateString()
+    return logDate === today
+  })
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "normal":
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Normal</Badge>
-      case "attention":
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Attention</Badge>
+        return <Badge className="bg-green-100 text-green-800">Normal</Badge>
+      case "high":
+        return <Badge className="bg-yellow-100 text-yellow-800">High</Badge>
+      case "low":
+        return <Badge className="bg-blue-100 text-blue-800">Low</Badge>
       case "critical":
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Critical</Badge>
+        return <Badge className="bg-red-100 text-red-800">Critical</Badge>
       default:
-        return <Badge variant="outline">{status}</Badge>
+        return <Badge>{status}</Badge>
     }
-  }
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    })
   }
 
   const getMetricIcon = (metricType: string) => {
-    switch (metricType.toLowerCase()) {
-      case "blood pressure":
-      case "heart rate":
-        return <Heart className="h-4 w-4 text-red-500" />
+    switch (metricType) {
+      case "blood_pressure":
+        return <Activity className="h-4 w-4" />
+      case "heart_rate":
+        return <Heart className="h-4 w-4" />
+      case "temperature":
+        return <Thermometer className="h-4 w-4" />
+      case "weight":
+        return <Weight className="h-4 w-4" />
+      case "glucose":
+        return <TrendingUp className="h-4 w-4" />
       default:
-        return <Activity className="h-4 w-4 text-blue-500" />
+        return <Activity className="h-4 w-4" />
     }
+  }
+
+  const formatMetricType = (type: string) => {
+    return type
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
   }
 
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      </AdminLayout>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
     )
   }
 
   return (
-    <AdminLayout>
+    <AuthProtection requiredRole="admin">
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Health Logs</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">Monitor patient health metrics and vitals</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button variant="outline">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold">Health Logs</h1>
+          <p className="text-gray-600">Monitor patient health metrics and vital signs</p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <Activity className="h-8 w-8 text-blue-600" />
-                <div>
-                  <p className="text-2xl font-bold text-blue-600">{stats.totalLogs}</p>
-                  <p className="text-sm text-gray-600">Total Logs</p>
-                </div>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{"Today's Logs"}</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{todayLogs.length}</div>
+              <p className="text-xs text-muted-foreground">Recorded today</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <Users className="h-8 w-8 text-green-600" />
-                <div>
-                  <p className="text-2xl font-bold text-green-600">{stats.activePatients}</p>
-                  <p className="text-sm text-gray-600">Active Patients</p>
-                </div>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Critical Alerts</CardTitle>
+              <Heart className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{criticalLogs.length}</div>
+              <p className="text-xs text-muted-foreground">Require immediate attention</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <Heart className="h-8 w-8 text-red-600" />
-                <div>
-                  <p className="text-2xl font-bold text-red-600">{stats.criticalAlerts}</p>
-                  <p className="text-sm text-gray-600">Critical Alerts</p>
-                </div>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Abnormal Readings</CardTitle>
+              <TrendingUp className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{abnormalLogs.length}</div>
+              <p className="text-xs text-muted-foreground">Outside normal range</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="h-8 w-8 text-purple-600" />
-                <div>
-                  <p className="text-2xl font-bold text-purple-600">{stats.todayLogs}</p>
-                  <p className="text-sm text-gray-600">Today's Logs</p>
-                </div>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{new Set(healthLogs.map((log) => log.patientName)).size}</div>
+              <p className="text-xs text-muted-foreground">Being monitored</p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Search and Actions */}
+        <div className="flex justify-between items-center">
+          <div className="relative w-64">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search health logs..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline">Export Data</Button>
+            <Button>Add Manual Entry</Button>
+          </div>
         </div>
 
         {/* Health Logs Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Activity className="h-5 w-5 mr-2" />
-              Recent Health Logs ({healthLogs.length})
-            </CardTitle>
+            <CardTitle>Recent Health Logs</CardTitle>
+            <CardDescription>Patient vital signs and health metrics monitoring</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -241,41 +220,45 @@ export default function AdminHealthLogsPage() {
                   <TableHead>Patient</TableHead>
                   <TableHead>Metric</TableHead>
                   <TableHead>Value</TableHead>
-                  <TableHead>Recorded</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Recorded</TableHead>
                   <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {healthLogs.map((log) => (
+                {filteredLogs.map((log) => (
                   <TableRow key={log.id}>
+                    <TableCell className="font-medium">{log.patientName}</TableCell>
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{log.patient_name}</p>
-                        <p className="text-sm text-gray-600">{log.patient_email}</p>
+                      <div className="flex items-center gap-2">
+                        {getMetricIcon(log.metricType)}
+                        {formatMetricType(log.metricType)}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center space-x-2">
-                        {getMetricIcon(log.metric_type)}
-                        <span>{log.metric_type}</span>
-                      </div>
+                      <span className="font-mono">
+                        {log.value} {log.unit}
+                      </span>
                     </TableCell>
-                    <TableCell>
-                      <span className="font-semibold">{log.value}</span>
-                      <span className="text-sm text-gray-600 ml-1">{log.unit}</span>
-                    </TableCell>
-                    <TableCell>{formatDateTime(log.recorded_at)}</TableCell>
                     <TableCell>{getStatusBadge(log.status)}</TableCell>
+                    <TableCell>{new Date(log.recordedAt).toLocaleString()}</TableCell>
                     <TableCell>
-                      <div className="max-w-xs truncate">{log.notes || "—"}</div>
+                      {log.notes ? (
+                        <span className="text-sm text-gray-600">{log.notes}</span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-3 w-3 mr-1" />
-                        View
-                      </Button>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          View
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          Flag
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -284,6 +267,6 @@ export default function AdminHealthLogsPage() {
           </CardContent>
         </Card>
       </div>
-    </AdminLayout>
+    </AuthProtection>
   )
 }

@@ -1,273 +1,249 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AdminLayout } from "@/components/admin/admin-layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, CalendarDays, Clock, Plus, Filter, ChevronLeft, ChevronRight } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { Calendar, Plus, Clock, Users } from "lucide-react"
+import { AuthProtection } from "@/components/auth-protection"
 
 interface CalendarEvent {
   id: string
   title: string
-  patient_name?: string
-  provider_name: string
-  start_time: string
-  end_time: string
-  type: "appointment" | "meeting" | "break" | "blocked"
-  status: "confirmed" | "tentative" | "cancelled"
+  patientName: string
+  startTime: string
+  endTime: string
+  type: "appointment" | "telehealth" | "consultation"
+  status: "scheduled" | "confirmed" | "cancelled"
 }
 
 export default function AdminCalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [loading, setLoading] = useState(true)
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<"day" | "week" | "month">("week")
-  const { toast } = useToast()
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadCalendarData()
-  }, [currentDate])
+    // Mock data - replace with actual API call
+    const mockEvents: CalendarEvent[] = [
+      {
+        id: "CAL-001",
+        title: "Regular Checkup",
+        patientName: "John Doe",
+        startTime: "2024-01-15T09:00:00Z",
+        endTime: "2024-01-15T09:30:00Z",
+        type: "appointment",
+        status: "confirmed",
+      },
+      {
+        id: "CAL-002",
+        title: "Therapy Session",
+        patientName: "Jane Smith",
+        startTime: "2024-01-15T14:00:00Z",
+        endTime: "2024-01-15T15:00:00Z",
+        type: "telehealth",
+        status: "scheduled",
+      },
+      {
+        id: "CAL-003",
+        title: "Follow-up Consultation",
+        patientName: "Bob Johnson",
+        startTime: "2024-01-16T10:00:00Z",
+        endTime: "2024-01-16T10:30:00Z",
+        type: "consultation",
+        status: "confirmed",
+      },
+    ]
 
-  const loadCalendarData = async () => {
-    try {
-      setLoading(true)
-
-      // Mock data for demo
-      const mockEvents: CalendarEvent[] = [
-        {
-          id: "CAL-001",
-          title: "Therapy Session",
-          patient_name: "John Smith",
-          provider_name: "Dr. Sarah Johnson",
-          start_time: "2024-02-15T10:00:00Z",
-          end_time: "2024-02-15T11:00:00Z",
-          type: "appointment",
-          status: "confirmed",
-        },
-        {
-          id: "CAL-002",
-          title: "Team Meeting",
-          provider_name: "All Staff",
-          start_time: "2024-02-15T12:00:00Z",
-          end_time: "2024-02-15T13:00:00Z",
-          type: "meeting",
-          status: "confirmed",
-        },
-        {
-          id: "CAL-003",
-          title: "Group Therapy",
-          patient_name: "Multiple Patients",
-          provider_name: "Dr. Michael Chen",
-          start_time: "2024-02-15T14:00:00Z",
-          end_time: "2024-02-15T15:30:00Z",
-          type: "appointment",
-          status: "confirmed",
-        },
-      ]
-
+    setTimeout(() => {
       setEvents(mockEvents)
-    } catch (error) {
-      console.error("Error loading calendar data:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load calendar data",
-        variant: "destructive",
-      })
-    } finally {
       setLoading(false)
-    }
-  }
+    }, 1000)
+  }, [])
+
+  const todayEvents = events.filter((event) => {
+    const eventDate = new Date(event.startTime).toDateString()
+    const today = new Date().toDateString()
+    return eventDate === today
+  })
+
+  const upcomingEvents = events.filter((event) => {
+    const eventDate = new Date(event.startTime)
+    const today = new Date()
+    return eventDate > today
+  })
 
   const getEventTypeBadge = (type: string) => {
     switch (type) {
       case "appointment":
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Appointment</Badge>
-      case "meeting":
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Meeting</Badge>
-      case "break":
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Break</Badge>
-      case "blocked":
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Blocked</Badge>
+        return <Badge className="bg-blue-100 text-blue-800">Appointment</Badge>
+      case "telehealth":
+        return <Badge className="bg-green-100 text-green-800">Telehealth</Badge>
+      case "consultation":
+        return <Badge className="bg-purple-100 text-purple-800">Consultation</Badge>
       default:
-        return <Badge variant="outline">{type}</Badge>
+        return <Badge>{type}</Badge>
     }
   }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "confirmed":
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Confirmed</Badge>
-      case "tentative":
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Tentative</Badge>
+        return <Badge className="bg-green-100 text-green-800">Confirmed</Badge>
+      case "scheduled":
+        return <Badge className="bg-yellow-100 text-yellow-800">Scheduled</Badge>
       case "cancelled":
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Cancelled</Badge>
+        return <Badge className="bg-red-100 text-red-800">Cancelled</Badge>
       default:
-        return <Badge variant="outline">{status}</Badge>
+        return <Badge>{status}</Badge>
     }
   }
 
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString("en-US", {
-      hour: "numeric",
+      hour: "2-digit",
       minute: "2-digit",
       hour12: true,
     })
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    })
-  }
-
-  const navigateDate = (direction: "prev" | "next") => {
-    const newDate = new Date(currentDate)
-    if (viewMode === "day") {
-      newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1))
-    } else if (viewMode === "week") {
-      newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7))
-    } else {
-      newDate.setMonth(newDate.getMonth() + (direction === "next" ? 1 : -1))
-    }
-    setCurrentDate(newDate)
-  }
-
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      </AdminLayout>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
     )
   }
 
   return (
-    <AdminLayout>
+    <AuthProtection requiredRole="admin">
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Calendar</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">Manage appointments and schedule</p>
+            <h1 className="text-3xl font-bold">Calendar</h1>
+            <p className="text-gray-600">Manage appointments and schedule</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-              <Button variant={viewMode === "day" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("day")}>
-                Day
-              </Button>
-              <Button variant={viewMode === "week" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("week")}>
-                Week
-              </Button>
-              <Button
-                variant={viewMode === "month" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("month")}
-              >
-                Month
-              </Button>
-            </div>
-            <Button variant="outline">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              New Event
-            </Button>
-          </div>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            New Appointment
+          </Button>
         </div>
 
-        {/* Calendar Navigation */}
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2" />
-                {currentDate.toLocaleDateString("en-US", {
-                  month: "long",
-                  year: "numeric",
-                  ...(viewMode === "day" && { day: "numeric" }),
-                })}
-              </CardTitle>
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={() => navigateDate("prev")}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-                  Today
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => navigateDate("next")}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Calendar Grid Placeholder */}
-            <div className="grid grid-cols-7 gap-4 mb-6">
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                <div key={day} className="text-center font-medium text-gray-600 p-2">
-                  {day}
-                </div>
-              ))}
-              {Array.from({ length: 35 }, (_, i) => (
-                <div key={i} className="aspect-square border border-gray-200 rounded-lg p-2 hover:bg-gray-50">
-                  <div className="text-sm text-gray-600">{(i % 31) + 1}</div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{"Today's Events"}</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{todayEvents.length}</div>
+              <p className="text-xs text-muted-foreground">Scheduled for today</p>
+            </CardContent>
+          </Card>
 
-        {/* Events List */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <CalendarDays className="h-5 w-5 mr-2" />
-              Upcoming Events ({events.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {events.map((event) => (
-                <div
-                  key={event.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">
-                        {formatDate(event.start_time)} • {formatTime(event.start_time)} - {formatTime(event.end_time)}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium">{event.title}</h4>
-                      <div className="flex items-center space-x-2 text-sm text-gray-600">
-                        <span>{event.provider_name}</span>
-                        {event.patient_name && (
-                          <>
-                            <span>•</span>
-                            <span>{event.patient_name}</span>
-                          </>
-                        )}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{upcomingEvents.length}</div>
+              <p className="text-xs text-muted-foreground">Future appointments</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{new Set(events.map((e) => e.patientName)).size}</div>
+              <p className="text-xs text-muted-foreground">Unique patients</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Today's Schedule */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                {"Today's Schedule"}
+              </CardTitle>
+              <CardDescription>
+                {new Date().toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {todayEvents.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No events scheduled for today</p>
+              ) : (
+                todayEvents.map((event) => (
+                  <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium">{event.title}</span>
+                        {getEventTypeBadge(event.type)}
                       </div>
+                      <p className="text-sm text-gray-600">{event.patientName}</p>
+                      <p className="text-sm text-gray-500">
+                        {formatTime(event.startTime)} - {formatTime(event.endTime)}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      {getStatusBadge(event.status)}
+                      <Button variant="outline" size="sm">
+                        View
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {getEventTypeBadge(event.type)}
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Upcoming Events */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Upcoming Events
+              </CardTitle>
+              <CardDescription>Next scheduled appointments</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {upcomingEvents.slice(0, 5).map((event) => (
+                <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium">{event.title}</span>
+                      {getEventTypeBadge(event.type)}
+                    </div>
+                    <p className="text-sm text-gray-600">{event.patientName}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(event.startTime).toLocaleDateString()} at {formatTime(event.startTime)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
                     {getStatusBadge(event.status)}
+                    <Button variant="outline" size="sm">
+                      Edit
+                    </Button>
                   </div>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
+              {upcomingEvents.length === 0 && <p className="text-gray-500 text-center py-4">No upcoming events</p>}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </AdminLayout>
+    </AuthProtection>
   )
 }
