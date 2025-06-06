@@ -12,8 +12,25 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error("Application error:", error)
+    // Log the full error details
+    console.error("Application error details:", {
+      message: error.message,
+      stack: error.stack,
+      digest: error.digest,
+      name: error.name,
+    })
   }, [error])
+
+  // Handle specific error types
+  const getErrorMessage = () => {
+    if (error.message.includes("response")) {
+      return "There was a problem with the server response. Please try again."
+    }
+    if (error.message.includes("fetch")) {
+      return "Network error occurred. Please check your connection."
+    }
+    return "An unexpected error occurred. Our team has been notified."
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -23,12 +40,20 @@ export default function Error({
         </div>
 
         <h1 className="text-2xl font-semibold mb-2 text-gray-900">Something went wrong</h1>
-        <p className="text-gray-600 mb-6">An unexpected error occurred</p>
+        <p className="text-gray-600 mb-6">{getErrorMessage()}</p>
 
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <h2 className="text-lg font-semibold text-red-800 mb-2">Application Error</h2>
-          <p className="text-sm text-red-700 mb-4">
-            We're sorry, but there was an error loading this page. Our team has been notified.
+          <h2 className="text-lg font-semibold text-red-800 mb-2">Error Information</h2>
+          <p className="text-sm text-red-700 mb-2">
+            <strong>Type:</strong> {error.name || "Application Error"}
+          </p>
+          {error.digest && (
+            <p className="text-sm text-red-700 mb-2">
+              <strong>ID:</strong> {error.digest}
+            </p>
+          )}
+          <p className="text-sm text-red-700">
+            <strong>Time:</strong> {new Date().toLocaleString()}
           </p>
         </div>
 

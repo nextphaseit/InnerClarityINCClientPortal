@@ -1,40 +1,34 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 
-// This is a simple API route that redirects to the error page
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    // Get the URL and search parameters
-    const url = new URL(request.url)
-    const error = url.searchParams.get("error")
-    const errorDescription = url.searchParams.get("error_description")
+    const { searchParams } = new URL(request.url)
+    const error = searchParams.get("error") || "UnknownError"
+    const errorDescription = searchParams.get("error_description") || "An authentication error occurred"
 
-    // Log the error for debugging
-    console.log("Auth error redirect:", { error, errorDescription })
+    console.log("Auth error:", { error, errorDescription })
 
-    // Build the redirect URL
-    const baseUrl = url.origin
-    const redirectUrl = new URL("/auth/error", baseUrl)
+    // Create a simple redirect to the error page
+    const redirectUrl = new URL("/auth/error", request.url)
+    redirectUrl.searchParams.set("error", error)
+    redirectUrl.searchParams.set("error_description", errorDescription)
 
-    // Add the error parameters to the redirect URL
-    if (error) {
-      redirectUrl.searchParams.set("error", error)
-    }
-    if (errorDescription) {
-      redirectUrl.searchParams.set("error_description", errorDescription)
-    }
-
-    // Return a redirect response
-    return NextResponse.redirect(redirectUrl.toString())
+    return NextResponse.redirect(redirectUrl)
   } catch (err) {
-    console.error("Error in auth error handler:", err)
+    console.error("Auth error handler failed:", err)
 
-    // Fallback redirect to the error page without parameters
-    const baseUrl = new URL(request.url).origin
-    return NextResponse.redirect(`${baseUrl}/auth/error?error=UnknownError`)
+    // Return a simple JSON response if redirect fails
+    return NextResponse.json(
+      {
+        error: "AuthError",
+        message: "Authentication error occurred",
+        timestamp: new Date().toISOString(),
+      },
+      { status: 400 },
+    )
   }
 }
 
-// Handle POST requests the same way
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   return GET(request)
 }

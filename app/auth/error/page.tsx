@@ -1,105 +1,72 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, Home, RefreshCw } from "lucide-react"
+import Link from "next/link"
 
-export default function AuthErrorPage() {
+function ErrorContent() {
   const searchParams = useSearchParams()
-  const [errorMessage, setErrorMessage] = useState("An authentication error occurred")
+  const [errorInfo, setErrorInfo] = useState({
+    error: "Unknown Error",
+    description: "An authentication error occurred",
+  })
 
   useEffect(() => {
-    const error = searchParams?.get("error")
-    const errorDescription = searchParams?.get("error_description")
+    const error = searchParams?.get("error") || "Unknown Error"
+    const description = searchParams?.get("error_description") || "An authentication error occurred"
 
-    if (errorDescription) {
-      setErrorMessage(errorDescription)
-      return
-    }
-
-    if (error) {
-      switch (error) {
-        case "AccessDenied":
-          setErrorMessage("Access denied. You do not have permission to access this resource.")
-          break
-        case "Configuration":
-          setErrorMessage("There is a problem with the server configuration.")
-          break
-        case "Verification":
-          setErrorMessage("The verification link is invalid or has expired.")
-          break
-        case "OAuthSignin":
-          setErrorMessage("Error in the OAuth sign-in process.")
-          break
-        case "OAuthCallback":
-          setErrorMessage("Error in the OAuth callback process.")
-          break
-        case "OAuthCreateAccount":
-          setErrorMessage("Could not create OAuth provider account.")
-          break
-        case "EmailCreateAccount":
-          setErrorMessage("Could not create email provider account.")
-          break
-        case "Callback":
-          setErrorMessage("Error in the OAuth callback handler.")
-          break
-        case "OAuthAccountNotLinked":
-          setErrorMessage("Email already in use with different provider.")
-          break
-        case "EmailSignin":
-          setErrorMessage("Error sending the verification email.")
-          break
-        case "CredentialsSignin":
-          setErrorMessage("Invalid credentials.")
-          break
-        case "SessionRequired":
-          setErrorMessage("Authentication required. Please sign in to access this page.")
-          break
-        case "UnknownError":
-          setErrorMessage("An unknown error occurred during authentication.")
-          break
-        default:
-          setErrorMessage(`Authentication error: ${error}`)
-      }
-    }
+    setErrorInfo({ error, description })
   }, [searchParams])
+
+  const getErrorMessage = (error: string) => {
+    switch (error) {
+      case "Configuration":
+        return "There's an issue with the authentication configuration."
+      case "AccessDenied":
+        return "Access was denied. You may not have permission to sign in."
+      case "Verification":
+        return "The verification link is invalid or has expired."
+      case "Default":
+        return "An error occurred during authentication."
+      default:
+        return "An unexpected authentication error occurred."
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="bg-white shadow-lg rounded-xl p-8 max-w-md w-full text-center">
-        <div className="mx-auto mb-6">
-          <Image
-            src="/images/inner-clarity-logo.png"
-            alt="Inner Clarity"
-            width={120}
-            height={40}
-            className="mx-auto"
-            priority
-          />
-        </div>
-
-        <div className="text-red-600 mb-4">
+        <div className="text-red-600 mb-6">
           <AlertTriangle className="h-12 w-12 mx-auto" />
         </div>
 
         <h1 className="text-2xl font-semibold mb-2 text-gray-900">Authentication Error</h1>
-        <p className="text-gray-600 mb-6">{errorMessage}</p>
+        <p className="text-gray-600 mb-6">{getErrorMessage(errorInfo.error)}</p>
+
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <h2 className="text-lg font-semibold text-red-800 mb-2">Error Details</h2>
+          <p className="text-sm text-red-700 mb-2">
+            <strong>Error:</strong> {errorInfo.error}
+          </p>
+          <p className="text-sm text-red-700">
+            <strong>Description:</strong> {errorInfo.description}
+          </p>
+        </div>
 
         <div className="space-y-3">
-          <Button asChild className="w-full">
+          <Button asChild className="w-full bg-gray-900 hover:bg-gray-800">
             <Link href="/auth/signin">
               <RefreshCw className="mr-2 h-4 w-4" />
-              Try Again
+              Try signing in again
             </Link>
           </Button>
 
           <Button asChild variant="outline" className="w-full">
             <Link href="/">
               <Home className="mr-2 h-4 w-4" />
-              Return to Home
+              Return to home page
             </Link>
           </Button>
         </div>
@@ -110,5 +77,19 @@ export default function AuthErrorPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      }
+    >
+      <ErrorContent />
+    </Suspense>
   )
 }
