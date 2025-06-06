@@ -1,127 +1,146 @@
-"use client"
-
-import { useAuth } from "@/hooks/use-auth"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertCircle, Database, Key, Settings } from "lucide-react"
+import Link from "next/link"
+import Image from "next/image"
 
 export default function HomePage() {
-  const { user, profile, loading, isConfigured } = useAuth()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!loading && isConfigured && user && profile) {
-      // Redirect based on role
-      if (profile.role === "admin" || profile.role === "super_admin") {
-        router.push("/admin")
-      } else {
-        router.push("/portal")
-      }
-    }
-  }, [user, profile, loading, isConfigured, router])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
-  if (!isConfigured) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center">
-              <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-            </div>
-            <CardTitle className="text-2xl font-bold">Setup Required</CardTitle>
-            <CardDescription className="text-lg">
-              Welcome to NextPhase IT Admin Portal. Please configure your environment to get started.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4">
-              <div className="flex items-start space-x-3 p-4 border rounded-lg">
-                <Database className="h-5 w-5 text-blue-600 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold">1. Configure Supabase</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Set up your Supabase project and add the connection details to your environment variables.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3 p-4 border rounded-lg">
-                <Key className="h-5 w-5 text-green-600 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold">2. Add Environment Variables</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Copy the .env.local.example file and add your Supabase keys.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3 p-4 border rounded-lg">
-                <Settings className="h-5 w-5 text-purple-600 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold">3. Run Database Scripts</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Execute the SQL scripts in the scripts folder to set up your database schema.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-              <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Required Environment Variables:</h4>
-              <code className="text-sm text-blue-800 dark:text-blue-200 block whitespace-pre-wrap">
-                {`NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key`}
-              </code>
-            </div>
-
-            <div className="text-center">
-              <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700">
-                Refresh After Setup
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // If configured but no user, show sign in
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">NextPhase IT</CardTitle>
-            <CardDescription>Admin Portal</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Button onClick={() => router.push("/auth/signin")} className="w-full bg-blue-600 hover:bg-blue-700">
-              Sign In
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // Loading state while redirecting
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-muted-foreground">Redirecting...</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <header className="container mx-auto px-4 py-6 flex justify-between items-center">
+        <div className="flex items-center">
+          <Image src="/images/inner-clarity-logo.png" alt="Inner Clarity" width={120} height={40} />
+        </div>
+
+        <nav className="hidden md:flex space-x-8">
+          <Link href="/" className="text-gray-800 hover:text-blue-600 transition-colors">
+            Home
+          </Link>
+          <Link href="/about" className="text-gray-800 hover:text-blue-600 transition-colors">
+            About
+          </Link>
+          <Link href="/services" className="text-gray-800 hover:text-blue-600 transition-colors">
+            Services
+          </Link>
+          <Link href="/contact" className="text-gray-800 hover:text-blue-600 transition-colors">
+            Contact
+          </Link>
+        </nav>
+
+        <div className="flex items-center space-x-4">
+          <Link href="/portal/auth/signin" className="text-blue-600 hover:text-blue-800 transition-colors">
+            Patient Sign In
+          </Link>
+          <Link href="/admin/login" className="text-gray-600 hover:text-gray-800 transition-colors text-sm">
+            Admin
+          </Link>
+          <Link
+            href="/portal/auth/signup"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Get Started
+          </Link>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-16">
+        <div className="text-center max-w-3xl mx-auto">
+          <h1 className="text-4xl md:text-5xl font-bold mb-6">
+            Your Journey to <span className="text-blue-600">Mental Wellness</span> Starts Here
+          </h1>
+          <p className="text-lg text-gray-600 mb-8">
+            Secure, HIPAA-compliant mental health services with personalized care, professional therapy, and a
+            comprehensive patient portal designed for your privacy and peace of mind.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <Link
+              href="/portal/auth/signup"
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-lg font-medium"
+            >
+              Start Your Journey
+            </Link>
+            <Link
+              href="/portal/auth/signin"
+              className="bg-white text-blue-600 border border-blue-600 px-6 py-3 rounded-lg hover:bg-blue-50 transition-colors text-lg font-medium"
+            >
+              Patient Portal
+            </Link>
+          </div>
+        </div>
+
+        {/* Features Section */}
+        <div className="mt-20 grid md:grid-cols-3 gap-8">
+          <div className="text-center p-6">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold mb-2">HIPAA Compliant</h3>
+            <p className="text-gray-600">
+              Your privacy and security are our top priorities with end-to-end encryption.
+            </p>
+          </div>
+
+          <div className="text-center p-6">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Professional Care</h3>
+            <p className="text-gray-600">Licensed therapists and mental health professionals ready to support you.</p>
+          </div>
+
+          <div className="text-center p-6">
+            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Comprehensive Portal</h3>
+            <p className="text-gray-600">
+              Manage appointments, access resources, and track your progress all in one place.
+            </p>
+          </div>
+        </div>
+      </main>
+
+      <footer className="bg-gray-50 mt-20">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex items-center mb-4 md:mb-0">
+              <Image src="/images/inner-clarity-logo.png" alt="Inner Clarity" width={100} height={33} />
+            </div>
+            <div className="flex space-x-6 text-sm text-gray-600">
+              <Link href="/privacy-policy" className="hover:text-blue-600 transition-colors">
+                Privacy Policy
+              </Link>
+              <Link href="/terms-of-service" className="hover:text-blue-600 transition-colors">
+                Terms of Service
+              </Link>
+              <Link href="/hipaa-notice" className="hover:text-blue-600 transition-colors">
+                HIPAA Notice
+              </Link>
+            </div>
+          </div>
+          <div className="border-t border-gray-200 mt-6 pt-6 text-center text-sm text-gray-500">
+            <p>&copy; 2024 Inner Clarity INC. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
