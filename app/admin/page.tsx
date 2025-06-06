@@ -1,250 +1,323 @@
-import type { Metadata } from "next"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+"use client"
+
+import { useState, useEffect } from "react"
+import { AdminLayout } from "@/components/admin/admin-layout"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Navigation } from "@/components/navigation"
-import { requireAdminAuth } from "@/lib/session"
 import {
   Users,
   Calendar,
+  CreditCard,
   MessageSquare,
-  FileText,
-  Shield,
   TrendingUp,
-  AlertTriangle,
-  Clock,
+  TrendingDown,
+  Activity,
   CheckCircle,
+  Clock,
+  DollarSign,
 } from "lucide-react"
-import Link from "next/link"
+import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
 
-export const metadata: Metadata = {
-  title: "Admin Dashboard | Inner Clarity",
-  description: "Admin dashboard for Inner Clarity mental health services",
+interface DashboardStats {
+  totalPatients: number
+  activePatients: number
+  upcomingAppointments: number
+  todayAppointments: number
+  unreadMessages: number
+  overdueInvoices: number
+  totalRevenue: number
+  monthlyRevenue: number
 }
 
-export default async function AdminDashboard() {
-  // Server-side authentication check
-  const user = await requireAdminAuth()
+interface RecentActivity {
+  id: string
+  type: "appointment" | "payment" | "message" | "registration"
+  description: string
+  timestamp: string
+  patient_name?: string
+}
 
-  // Mock data - in a real app, this would come from your API
-  const stats = {
-    totalClients: 127,
-    todayAppointments: 8,
-    unreadMessages: 5,
-    newUploads: 3,
-    auditAlerts: 2,
+export default function AdminDashboard() {
+  const [stats, setStats] = useState<DashboardStats>({
+    totalPatients: 0,
+    activePatients: 0,
+    upcomingAppointments: 0,
+    todayAppointments: 0,
+    unreadMessages: 0,
+    overdueInvoices: 0,
+    totalRevenue: 0,
+    monthlyRevenue: 0,
+  })
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+
+      // Load stats in parallel
+      const [patientsResult, appointmentsResult, messagesResult, invoicesResult, paymentsResult] = await Promise.all([
+        supabase.from("profiles").select("id, status").eq("role", "patient"),
+        supabase.from("appointments").select("id, appointment_date, status"),
+        supabase.from("messages").select("id, read").eq("read", false),
+        supabase.from("invoices").select("id, amount, status, due_date"),
+        supabase.from("payments").select("id, amount, created_at"),
+      ])
+
+      // Calculate stats
+      const patients = patientsResult.data || []
+      const appointments = appointmentsResult.data || []
+      const messages = messagesResult.data || []
+      const invoices = invoicesResult.data || []
+      const payments = paymentsResult.data || []
+
+      const today = new Date().toISOString().split("T")[0]
+      const thisMonth = new Date().toISOString().slice(0, 7)
+
+      setStats({
+        totalPatients: patients.length,
+        activePatients: patients.filter((p) => p.status === "active").length,
+        upcomingAppointments: appointments.filter((a) => a.appointment_date >= today && a.status === "confirmed")
+          .length,
+        todayAppointments: appointments.filter((a) => a.appointment_date.startsWith(today)).length,
+        unreadMessages: messages.length,
+        overdueInvoices: invoices.filter((i) => i.status === "pending" && i.due_date < today).length,
+        totalRevenue: payments.reduce((sum, p) => sum + (p.amount || 0), 0),
+        monthlyRevenue: payments
+          .filter((p) => p.created_at.startsWith(thisMonth))
+          .reduce((sum, p) => sum + (p.amount || 0), 0),
+      })
+
+      // Load recent activity
+      await loadRecentActivity()
+    } catch (error) {
+      console.error("Error loading dashboard data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Add this after the existing stats
-  const tenantInfo = {
-    name: user?.tenantId === "inner-clarity" ? "Inner Clarity" : "Health Corp",
-    id: user?.tenantId || "unknown",
+  const loadRecentActivity = async () => {
+    try {
+      // This would be more complex in a real app with proper audit logging
+      const activities: RecentActivity[] = [
+        {
+          id: "1",
+          type: "registration",
+          description: "New patient registered",
+          timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+          patient_name: "John Smith",
+        },
+        {
+          id: "2",
+          type: "appointment",
+          description: "Appointment scheduled",
+          timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+          patient_name: "Jane Doe",
+        },
+        {
+          id: "3",
+          type: "payment",
+          description: "Payment received",
+          timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+          patient_name: "Bob Johnson",
+        },
+        {
+          id: "4",
+          type: "message",
+          description: "New message received",
+          timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+          patient_name: "Alice Brown",
+        },
+      ]
+
+      setRecentActivity(activities)
+    } catch (error) {
+      console.error("Error loading recent activity:", error)
+    }
   }
 
-  const upcomingAppointments = [
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount / 100) // Assuming amounts are in cents
+  }
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case "registration":
+        return <Users className="h-4 w-4 text-green-600" />
+      case "appointment":
+        return <Calendar className="h-4 w-4 text-blue-600" />
+      case "payment":
+        return <DollarSign className="h-4 w-4 text-green-600" />
+      case "message":
+        return <MessageSquare className="h-4 w-4 text-purple-600" />
+      default:
+        return <Activity className="h-4 w-4 text-gray-600" />
+    }
+  }
+
+  const formatTimeAgo = (timestamp: string) => {
+    const now = new Date()
+    const time = new Date(timestamp)
+    const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60))
+
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} minutes ago`
+    } else if (diffInMinutes < 1440) {
+      return `${Math.floor(diffInMinutes / 60)} hours ago`
+    } else {
+      return `${Math.floor(diffInMinutes / 1440)} days ago`
+    }
+  }
+
+  const statCards = [
     {
-      id: "1",
-      time: "09:00 AM",
-      client: "John Smith",
-      type: "Initial Consultation",
-      status: "confirmed",
+      title: "Total Patients",
+      value: stats.totalPatients,
+      subtitle: `${stats.activePatients} active`,
+      icon: Users,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100 dark:bg-blue-900/20",
+      change: "+12%",
+      changeType: "increase" as const,
     },
     {
-      id: "2",
-      time: "10:30 AM",
-      client: "Sarah Johnson",
-      type: "Follow-up",
-      status: "confirmed",
+      title: "Today's Appointments",
+      value: stats.todayAppointments,
+      subtitle: `${stats.upcomingAppointments} upcoming`,
+      icon: Calendar,
+      color: "text-green-600",
+      bgColor: "bg-green-100 dark:bg-green-900/20",
+      change: "+8%",
+      changeType: "increase" as const,
     },
     {
-      id: "3",
-      time: "02:00 PM",
-      client: "Michael Brown",
-      type: "Therapy Session",
-      status: "pending",
+      title: "Unread Messages",
+      value: stats.unreadMessages,
+      subtitle: "Requires attention",
+      icon: MessageSquare,
+      color: "text-purple-600",
+      bgColor: "bg-purple-100 dark:bg-purple-900/20",
+      change: "-5%",
+      changeType: "decrease" as const,
+    },
+    {
+      title: "Monthly Revenue",
+      value: formatCurrency(stats.monthlyRevenue),
+      subtitle: `${stats.overdueInvoices} overdue invoices`,
+      icon: CreditCard,
+      color: "text-orange-600",
+      bgColor: "bg-orange-100 dark:bg-orange-900/20",
+      change: "+15%",
+      changeType: "increase" as const,
     },
   ]
 
-  const recentActivity = [
-    {
-      id: "1",
-      type: "document_upload",
-      client: "Jane Doe",
-      description: "Uploaded insurance card",
-      timestamp: "10 minutes ago",
-    },
-    {
-      id: "2",
-      type: "appointment_booked",
-      client: "Robert Wilson",
-      description: "Booked therapy session for Jan 20",
-      timestamp: "25 minutes ago",
-    },
-    {
-      id: "3",
-      type: "message_sent",
-      client: "Lisa Anderson",
-      description: "Sent message about medication",
-      timestamp: "1 hour ago",
-    },
-  ]
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </AdminLayout>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navigation />
-
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">
-                Overview of your practice and client management - {tenantInfo.name}
-              </p>
-            </div>
-            <Badge variant="outline" className="text-clarity-blue-600">
-              Tenant: {tenantInfo.id}
+    <AdminLayout>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">Welcome to the NextPhase IT Admin Portal</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Badge variant="outline" className="flex items-center space-x-1">
+              <CheckCircle className="h-3 w-3 text-green-600" />
+              <span>System Healthy</span>
             </Badge>
+            <Button onClick={loadDashboardData} variant="outline" size="sm">
+              <Activity className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Users className="h-8 w-8 text-clarity-blue-500" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Clients</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalClients}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Calendar className="h-8 w-8 text-clarity-green-500" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Today's Appointments</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.todayAppointments}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <MessageSquare className="h-8 w-8 text-yellow-500" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Unread Messages</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.unreadMessages}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <FileText className="h-8 w-8 text-purple-500" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">New Uploads</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.newUploads}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Shield className="h-8 w-8 text-red-500" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Audit Alerts</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.auditAlerts}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Today's Appointments */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Calendar className="mr-2 h-5 w-5" />
-                  Today's Appointments
-                </div>
-                <Badge variant="outline">{stats.todayAppointments} scheduled</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {upcomingAppointments.map((appointment) => (
-                  <div key={appointment.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-shrink-0">
-                        <Clock className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{appointment.client}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {appointment.type} at {appointment.time}
-                        </p>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {statCards.map((stat, index) => {
+            const Icon = stat.icon
+            return (
+              <Card key={index} className="hover:shadow-lg transition-shadow duration-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.title}</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500">{stat.subtitle}</p>
+                      <div className="flex items-center space-x-1">
+                        {stat.changeType === "increase" ? (
+                          <TrendingUp className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3 text-red-600" />
+                        )}
+                        <span
+                          className={`text-xs ${stat.changeType === "increase" ? "text-green-600" : "text-red-600"}`}
+                        >
+                          {stat.change}
+                        </span>
                       </div>
                     </div>
-                    <Badge
-                      variant={appointment.status === "confirmed" ? "default" : "secondary"}
-                      className={appointment.status === "confirmed" ? "bg-clarity-green-500" : ""}
-                    >
-                      {appointment.status}
-                    </Badge>
+                    <div className={`p-3 rounded-full ${stat.bgColor}`}>
+                      <Icon className={`h-6 w-6 ${stat.color}`} />
+                    </div>
                   </div>
-                ))}
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/admin/appointments">View All Appointments</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
 
+        {/* Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Activity */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <TrendingUp className="mr-2 h-5 w-5" />
-                Recent Activity
+              <CardTitle className="flex items-center space-x-2">
+                <Clock className="h-5 w-5" />
+                <span>Recent Activity</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {recentActivity.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
-                  >
-                    <div className="flex-shrink-0 mt-1">
-                      {activity.type === "document_upload" && <FileText className="h-4 w-4 text-clarity-blue-500" />}
-                      {activity.type === "appointment_booked" && (
-                        <Calendar className="h-4 w-4 text-clarity-green-500" />
-                      )}
-                      {activity.type === "message_sent" && <MessageSquare className="h-4 w-4 text-yellow-500" />}
-                    </div>
+                  <div key={activity.id} className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">{getActivityIcon(activity.type)}</div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{activity.client}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{activity.description}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{activity.timestamp}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{activity.description}</p>
+                      {activity.patient_name && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{activity.patient_name}</p>
+                      )}
+                      <p className="text-xs text-gray-500 dark:text-gray-500">{formatTimeAgo(activity.timestamp)}</p>
                     </div>
                   </div>
                 ))}
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/admin/audit">View Audit Logs</Link>
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -253,107 +326,28 @@ export default async function AdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common administrative tasks</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                <Button asChild variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
-                  <Link href="/admin/clients">
-                    <Users className="h-6 w-6" />
-                    <span className="text-sm">Manage Clients</span>
-                  </Link>
-                </Button>
-
-                <Button asChild variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
-                  <Link href="/admin/appointments">
-                    <Calendar className="h-6 w-6" />
-                    <span className="text-sm">Schedule Appointment</span>
-                  </Link>
-                </Button>
-
-                <Button asChild variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
-                  <Link href="/admin/messages">
-                    <MessageSquare className="h-6 w-6" />
-                    <span className="text-sm">Review Messages</span>
-                  </Link>
-                </Button>
-
-                <Button asChild variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
-                  <Link href="/admin/files">
-                    <FileText className="h-6 w-6" />
-                    <span className="text-sm">Review Files</span>
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* System Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shield className="mr-2 h-5 w-5" />
-                System Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">HIPAA Compliance</span>
-                  <div className="flex items-center space-x-1">
-                    <CheckCircle className="h-4 w-4 text-clarity-green-500" />
-                    <span className="text-sm text-clarity-green-600">Active</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Data Encryption</span>
-                  <div className="flex items-center space-x-1">
-                    <CheckCircle className="h-4 w-4 text-clarity-green-500" />
-                    <span className="text-sm text-clarity-green-600">Enabled</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Backup Status</span>
-                  <div className="flex items-center space-x-1">
-                    <CheckCircle className="h-4 w-4 text-clarity-green-500" />
-                    <span className="text-sm text-clarity-green-600">Current</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Audit Logging</span>
-                  <div className="flex items-center space-x-1">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm text-yellow-600">2 Alerts</span>
-                  </div>
-                </div>
-
-                <Button asChild variant="outline" size="sm" className="w-full mt-4">
-                  <Link href="/admin/audit">View Security Details</Link>
-                </Button>
-              </div>
+            <CardContent className="space-y-3">
+              <Button className="w-full justify-start" variant="outline">
+                <Users className="mr-2 h-4 w-4" />
+                Add New Patient
+              </Button>
+              <Button className="w-full justify-start" variant="outline">
+                <Calendar className="mr-2 h-4 w-4" />
+                Schedule Appointment
+              </Button>
+              <Button className="w-full justify-start" variant="outline">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Send Message
+              </Button>
+              <Button className="w-full justify-start" variant="outline">
+                <CreditCard className="mr-2 h-4 w-4" />
+                Create Invoice
+              </Button>
             </CardContent>
           </Card>
         </div>
-
-        {/* HIPAA Compliance Notice */}
-        <Card className="mt-8 hipaa-secure">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Shield className="h-5 w-5 text-clarity-blue-600" />
-              <div>
-                <p className="text-sm font-medium">HIPAA Administrative Safeguards</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  All administrative actions are logged and monitored for compliance. Access controls and audit trails
-                  are maintained according to HIPAA requirements.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+      </div>
+    </AdminLayout>
   )
 }

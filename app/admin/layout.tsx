@@ -5,6 +5,7 @@ import { SessionProvider } from "next-auth/react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { ThemeProvider } from "@/components/theme-provider"
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
@@ -69,7 +70,9 @@ export default function AdminLayout({
 }) {
   return (
     <SessionProvider>
-      <AdminLayoutContent>{children}</AdminLayoutContent>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+        <AdminLayoutContent>{children}</AdminLayoutContent>
+      </ThemeProvider>
     </SessionProvider>
   )
 }
