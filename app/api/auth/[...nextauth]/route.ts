@@ -33,13 +33,12 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password are required")
+          return null
         }
 
         // Check if this is the demo admin account
         if (credentials.email === DEMO_ADMIN.email) {
           // For demo purposes, we'll use a simple password check
-          // In production, you'd want to hash this properly
           if (credentials.password === "DemoAdmin123!") {
             console.log("✅ Demo admin login successful")
             return {
@@ -52,7 +51,7 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
-        throw new Error("Invalid demo credentials")
+        return null
       },
     }),
   ],
