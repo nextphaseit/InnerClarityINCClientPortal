@@ -28,7 +28,6 @@ export default function AdminAuditLogsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with actual API call
     const mockAuditLogs: AuditLog[] = [
       {
         id: "AUDIT-001",
@@ -154,11 +153,10 @@ export default function AdminAuditLogsPage() {
           </Button>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{"Today's Events"}</CardTitle>
+              <CardTitle className="text-sm font-medium">Today Events</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -201,7 +199,6 @@ export default function AdminAuditLogsPage() {
           </Card>
         </div>
 
-        {/* Search and Filters */}
         <div className="flex justify-between items-center">
           <div className="relative w-64">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -218,7 +215,6 @@ export default function AdminAuditLogsPage() {
           </div>
         </div>
 
-        {/* Audit Logs Table */}
         <Card>
           <CardHeader>
             <CardTitle>Security Audit Trail</CardTitle>

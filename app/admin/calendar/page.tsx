@@ -19,11 +19,9 @@ interface CalendarEvent {
 
 export default function AdminCalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [currentDate, setCurrentDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with actual API call
     const mockEvents: CalendarEvent[] = [
       {
         id: "CAL-001",
@@ -128,11 +126,10 @@ export default function AdminCalendarPage() {
           </Button>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{"Today's Events"}</CardTitle>
+              <CardTitle className="text-sm font-medium">Today Events</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -165,12 +162,11 @@ export default function AdminCalendarPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Today's Schedule */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                {"Today's Schedule"}
+                Today Schedule
               </CardTitle>
               <CardDescription>
                 {new Date().toLocaleDateString("en-US", {
@@ -209,7 +205,6 @@ export default function AdminCalendarPage() {
             </CardContent>
           </Card>
 
-          {/* Upcoming Events */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

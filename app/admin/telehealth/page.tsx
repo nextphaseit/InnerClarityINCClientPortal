@@ -25,7 +25,6 @@ export default function AdminTelehealthPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with actual API call
     const mockSessions: TelehealthSession[] = [
       {
         id: "TH-001",
@@ -120,11 +119,10 @@ export default function AdminTelehealthPage() {
           <p className="text-gray-600">Manage virtual appointments and video consultations</p>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{"Today's Sessions"}</CardTitle>
+              <CardTitle className="text-sm font-medium">Today Sessions</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -167,7 +165,6 @@ export default function AdminTelehealthPage() {
           </Card>
         </div>
 
-        {/* Search and Actions */}
         <div className="flex justify-between items-center">
           <div className="relative w-64">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -190,7 +187,6 @@ export default function AdminTelehealthPage() {
           </div>
         </div>
 
-        {/* Sessions Table */}
         <Card>
           <CardHeader>
             <CardTitle>Telehealth Sessions</CardTitle>

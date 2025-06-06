@@ -26,7 +26,6 @@ export default function AdminHealthLogsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with actual API call
     const mockHealthLogs: HealthLog[] = [
       {
         id: "HL-001",
@@ -143,11 +142,10 @@ export default function AdminHealthLogsPage() {
           <p className="text-gray-600">Monitor patient health metrics and vital signs</p>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{"Today's Logs"}</CardTitle>
+              <CardTitle className="text-sm font-medium">Today Logs</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -190,7 +188,6 @@ export default function AdminHealthLogsPage() {
           </Card>
         </div>
 
-        {/* Search and Actions */}
         <div className="flex justify-between items-center">
           <div className="relative w-64">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -207,7 +204,6 @@ export default function AdminHealthLogsPage() {
           </div>
         </div>
 
-        {/* Health Logs Table */}
         <Card>
           <CardHeader>
             <CardTitle>Recent Health Logs</CardTitle>

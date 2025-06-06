@@ -24,7 +24,6 @@ export default function AdminBillingPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with actual API call
     const mockInvoices: Invoice[] = [
       {
         id: "INV-001",
@@ -98,7 +97,6 @@ export default function AdminBillingPage() {
           <p className="text-gray-600">Manage patient billing and invoice tracking</p>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -107,7 +105,7 @@ export default function AdminBillingPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">+12% from last month</p>
+              <p className="text-xs text-muted-foreground">Revenue from paid invoices</p>
             </CardContent>
           </Card>
 
@@ -119,7 +117,9 @@ export default function AdminBillingPage() {
             <CardContent>
               <div className="text-2xl font-bold">{paidInvoices.length}</div>
               <p className="text-xs text-muted-foreground">
-                {((paidInvoices.length / invoices.length) * 100).toFixed(1)}% of total
+                {invoices.length > 0
+                  ? `${((paidInvoices.length / invoices.length) * 100).toFixed(1)}% of total`
+                  : "No invoices"}
               </p>
             </CardContent>
           </Card>
@@ -149,7 +149,6 @@ export default function AdminBillingPage() {
           </Card>
         </div>
 
-        {/* Search and Actions */}
         <div className="flex justify-between items-center">
           <div className="relative w-64">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -169,11 +168,10 @@ export default function AdminBillingPage() {
           </div>
         </div>
 
-        {/* Invoices Table */}
         <Card>
           <CardHeader>
             <CardTitle>Recent Invoices</CardTitle>
-            <CardDescription>{"A list of all invoices and their current status"}</CardDescription>
+            <CardDescription>A list of all invoices and their current status</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
