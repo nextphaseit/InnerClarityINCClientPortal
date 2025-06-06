@@ -14,21 +14,36 @@ function ErrorContent() {
   })
 
   useEffect(() => {
-    const error = searchParams?.get("error") || "Unknown Error"
-    const description = searchParams?.get("error_description") || "An authentication error occurred"
+    try {
+      const error = searchParams?.get("error") || "Unknown Error"
+      const description = searchParams?.get("error_description") || "An authentication error occurred"
 
-    setErrorInfo({ error, description })
+      setErrorInfo({
+        error: String(error),
+        description: String(description),
+      })
+    } catch (err) {
+      console.error("Error parsing search params:", err)
+      setErrorInfo({
+        error: "Unknown Error",
+        description: "An authentication error occurred",
+      })
+    }
   }, [searchParams])
 
   const getErrorMessage = (error: string) => {
-    switch (error) {
-      case "Configuration":
+    if (!error || typeof error !== "string") {
+      return "An unexpected authentication error occurred."
+    }
+
+    switch (error.toLowerCase()) {
+      case "configuration":
         return "There's an issue with the authentication configuration."
-      case "AccessDenied":
+      case "accessdenied":
         return "Access was denied. You may not have permission to sign in."
-      case "Verification":
+      case "verification":
         return "The verification link is invalid or has expired."
-      case "Default":
+      case "default":
         return "An error occurred during authentication."
       default:
         return "An unexpected authentication error occurred."
@@ -48,10 +63,10 @@ function ErrorContent() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <h2 className="text-lg font-semibold text-red-800 mb-2">Error Details</h2>
           <p className="text-sm text-red-700 mb-2">
-            <strong>Error:</strong> {errorInfo.error}
+            <strong>Error:</strong> {errorInfo.error || "Unknown"}
           </p>
           <p className="text-sm text-red-700">
-            <strong>Description:</strong> {errorInfo.description}
+            <strong>Description:</strong> {errorInfo.description || "No description available"}
           </p>
         </div>
 

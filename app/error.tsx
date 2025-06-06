@@ -23,11 +23,16 @@ export default function Error({
 
   // Handle specific error types
   const getErrorMessage = () => {
-    if (error.message.includes("response")) {
+    const message = error?.message || ""
+
+    if (message.includes("response")) {
       return "There was a problem with the server response. Please try again."
     }
-    if (error.message.includes("fetch")) {
+    if (message.includes("fetch")) {
       return "Network error occurred. Please check your connection."
+    }
+    if (message.includes("auth")) {
+      return "Authentication error occurred. Please try signing in again."
     }
     return "An unexpected error occurred. Our team has been notified."
   }
@@ -45,9 +50,9 @@ export default function Error({
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <h2 className="text-lg font-semibold text-red-800 mb-2">Error Information</h2>
           <p className="text-sm text-red-700 mb-2">
-            <strong>Type:</strong> {error.name || "Application Error"}
+            <strong>Type:</strong> {error?.name || "Application Error"}
           </p>
-          {error.digest && (
+          {error?.digest && (
             <p className="text-sm text-red-700 mb-2">
               <strong>ID:</strong> {error.digest}
             </p>

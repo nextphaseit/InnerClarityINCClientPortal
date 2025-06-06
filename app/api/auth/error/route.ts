@@ -2,26 +2,34 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const error = searchParams.get("error") || "UnknownError"
-    const errorDescription = searchParams.get("error_description") || "An authentication error occurred"
+    const url = new URL(request.url)
+    const error = url.searchParams.get("error") || "UnknownError"
+    const errorDescription = url.searchParams.get("error_description") || "An authentication error occurred"
 
-    console.log("Auth error:", { error, errorDescription })
+    console.log("Auth error redirect:", { error, errorDescription })
 
-    // Create a simple redirect to the error page
-    const redirectUrl = new URL("/auth/error", request.url)
-    redirectUrl.searchParams.set("error", error)
-    redirectUrl.searchParams.set("error_description", errorDescription)
+    // Create redirect URL safely
+    const baseUrl = url.origin
+    const redirectUrl = new URL("/auth/error", baseUrl)
 
-    return NextResponse.redirect(redirectUrl)
+    // Add parameters safely
+    if (error && typeof error === "string") {
+      redirectUrl.searchParams.set("error", error)
+    }
+    if (errorDescription && typeof errorDescription === "string") {
+      redirectUrl.searchParams.set("error_description", errorDescription)
+    }
+
+    return NextResponse.redirect(redirectUrl.toString())
   } catch (err) {
     console.error("Auth error handler failed:", err)
 
-    // Return a simple JSON response if redirect fails
+    // Return JSON response as fallback
     return NextResponse.json(
       {
         error: "AuthError",
         message: "Authentication error occurred",
+        details: err instanceof Error ? err.message : "Unknown error",
         timestamp: new Date().toISOString(),
       },
       { status: 400 },
