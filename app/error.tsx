@@ -12,7 +12,6 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    // Log the full error details
     console.error("Application error details:", {
       message: error.message,
       stack: error.stack,
@@ -21,7 +20,6 @@ export default function Error({
     })
   }, [error])
 
-  // Handle specific error types
   const getErrorMessage = () => {
     const message = error?.message || ""
 

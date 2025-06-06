@@ -3,7 +3,6 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { AuthProvider } from "@/hooks/use-auth"
 import { Toaster } from "@/components/ui/toaster"
 import { ErrorBoundary } from "@/components/error-boundary"
 
@@ -11,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "Inner Clarity Portal",
-  description: "Mental health practice management and patient portal",
+  description: "Secure patient portal for Inner Clarity INC",
     generator: 'v0.dev'
 }
 
@@ -25,10 +24,8 @@ export default function RootLayout({
       <body className={inter.className}>
         <ErrorBoundary>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-            <AuthProvider>
-              {children}
-              <Toaster />
-            </AuthProvider>
+            {children}
+            <Toaster />
           </ThemeProvider>
         </ErrorBoundary>
       </body>

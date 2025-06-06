@@ -15,7 +15,7 @@ interface State {
   error: Error | null
 }
 
-class ErrorBoundary extends Component<Props, State> {
+export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props)
     this.state = { hasError: false, error: null }
@@ -31,7 +31,6 @@ class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      // You can render any custom fallback UI
       return (
         this.props.fallback || (
           <div className="min-h-screen flex items-center justify-center p-6 text-center bg-red-50">
