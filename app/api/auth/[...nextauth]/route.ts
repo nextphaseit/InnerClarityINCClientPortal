@@ -3,21 +3,38 @@ import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 import type { NextAuthOptions } from "next-auth"
 
-// Demo admin credentials
+// Demo admin credentials for testing
 const DEMO_ADMIN = {
   id: "demo-admin-001",
-  email: "demo@admin.nextphaseit.org",
+  email: "admin@innerclarityinc.com",
   name: "Demo Administrator",
   role: "super_admin",
-  // Password: "DemoAdmin123!"
-  passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ",
+  password: "Admin123!",
 }
+
+// Mock admin users database
+const adminUsers = [
+  {
+    id: "admin-1",
+    email: "admin@innerclarityinc.com",
+    name: "Adrian Knight",
+    password: "Admin123!",
+    role: "super_admin",
+  },
+  {
+    id: "admin-2",
+    email: "demo@admin.nextphaseit.org",
+    name: "Demo Administrator",
+    password: "DemoAdmin123!",
+    role: "super_admin",
+  },
+]
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID || "dummy",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "dummy",
       authorization: {
         params: {
           scope: "openid email profile",
@@ -25,33 +42,43 @@ export const authOptions: NextAuthOptions = {
       },
     }),
     CredentialsProvider({
-      id: "demo-admin",
-      name: "Demo Admin",
+      id: "admin-credentials",
+      name: "Admin Login",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log("❌ Missing credentials")
           return null
         }
 
-        // Check if this is the demo admin account
-        if (credentials.email === DEMO_ADMIN.email) {
-          // For demo purposes, we'll use a simple password check
-          if (credentials.password === "DemoAdmin123!") {
-            console.log("✅ Demo admin login successful")
-            return {
-              id: DEMO_ADMIN.id,
-              email: DEMO_ADMIN.email,
-              name: DEMO_ADMIN.name,
-              role: DEMO_ADMIN.role,
-              image: null,
-            }
-          }
+        console.log("🔍 Attempting login for:", credentials.email)
+
+        // Find admin user
+        const adminUser = adminUsers.find((user) => user.email.toLowerCase() === credentials.email.toLowerCase())
+
+        if (!adminUser) {
+          console.log("❌ Admin user not found:", credentials.email)
+          return null
         }
 
-        return null
+        // Check password (simple comparison for demo)
+        if (credentials.password !== adminUser.password) {
+          console.log("❌ Invalid password for:", credentials.email)
+          return null
+        }
+
+        console.log("✅ Admin login successful:", adminUser.email)
+
+        return {
+          id: adminUser.id,
+          email: adminUser.email,
+          name: adminUser.name,
+          role: adminUser.role,
+          image: null,
+        }
       },
     }),
   ],
@@ -60,19 +87,19 @@ export const authOptions: NextAuthOptions = {
     maxAge: 8 * 60 * 60, // 8 hours
   },
   pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error", // Use the page directly, not the API route
+    signIn: "/admin/login",
+    error: "/auth/error",
   },
   callbacks: {
     async signIn({ user, account }) {
       try {
-        console.log("Sign-in attempt:", {
+        console.log("🔐 Sign-in attempt:", {
           provider: account?.provider,
           email: user.email,
         })
 
-        // Allow demo admin login
-        if (account?.provider === "demo-admin") {
+        // Allow admin credentials login
+        if (account?.provider === "admin-credentials") {
           return true
         }
 
@@ -91,6 +118,9 @@ export const authOptions: NextAuthOptions = {
               console.error(`❌ Unauthorized domain for admin access: ${domain}`)
               return false
             }
+
+            // Set role to admin for Google logins
+            user.role = "admin"
           }
         }
 

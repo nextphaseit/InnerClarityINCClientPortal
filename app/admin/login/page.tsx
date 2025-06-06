@@ -1,18 +1,27 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { signIn, getSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Shield, AlertCircle } from "lucide-react"
+import { Loader2, Shield, AlertCircle, Eye, EyeOff, TestTube } from "lucide-react"
 
 export default function AdminLoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [credentials, setCredentials] = useState({
+    email: "",
+    password: "",
+  })
 
   const callbackUrl = searchParams?.get("callbackUrl") || "/admin/dashboard"
   const errorParam = searchParams?.get("error")
@@ -31,6 +40,9 @@ export default function AdminLoginPage() {
   useEffect(() => {
     if (errorParam) {
       switch (errorParam) {
+        case "CredentialsSignin":
+          setError("Invalid email or password. Please try again.")
+          break
         case "OAuthSignin":
           setError("Error occurred during sign-in. Please try again.")
           break
@@ -49,61 +61,161 @@ export default function AdminLoginPage() {
     }
   }, [errorParam])
 
-  const handleSignIn = async (provider: "google" | "auth0") => {
+  const handleCredentialsSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      console.log("🔑 Attempting credentials login...")
+
+      const result = await signIn("admin-credentials", {
+        email: credentials.email,
+        password: credentials.password,
+        callbackUrl,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        console.error("❌ Credentials sign-in error:", result.error)
+        setError("Invalid email or password. Please check your credentials.")
+      } else if (result?.url) {
+        console.log("✅ Login successful, redirecting...")
+        window.location.href = result.url
+      }
+    } catch (err) {
+      console.error("❌ Credentials sign-in exception:", err)
+      setError("An unexpected error occurred during login.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      console.log(`🔑 Initiating ${provider} admin login...`)
+      console.log("🔑 Initiating Google admin login...")
 
-      const result = await signIn(provider, {
+      const result = await signIn("google", {
         callbackUrl,
         redirect: true,
       })
 
       if (result?.error) {
-        console.error(`❌ ${provider} sign-in error:`, result.error)
-        setError(`${provider} sign-in failed. Please try again.`)
+        console.error("❌ Google sign-in error:", result.error)
+        setError("Google sign-in failed. Please try again.")
         setLoading(false)
       }
     } catch (err) {
-      console.error(`❌ ${provider} sign-in exception:`, err)
-      setError(`${provider} sign-in failed. Please try again.`)
+      console.error("❌ Google sign-in exception:", err)
+      setError("Google sign-in failed. Please try again.")
       setLoading(false)
     }
   }
 
+  const fillDemoCredentials = () => {
+    setCredentials({
+      email: "admin@innerclarityinc.com",
+      password: "Admin123!",
+    })
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-2xl border-0 backdrop-blur-sm bg-white/95">
-        <CardHeader className="space-y-4 text-center pb-6">
-          <div className="flex justify-center mb-2">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg">
-              <Shield className="h-8 w-8 text-white" />
+      <div className="w-full max-w-md space-y-6">
+        <Card className="shadow-2xl border-0 backdrop-blur-sm bg-white/95">
+          <CardHeader className="space-y-4 text-center pb-6">
+            <div className="flex justify-center mb-2">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg">
+                <Shield className="h-8 w-8 text-white" />
+              </div>
             </div>
-          </div>
-          <div className="space-y-2">
-            <CardTitle className="text-2xl font-bold text-slate-800">Admin Portal</CardTitle>
-            <CardDescription className="text-slate-600">
-              Sign in to manage clients, appointments, and practice operations
-            </CardDescription>
-          </div>
-        </CardHeader>
+            <div className="space-y-2">
+              <CardTitle className="text-2xl font-bold text-slate-800">Admin Portal</CardTitle>
+              <CardDescription className="text-slate-600">
+                Sign in to manage clients, appointments, and practice operations
+              </CardDescription>
+            </div>
+          </CardHeader>
 
-        <CardContent className="space-y-6 pb-8">
-          {error && (
-            <Alert variant="destructive" className="border-red-200 bg-red-50">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">{error}</AlertDescription>
-            </Alert>
-          )}
+          <CardContent className="space-y-6 pb-8">
+            {error && (
+              <Alert variant="destructive" className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">{error}</AlertDescription>
+              </Alert>
+            )}
 
-          <div className="space-y-3">
+            {/* Credentials Login Form */}
+            <form onSubmit={handleCredentialsSignIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={credentials.email}
+                  onChange={(e) => setCredentials((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="admin@innerclarityinc.com"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={credentials.password}
+                    onChange={(e) => setCredentials((prev) => ({ ...prev, password: e.target.value }))}
+                    placeholder="Enter your password"
+                    className="pr-10"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                size="lg"
+              >
+                {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Shield className="mr-2 h-5 w-5" />}
+                {loading ? "Signing in..." : "Sign In"}
+              </Button>
+            </form>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+
             {/* Google Sign-In Button */}
             <Button
-              onClick={() => handleSignIn("google")}
+              onClick={handleGoogleSignIn}
               disabled={loading}
-              className="w-full h-12 bg-[#4285F4] hover:bg-[#3367D6] text-white shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+              variant="outline"
+              className="w-full h-12 border-slate-300 hover:bg-slate-50"
               size="lg"
             >
               {loading ? (
@@ -130,53 +242,78 @@ export default function AdminLoginPage() {
               )}
               {loading ? "Signing in..." : "Sign in with Google"}
             </Button>
+          </CardContent>
+        </Card>
 
-            {/* Auth0 Sign-In Button */}
-            <Button
-              onClick={() => handleSignIn("auth0")}
-              disabled={loading}
-              variant="outline"
-              className="w-full h-12 border-slate-300 hover:bg-slate-50"
-              size="lg"
-            >
-              {loading ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M21.98 7.448L19.62 0H4.347L2.02 7.448c-1.352 4.312.03 9.206 3.815 12.015L12.007 24l6.157-4.537c3.785-2.809 5.167-7.703 3.815-12.015z" />
-                </svg>
-              )}
-              {loading ? "Signing in..." : "Sign in with Auth0"}
-            </Button>
-          </div>
-
-          <div className="text-center space-y-3 pt-4 border-t border-slate-200">
-            <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
-              <p className="font-medium mb-1">Authorized Domains</p>
-              <p>@nextphaseit.org • @innerclaritycounseling.com</p>
-              <p>@innerclarity.org • @innerclarityinc.com</p>
+        {/* Demo Credentials Card */}
+        <Card className="border-amber-200 bg-amber-50/50">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2">
+              <TestTube className="h-5 w-5 text-amber-600" />
+              <CardTitle className="text-lg text-amber-800">Demo Credentials</CardTitle>
             </div>
-          </div>
+            <CardDescription className="text-amber-700">Use these credentials to test the admin portal</CardDescription>
+          </CardHeader>
 
-          <div className="text-center space-y-2 pt-4 border-t border-slate-200">
-            <p className="text-sm text-slate-600">
-              Need patient portal access?{" "}
-              <a href="/portal/auth/signin" className="text-blue-600 hover:underline font-medium">
-                Patient Portal
-              </a>
-            </p>
-          </div>
+          <CardContent className="space-y-4">
+            <div className="text-sm text-amber-700 bg-amber-100 p-3 rounded-lg">
+              <div className="font-medium mb-2">Available Demo Accounts:</div>
+              <div className="space-y-2 text-xs">
+                <div>
+                  <strong>Super Admin:</strong>
+                  <br />
+                  Email: admin@innerclarityinc.com
+                  <br />
+                  Password: Admin123!
+                </div>
+                <div>
+                  <strong>Demo Admin:</strong>
+                  <br />
+                  Email: demo@admin.nextphaseit.org
+                  <br />
+                  Password: DemoAdmin123!
+                </div>
+              </div>
+            </div>
 
-          <div className="pt-2 border-t border-slate-200">
-            <p className="text-xs text-center text-slate-500">
-              Need help? Contact{" "}
-              <a href="mailto:support@innerclarityinc.com" className="text-blue-600 hover:underline font-medium">
-                support@innerclarityinc.com
-              </a>
-            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={fillDemoCredentials}
+              className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
+            >
+              <TestTube className="mr-2 h-4 w-4" />
+              Fill Demo Credentials
+            </Button>
+          </CardContent>
+        </Card>
+
+        <div className="text-center space-y-3">
+          <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+            <p className="font-medium mb-1">Authorized Domains for Google Sign-In</p>
+            <p>@nextphaseit.org • @innerclaritycounseling.com</p>
+            <p>@innerclarity.org • @innerclarityinc.com</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="text-center space-y-2">
+          <p className="text-sm text-slate-600">
+            Need patient portal access?{" "}
+            <a href="/portal/auth/signin" className="text-blue-600 hover:underline font-medium">
+              Patient Portal
+            </a>
+          </p>
+        </div>
+
+        <div className="text-center">
+          <p className="text-xs text-slate-500">
+            Need help? Contact{" "}
+            <a href="mailto:support@innerclarityinc.com" className="text-blue-600 hover:underline font-medium">
+              support@innerclarityinc.com
+            </a>
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
