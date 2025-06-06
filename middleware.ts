@@ -19,6 +19,9 @@ export async function middleware(request: NextRequest) {
     "/privacy-policy",
     "/terms-of-service",
     "/hipaa-notice",
+    "/portal/auth/signin",
+    "/portal/auth/signup",
+    "/admin/login",
   ]
 
   // Allow public paths and static files
@@ -42,8 +45,8 @@ export async function middleware(request: NextRequest) {
     })
 
     if (!token) {
-      console.log("❌ No admin token found, redirecting to signin")
-      const url = new URL("/auth/signin", request.url)
+      console.log("❌ No admin token found, redirecting to admin login")
+      const url = new URL("/admin/login", request.url)
       url.searchParams.set("callbackUrl", request.url)
       return NextResponse.redirect(url)
     }
@@ -58,7 +61,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Handle PATIENT PORTAL routes with Supabase Auth
-  if (pathname.startsWith("/portal")) {
+  if (pathname.startsWith("/portal") && !pathname.startsWith("/portal/auth")) {
     // Get Supabase session from cookies
     const supabaseToken =
       request.cookies.get("sb-access-token")?.value || request.cookies.get("supabase-auth-token")?.value
@@ -72,7 +75,7 @@ export async function middleware(request: NextRequest) {
       )
 
     if (!hasSupabaseSession && !supabaseToken) {
-      const url = new URL("/auth/signin", request.url)
+      const url = new URL("/portal/auth/signin", request.url)
       url.searchParams.set("callbackUrl", request.url)
       return NextResponse.redirect(url)
     }

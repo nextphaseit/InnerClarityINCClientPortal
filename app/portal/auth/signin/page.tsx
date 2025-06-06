@@ -1,45 +1,25 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Mail, Lock, ExternalLink, AlertCircle, Heart } from "lucide-react"
+import { Loader2, Mail, Lock, ExternalLink, AlertCircle, Heart, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { usePatientAuth } from "@/components/patient-auth-provider"
 
 export default function PatientSignInPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isPatientDomain, setIsPatientDomain] = useState(false)
-  const [isCheckingDomain, setIsCheckingDomain] = useState(true)
   const router = useRouter()
   const { signIn } = usePatientAuth()
-
-  useEffect(() => {
-    // Check if we're on the patient domain
-    const hostname = window.location.hostname
-    const isPatient =
-      hostname.includes("patients.nextphaseit.org") ||
-      (hostname.includes("localhost") && window.location.pathname.startsWith("/portal"))
-
-    setIsPatientDomain(isPatient)
-    setIsCheckingDomain(false)
-
-    if (!isPatient && hostname.includes("admin")) {
-      // Redirect to admin portal if on admin domain
-      console.log("🔄 On admin domain, redirecting to admin portal")
-      window.location.href = "https://admin.nextphaseit.org/admin/login"
-      return
-    }
-  }, [])
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,10 +39,23 @@ export default function PatientSignInPage() {
 
       if (signInError) {
         console.error("❌ Patient sign-in error:", signInError.message)
-        setError(signInError.message)
+
+        switch (signInError.message) {
+          case "Invalid login credentials":
+            setError("Invalid email or password. Please check your credentials and try again.")
+            break
+          case "Email not confirmed":
+            setError("Please verify your email address before signing in. Check your inbox for a verification link.")
+            break
+          case "Too many requests":
+            setError("Too many login attempts. Please wait a moment before trying again.")
+            break
+          default:
+            setError(signInError.message || "Login failed. Please try again.")
+        }
       } else {
         console.log("✅ Patient sign-in successful")
-        router.push("/portal")
+        router.push("/portal/dashboard")
       }
     } catch (error) {
       console.error("❌ Unexpected sign-in error:", error)
@@ -86,7 +79,7 @@ export default function PatientSignInPage() {
         setError("Demo sign-in failed. Please try manual sign-in.")
       } else {
         console.log("✅ Demo sign-in successful")
-        router.push("/portal")
+        router.push("/portal/dashboard")
       }
     } catch (error) {
       console.error("❌ Demo sign-in error:", error)
@@ -96,43 +89,8 @@ export default function PatientSignInPage() {
     }
   }
 
-  // Show loading while checking domain
-  if (isCheckingDomain) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
-        <Card className="w-full max-w-md shadow-2xl border-0">
-          <CardContent className="flex flex-col items-center justify-center p-8">
-            <Loader2 className="h-8 w-8 animate-spin text-green-600 mb-4" />
-            <p className="text-center text-slate-600">Verifying domain access...</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // Show redirect message if on admin domain
-  if (!isPatientDomain) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
-        <Card className="w-full max-w-md shadow-2xl border-0">
-          <CardContent className="flex flex-col items-center justify-center p-8">
-            <ExternalLink className="h-8 w-8 text-green-600 mb-4" />
-            <p className="text-center text-slate-600 mb-4">Redirecting to admin portal...</p>
-            <Button
-              onClick={() => (window.location.href = "https://admin.nextphaseit.org/admin/login")}
-              variant="outline"
-              className="w-full"
-            >
-              Continue to Admin Portal
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-blue-50 to-teal-100 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-2xl border-0 backdrop-blur-sm bg-white/95">
         <CardHeader className="space-y-4 text-center pb-6">
           <div className="flex justify-center mb-2">
@@ -183,13 +141,20 @@ export default function PatientSignInPage() {
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 border-slate-300 focus:border-green-500 focus:ring-green-500"
+                  className="pl-10 pr-10 border-slate-300 focus:border-green-500 focus:ring-green-500"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
@@ -242,7 +207,7 @@ export default function PatientSignInPage() {
                 </Link>
               </p>
               <p className="text-sm text-slate-600">
-                <Link href="/portal/auth/reset-password" className="text-green-600 hover:underline font-medium">
+                <Link href="/auth/reset-password" className="text-green-600 hover:underline font-medium">
                   Forgot your password?
                 </Link>
               </p>
@@ -255,7 +220,7 @@ export default function PatientSignInPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.open("https://admin.nextphaseit.org", "_blank")}
+                onClick={() => window.open("/admin/login", "_blank")}
                 className="text-xs border-slate-300 hover:bg-slate-50"
               >
                 <ExternalLink className="mr-1 h-3 w-3" />
