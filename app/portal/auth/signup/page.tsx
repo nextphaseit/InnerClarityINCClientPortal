@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -11,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { AlertCircle, Eye, EyeOff, CheckCircle } from "lucide-react"
+import { AlertCircle, Eye, EyeOff, CheckCircle, Loader2 } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function PatientSignUpPage() {
   const [formData, setFormData] = useState({
@@ -31,6 +31,7 @@ export default function PatientSignUpPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const router = useRouter()
+  const { signUp, isConfigured } = useAuth()
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -46,9 +47,21 @@ export default function PatientSignUpPage() {
     setLoading(true)
     setError("")
 
+    if (!isConfigured) {
+      setError("Authentication is not configured. Please contact support.")
+      setLoading(false)
+      return
+    }
+
     // Validation
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match")
+      setLoading(false)
+      return
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters long")
       setLoading(false)
       return
     }
@@ -60,19 +73,24 @@ export default function PatientSignUpPage() {
     }
 
     try {
-      // TODO: Implement actual registration
-      console.log("Registration attempt:", formData)
+      console.log("📝 Patient registration attempt:", formData.email)
 
-      // Simulate registration
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const fullName = `${formData.firstName} ${formData.lastName}`.trim()
+      const result = await signUp(formData.email, formData.password, fullName)
 
-      setSuccess(true)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        console.log("✅ Registration successful")
+        setSuccess(true)
 
-      // Redirect after success
-      setTimeout(() => {
-        router.push("/portal/auth/signin")
-      }, 2000)
+        // Redirect after success
+        setTimeout(() => {
+          router.push("/portal/auth/signin")
+        }, 3000)
+      }
     } catch (err) {
+      console.error("❌ Registration error:", err)
       setError("Registration failed. Please try again.")
     } finally {
       setLoading(false)
@@ -87,9 +105,11 @@ export default function PatientSignUpPage() {
             <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h2>
             <p className="text-gray-600 mb-4">
-              Your account has been created successfully. You will be redirected to the sign-in page shortly.
+              Your account has been created successfully. Please check your email for a confirmation link, then you can
+              sign in.
             </p>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-sm text-gray-500 mt-2">Redirecting to sign-in page...</p>
           </CardContent>
         </Card>
       </div>
@@ -117,6 +137,16 @@ export default function PatientSignUpPage() {
             <CardDescription>Fill out the form below to create your patient account</CardDescription>
           </CardHeader>
           <CardContent>
+            {!isConfigured && (
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-center space-x-2 text-amber-800">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm font-medium">Demo Mode</span>
+                </div>
+                <p className="text-sm text-amber-700 mt-1">Authentication is not configured. This is a demo version.</p>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
@@ -135,6 +165,7 @@ export default function PatientSignUpPage() {
                     onChange={handleInputChange}
                     placeholder="John"
                     required
+                    disabled={!isConfigured}
                   />
                 </div>
                 <div className="space-y-2">
@@ -146,6 +177,7 @@ export default function PatientSignUpPage() {
                     onChange={handleInputChange}
                     placeholder="Doe"
                     required
+                    disabled={!isConfigured}
                   />
                 </div>
               </div>
@@ -160,6 +192,7 @@ export default function PatientSignUpPage() {
                   onChange={handleInputChange}
                   placeholder="john.doe@example.com"
                   required
+                  disabled={!isConfigured}
                 />
               </div>
 
@@ -173,6 +206,7 @@ export default function PatientSignUpPage() {
                   onChange={handleInputChange}
                   placeholder="(555) 123-4567"
                   required
+                  disabled={!isConfigured}
                 />
               </div>
 
@@ -185,6 +219,7 @@ export default function PatientSignUpPage() {
                   value={formData.dateOfBirth}
                   onChange={handleInputChange}
                   required
+                  disabled={!isConfigured}
                 />
               </div>
 
@@ -199,6 +234,7 @@ export default function PatientSignUpPage() {
                     onChange={handleInputChange}
                     placeholder="Create a strong password"
                     required
+                    disabled={!isConfigured}
                   />
                   <Button
                     type="button"
@@ -206,6 +242,7 @@ export default function PatientSignUpPage() {
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
+                    disabled={!isConfigured}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
@@ -223,6 +260,7 @@ export default function PatientSignUpPage() {
                     onChange={handleInputChange}
                     placeholder="Confirm your password"
                     required
+                    disabled={!isConfigured}
                   />
                   <Button
                     type="button"
@@ -230,6 +268,7 @@ export default function PatientSignUpPage() {
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={!isConfigured}
                   >
                     {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
@@ -242,6 +281,7 @@ export default function PatientSignUpPage() {
                     id="agreeToTerms"
                     checked={formData.agreeToTerms}
                     onCheckedChange={(checked) => handleCheckboxChange("agreeToTerms", checked as boolean)}
+                    disabled={!isConfigured}
                   />
                   <Label htmlFor="agreeToTerms" className="text-sm">
                     I agree to the{" "}
@@ -256,6 +296,7 @@ export default function PatientSignUpPage() {
                     id="agreeToHipaa"
                     checked={formData.agreeToHipaa}
                     onCheckedChange={(checked) => handleCheckboxChange("agreeToHipaa", checked as boolean)}
+                    disabled={!isConfigured}
                   />
                   <Label htmlFor="agreeToHipaa" className="text-sm">
                     I acknowledge the{" "}
@@ -266,15 +307,25 @@ export default function PatientSignUpPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating Account..." : "Create Account"}
+              <Button type="submit" className="w-full" disabled={loading || !isConfigured}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 Already have an account?{" "}
-                <Link href="/portal/auth/signin" className="text-blue-600 hover:text-blue-800 font-medium">
+                <Link
+                  href="/portal/auth/signin"
+                  className={`font-medium hover:text-blue-800 ${isConfigured ? "text-blue-600" : "text-gray-400 pointer-events-none"}`}
+                >
                   Sign in here
                 </Link>
               </p>
