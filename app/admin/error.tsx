@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, Home, RefreshCw } from "lucide-react"
 
-export default function Error({
+export default function AdminError({
   error,
   reset,
 }: {
@@ -12,42 +12,38 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error("Application error:", error)
+    console.error("Admin error:", error)
   }, [error])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="bg-white shadow-lg rounded-xl p-8 max-w-md w-full text-center">
         <div className="text-red-600 mb-6">
           <AlertTriangle className="h-12 w-12 mx-auto" />
         </div>
 
-        <h1 className="text-2xl font-semibold mb-2 text-gray-900">Something went wrong</h1>
-        <p className="text-gray-600 mb-6">An unexpected error occurred</p>
-
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <h2 className="text-lg font-semibold text-red-800 mb-2">Application Error</h2>
-          <p className="text-sm text-red-700 mb-4">
-            We're sorry, but there was an error loading this page. Our team has been notified.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold mb-4">Admin Portal Error</h1>
+        <p className="text-gray-600 mb-6">
+          Something went wrong in the admin portal. Please try again or contact support.
+        </p>
 
         <div className="space-y-3">
-          <Button onClick={reset} className="w-full bg-gray-900 hover:bg-gray-800">
+          <Button onClick={reset} className="w-full">
             <RefreshCw className="mr-2 h-4 w-4" />
-            Try again
+            Try Again
           </Button>
 
           <Button asChild variant="outline" className="w-full">
-            <a href="/">
+            <a href="/auth/signin?tab=admin">
               <Home className="mr-2 h-4 w-4" />
-              Return to home page
+              Return to Sign In
             </a>
           </Button>
         </div>
 
         <div className="mt-6 text-xs text-gray-500">
-          <p>If this problem persists, please contact support at:</p>
+          <p>Error ID: {error.digest}</p>
+          <p className="mt-2">If this problem persists, please contact support at:</p>
           <p className="font-medium">support@nextphaseit.org</p>
         </div>
       </div>

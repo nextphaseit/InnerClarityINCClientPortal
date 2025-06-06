@@ -1,38 +1,75 @@
-import type React from "react"
-import { getServerSession } from "next-auth/next"
-import { redirect } from "next/navigation"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
-import { SessionProvider } from "next-auth/react"
-import AdminSidebar from "@/components/admin-sidebar"
+"use client"
 
-export default async function AdminLayout({
+import type React from "react"
+import { SessionProvider } from "next-auth/react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (status === "loading") return
+
+    if (status === "unauthenticated") {
+      console.log("🔒 No admin session found, redirecting to signin...")
+      router.push("/auth/signin?tab=admin")
+      return
+    }
+
+    if (session?.user?.role !== "admin" && session?.user?.role !== "super_admin") {
+      console.log("🚫 User is not admin, redirecting to unauthorized...")
+      router.push("/unauthorized")
+      return
+    }
+  }, [session, status, router])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === "unauthenticated") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-gray-600">Redirecting to sign in...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (session?.user?.role !== "admin" && session?.user?.role !== "super_admin") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+          <p className="text-gray-600">Redirecting...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}
+
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Get session on the server side
-  const session = await getServerSession(authOptions)
-
-  // Double-check authentication on the server side
-  if (!session) {
-    console.log("🔒 No admin session found in layout, redirecting to signin...")
-    redirect("/auth/signin?tab=admin")
-  }
-
-  // Check if user has admin role
-  if (!session.user?.role?.includes("admin")) {
-    console.log("🚫 User is not admin, redirecting to unauthorized...")
-    redirect("/unauthorized")
-  }
-
   return (
-    <SessionProvider session={session}>
-      <div className="flex h-screen bg-gray-100">
-        <AdminSidebar />
-        <div className="flex-1 overflow-auto">
-          <main className="p-6">{children}</main>
-        </div>
-      </div>
+    <SessionProvider>
+      <AdminLayoutContent>{children}</AdminLayoutContent>
     </SessionProvider>
   )
 }
