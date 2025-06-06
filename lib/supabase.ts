@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 
 // Get environment variables with fallbacks
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Check if Supabase is configured
 export const isSupabaseConfigured = () => {
@@ -42,15 +42,15 @@ const createMockClient = () => ({
 export { createClient }
 
 // Create and export the main Supabase client
-export const supabase = isSupabaseConfigured()
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-      },
-    })
-  : (createMockClient() as any)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Admin client for server-side operations
+export const supabaseAdmin = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+})
 
 // Client-side Supabase client (singleton pattern)
 let supabaseClient: any = null

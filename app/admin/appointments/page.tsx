@@ -20,9 +20,11 @@ import {
   Video,
   MapPin,
   CalendarDays,
+  AlertCircle,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
+import { logAuditEvent } from "@/lib/auth"
 
 interface Appointment {
   id: string
@@ -53,10 +55,21 @@ export default function AppointmentsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"table" | "calendar">("table")
+  const [editForm, setEditForm] = useState({
+    appointment_date: "",
+    appointment_time: "",
+    duration: 60,
+    type: "in-person" as const,
+    status: "scheduled" as const,
+    reason: "",
+    notes: "",
+    provider_name: "",
+  })
   const { toast } = useToast()
 
   useEffect(() => {
     loadAppointments()
+    logAuditEvent("view", "appointments")
   }, [])
 
   useEffect(() => {
@@ -130,6 +143,13 @@ export default function AppointmentsPage() {
 
       if (error) throw error
 
+      const appointment = appointments.find((a) => a.id === appointmentId)
+      await logAuditEvent("status_change", "appointment", appointmentId, {
+        new_status: newStatus,
+        patient_name: appointment?.patient_profile?.full_name,
+        appointment_date: appointment?.appointment_date,
+      })
+
       toast({
         title: "Success",
         description: `Appointment ${newStatus}`,
@@ -183,6 +203,24 @@ export default function AppointmentsPage() {
     })
   }
 
+  const getAppointmentStats = () => {
+    const today = new Date().toISOString().split("T")[0]
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowStr = tomorrow.toISOString().split("T")[0]
+
+    return {
+      total: appointments.length,
+      today: appointments.filter((a) => a.appointment_date === today).length,
+      tomorrow: appointments.filter((a) => a.appointment_date === tomorrowStr).length,
+      confirmed: appointments.filter((a) => a.status === "confirmed").length,
+      virtual: appointments.filter((a) => a.type === "virtual").length,
+      pending: appointments.filter((a) => a.status === "scheduled").length,
+    }
+  }
+
+  const stats = getAppointmentStats()
+
   if (loading) {
     return (
       <AdminLayout>
@@ -225,6 +263,76 @@ export default function AppointmentsPage() {
               Schedule Appointment
             </Button>
           </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-6 w-6 text-blue-600" />
+                <div>
+                  <p className="text-xl font-bold">{stats.total}</p>
+                  <p className="text-xs text-gray-600">Total</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-6 w-6 text-green-600" />
+                <div>
+                  <p className="text-xl font-bold">{stats.today}</p>
+                  <p className="text-xs text-gray-600">Today</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <CalendarDays className="h-6 w-6 text-purple-600" />
+                <div>
+                  <p className="text-xl font-bold">{stats.tomorrow}</p>
+                  <p className="text-xs text-gray-600">Tomorrow</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-6 w-6 text-emerald-600" />
+                <div>
+                  <p className="text-xl font-bold">{stats.confirmed}</p>
+                  <p className="text-xs text-gray-600">Confirmed</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Video className="h-6 w-6 text-indigo-600" />
+                <div>
+                  <p className="text-xl font-bold">{stats.virtual}</p>
+                  <p className="text-xs text-gray-600">Virtual</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-6 w-6 text-orange-600" />
+                <div>
+                  <p className="text-xl font-bold">{stats.pending}</p>
+                  <p className="text-xs text-gray-600">Pending</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filters */}
@@ -359,6 +467,15 @@ export default function AppointmentsPage() {
                               >
                                 <CheckCircle className="h-4 w-4 mr-2" />
                                 Mark Complete
+                              </DropdownMenuItem>
+                            )}
+                            {appointment.status === "confirmed" && (
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(appointment.id, "no-show")}
+                                className="text-orange-600"
+                              >
+                                <AlertCircle className="h-4 w-4 mr-2" />
+                                Mark No Show
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>

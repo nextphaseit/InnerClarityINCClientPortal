@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { AdminSidebar } from "./admin-sidebar"
-import { useSupabaseAuth } from "@/hooks/use-supabase-auth"
+import { AdminHeader } from "./admin-header"
+import { useAuth } from "@/hooks/use-auth"
 import { Loader2 } from "lucide-react"
 import { Toaster } from "@/components/ui/toaster"
 
@@ -16,13 +16,13 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children, requiredRole = "admin" }: AdminLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const { user, loading } = useSupabaseAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        router.push("/auth/signin?tab=admin")
+        router.push("/auth/signin")
         return
       }
 
@@ -63,12 +63,13 @@ export function AdminLayout({ children, requiredRole = "admin" }: AdminLayoutPro
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <AdminSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <AdminHeader sidebarCollapsed={sidebarCollapsed} />
 
       <main
         className={`
-          transition-all duration-300 ease-in-out
-          ${sidebarCollapsed ? "ml-16" : "ml-64"}
-        `}
+        transition-all duration-300 ease-in-out pt-16
+        ${sidebarCollapsed ? "ml-16" : "ml-64"}
+      `}
       >
         <div className="p-6">{children}</div>
       </main>

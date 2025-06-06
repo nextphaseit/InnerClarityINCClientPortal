@@ -16,9 +16,12 @@ import {
   CheckCircle,
   Clock,
   DollarSign,
+  AlertTriangle,
+  FileText,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
+import { logAuditEvent } from "@/lib/auth"
 
 interface DashboardStats {
   totalPatients: number
@@ -29,14 +32,17 @@ interface DashboardStats {
   overdueInvoices: number
   totalRevenue: number
   monthlyRevenue: number
+  pendingDocuments: number
+  completedForms: number
 }
 
 interface RecentActivity {
   id: string
-  type: "appointment" | "payment" | "message" | "registration"
+  type: "appointment" | "payment" | "message" | "registration" | "document" | "form"
   description: string
   timestamp: string
   patient_name?: string
+  amount?: number
 }
 
 export default function AdminDashboard() {
@@ -49,6 +55,8 @@ export default function AdminDashboard() {
     overdueInvoices: 0,
     totalRevenue: 0,
     monthlyRevenue: 0,
+    pendingDocuments: 0,
+    completedForms: 0,
   })
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,6 +64,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadDashboardData()
+    logAuditEvent("view", "dashboard")
   }, [])
 
   const loadDashboardData = async () => {
@@ -63,12 +72,22 @@ export default function AdminDashboard() {
       setLoading(true)
 
       // Load stats in parallel
-      const [patientsResult, appointmentsResult, messagesResult, invoicesResult, paymentsResult] = await Promise.all([
+      const [
+        patientsResult,
+        appointmentsResult,
+        messagesResult,
+        invoicesResult,
+        paymentsResult,
+        documentsResult,
+        formsResult,
+      ] = await Promise.all([
         supabase.from("profiles").select("id, status").eq("role", "patient"),
         supabase.from("appointments").select("id, appointment_date, status"),
         supabase.from("messages").select("id, read").eq("read", false),
         supabase.from("invoices").select("id, amount, status, due_date"),
         supabase.from("payments").select("id, amount, created_at"),
+        supabase.from("documents").select("id, status"),
+        supabase.from("forms_submissions").select("id, status"),
       ])
 
       // Calculate stats
@@ -77,6 +96,8 @@ export default function AdminDashboard() {
       const messages = messagesResult.data || []
       const invoices = invoicesResult.data || []
       const payments = paymentsResult.data || []
+      const documents = documentsResult.data || []
+      const forms = formsResult.data || []
 
       const today = new Date().toISOString().split("T")[0]
       const thisMonth = new Date().toISOString().slice(0, 7)
@@ -93,6 +114,8 @@ export default function AdminDashboard() {
         monthlyRevenue: payments
           .filter((p) => p.created_at.startsWith(thisMonth))
           .reduce((sum, p) => sum + (p.amount || 0), 0),
+        pendingDocuments: documents.filter((d) => d.status === "pending").length,
+        completedForms: forms.filter((f) => f.status === "completed").length,
       })
 
       // Load recent activity
@@ -111,7 +134,7 @@ export default function AdminDashboard() {
 
   const loadRecentActivity = async () => {
     try {
-      // This would be more complex in a real app with proper audit logging
+      // In a real app, this would be a more sophisticated query
       const activities: RecentActivity[] = [
         {
           id: "1",
@@ -133,6 +156,7 @@ export default function AdminDashboard() {
           description: "Payment received",
           timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
           patient_name: "Bob Johnson",
+          amount: 15000, // $150.00 in cents
         },
         {
           id: "4",
@@ -140,6 +164,13 @@ export default function AdminDashboard() {
           description: "New message received",
           timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
           patient_name: "Alice Brown",
+        },
+        {
+          id: "5",
+          type: "document",
+          description: "Document uploaded",
+          timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
+          patient_name: "Charlie Wilson",
         },
       ]
 
@@ -166,6 +197,10 @@ export default function AdminDashboard() {
         return <DollarSign className="h-4 w-4 text-green-600" />
       case "message":
         return <MessageSquare className="h-4 w-4 text-purple-600" />
+      case "document":
+        return <FileText className="h-4 w-4 text-orange-600" />
+      case "form":
+        return <CheckCircle className="h-4 w-4 text-blue-600" />
       default:
         return <Activity className="h-4 w-4 text-gray-600" />
     }
@@ -226,6 +261,26 @@ export default function AdminDashboard() {
       change: "+15%",
       changeType: "increase" as const,
     },
+    {
+      title: "Pending Documents",
+      value: stats.pendingDocuments,
+      subtitle: "Awaiting review",
+      icon: FileText,
+      color: "text-red-600",
+      bgColor: "bg-red-100 dark:bg-red-900/20",
+      change: "+3%",
+      changeType: "increase" as const,
+    },
+    {
+      title: "Completed Forms",
+      value: stats.completedForms,
+      subtitle: "This month",
+      icon: CheckCircle,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100 dark:bg-emerald-900/20",
+      change: "+22%",
+      changeType: "increase" as const,
+    },
   ]
 
   if (loading) {
@@ -260,7 +315,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {statCards.map((stat, index) => {
             const Icon = stat.icon
             return (
@@ -312,7 +367,12 @@ export default function AdminDashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{activity.description}</p>
                       {activity.patient_name && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{activity.patient_name}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {activity.patient_name}
+                          {activity.amount && (
+                            <span className="ml-2 font-medium text-green-600">{formatCurrency(activity.amount)}</span>
+                          )}
+                        </p>
                       )}
                       <p className="text-xs text-gray-500 dark:text-gray-500">{formatTimeAgo(activity.timestamp)}</p>
                     </div>
@@ -344,6 +404,71 @@ export default function AdminDashboard() {
                 <CreditCard className="mr-2 h-4 w-4" />
                 Create Invoice
               </Button>
+              <Button className="w-full justify-start" variant="outline">
+                <FileText className="mr-2 h-4 w-4" />
+                Review Documents
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* System Alerts */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-orange-600" />
+                <span>System Alerts</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {stats.overdueInvoices > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <span className="text-sm font-medium text-red-800 dark:text-red-200">
+                        {stats.overdueInvoices} overdue invoices require attention
+                      </span>
+                    </div>
+                    <Button size="sm" variant="outline">
+                      Review
+                    </Button>
+                  </div>
+                )}
+                {stats.pendingDocuments > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                        {stats.pendingDocuments} documents awaiting review
+                      </span>
+                    </div>
+                    <Button size="sm" variant="outline">
+                      Review
+                    </Button>
+                  </div>
+                )}
+                {stats.unreadMessages > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <MessageSquare className="h-4 w-4 text-purple-600" />
+                      <span className="text-sm font-medium text-purple-800 dark:text-purple-200">
+                        {stats.unreadMessages} unread messages
+                      </span>
+                    </div>
+                    <Button size="sm" variant="outline">
+                      View
+                    </Button>
+                  </div>
+                )}
+                {stats.overdueInvoices === 0 && stats.pendingDocuments === 0 && stats.unreadMessages === 0 && (
+                  <div className="flex items-center justify-center p-6 text-gray-500 dark:text-gray-400">
+                    <div className="text-center">
+                      <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                      <p>No alerts at this time</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
