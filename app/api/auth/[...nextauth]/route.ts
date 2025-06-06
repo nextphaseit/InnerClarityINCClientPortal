@@ -1,6 +1,5 @@
 import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
-import Auth0Provider from "next-auth/providers/auth0"
 import type { NextAuthOptions } from "next-auth"
 
 export const authOptions: NextAuthOptions = {
@@ -14,17 +13,6 @@ export const authOptions: NextAuthOptions = {
         },
       },
     }),
-    Auth0Provider({
-      clientId: process.env.AUTH0_CLIENT_ID!,
-      clientSecret: process.env.AUTH0_CLIENT_SECRET!,
-      issuer: `https://${process.env.AUTH0_DOMAIN}`,
-      authorization: {
-        params: {
-          scope: "openid email profile",
-          audience: process.env.AUTH0_AUDIENCE || undefined,
-        },
-      },
-    }),
   ],
   session: {
     strategy: "jwt",
@@ -35,19 +23,13 @@ export const authOptions: NextAuthOptions = {
     error: "/auth/error",
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       try {
         console.log("Sign-in attempt:", {
           provider: account?.provider,
           email: user.email,
           timestamp: new Date().toISOString(),
         })
-
-        // Only allow Google and Auth0 authentication for admin portal
-        if (!account?.provider || !["google", "auth0"].includes(account.provider)) {
-          console.error("❌ Admin login requires Google or Auth0 authentication")
-          return false
-        }
 
         // Validate authorized email domains
         if (user.email) {
@@ -73,14 +55,13 @@ export const authOptions: NextAuthOptions = {
       }
     },
 
-    async jwt({ token, account, profile, user }) {
+    async jwt({ token, account, user }) {
       try {
-        if (account && (profile || user)) {
+        if (account && user) {
           // Store user info in token
-          token.email = user?.email || profile?.email
-          token.name = user?.name || profile?.name
-          token.picture = user?.image || (profile as any)?.picture
-          token.provider = account.provider
+          token.email = user.email
+          token.name = user.name
+          token.picture = user.image
           token.role = "admin"
 
           console.log("JWT token created for:", token.email)
@@ -88,7 +69,6 @@ export const authOptions: NextAuthOptions = {
         return token
       } catch (error) {
         console.error("JWT callback error:", error)
-        // Return token even if there's an error to prevent auth failure
         return token
       }
     },
@@ -100,12 +80,10 @@ export const authOptions: NextAuthOptions = {
           session.user.name = token.name as string
           session.user.image = token.picture as string
           session.user.role = token.role as string
-          session.user.provider = token.provider as string
         }
         return session
       } catch (error) {
         console.error("Session callback error:", error)
-        // Return session even if there's an error to prevent auth failure
         return session
       }
     },
@@ -130,21 +108,6 @@ export const authOptions: NextAuthOptions = {
         console.error("Redirect callback error:", error)
         return `${baseUrl}/admin/dashboard`
       }
-    },
-  },
-  events: {
-    async signIn({ user, account, profile }) {
-      console.log("✅ Sign in event:", {
-        user: user.email,
-        provider: account?.provider,
-        timestamp: new Date().toISOString(),
-      })
-    },
-    async signOut({ session, token }) {
-      console.log("👋 Sign out event:", {
-        user: session?.user?.email || token?.email,
-        timestamp: new Date().toISOString(),
-      })
     },
   },
   debug: process.env.NODE_ENV === "development",
