@@ -1,290 +1,343 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Calendar, MessageSquare, Ticket, TrendingUp, Clock, AlertCircle, CheckCircle } from "lucide-react"
-
-interface DashboardStats {
-  totalClients: number
-  activeTickets: number
-  todayAppointments: number
-  unreadMessages: number
-  pendingTasks: number
-  systemHealth: "healthy" | "warning" | "error"
-}
+import {
+  Users,
+  Calendar,
+  MessageSquare,
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Activity,
+} from "lucide-react"
 
 export default function AdminDashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [stats, setStats] = useState<DashboardStats>({
-    totalClients: 0,
-    activeTickets: 0,
-    todayAppointments: 0,
-    unreadMessages: 0,
-    pendingTasks: 0,
-    systemHealth: "healthy",
-  })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === "loading") return
 
-    if (status === "unauthenticated") {
-      router.push("/auth/signin?tab=admin")
+    if (!session) {
+      console.log("❌ No session found, redirecting to signin")
+      router.push("/auth/signin")
       return
     }
 
-    if (session?.user?.role !== "admin" && session?.user?.role !== "super_admin") {
+    if (!["admin", "super_admin"].includes(session.user?.role || "")) {
+      console.log("❌ User is not admin, redirecting to unauthorized")
       router.push("/unauthorized")
       return
     }
 
-    loadDashboardData()
+    console.log("✅ Admin dashboard access granted for:", session.user?.email)
   }, [session, status, router])
 
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Use demo data for now to avoid database connection issues
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate loading
-
-      setStats({
-        totalClients: 156,
-        activeTickets: 12,
-        todayAppointments: 8,
-        unreadMessages: 3,
-        pendingTasks: 5,
-        systemHealth: "healthy",
-      })
-    } catch (error) {
-      console.error("Error loading dashboard data:", error)
-      setError("Failed to load dashboard data")
-
-      // Fallback to demo data
-      setStats({
-        totalClients: 156,
-        activeTickets: 12,
-        todayAppointments: 8,
-        unreadMessages: 3,
-        pendingTasks: 5,
-        systemHealth: "warning",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const statCards = [
-    {
-      title: "Total Clients",
-      value: stats.totalClients,
-      icon: Users,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
-      change: "+12%",
-    },
-    {
-      title: "Active Tickets",
-      value: stats.activeTickets,
-      icon: Ticket,
-      color: "text-orange-600",
-      bgColor: "bg-orange-100",
-      change: "-5%",
-    },
-    {
-      title: "Today's Appointments",
-      value: stats.todayAppointments,
-      icon: Calendar,
-      color: "text-green-600",
-      bgColor: "bg-green-100",
-      change: "+8%",
-    },
-    {
-      title: "Unread Messages",
-      value: stats.unreadMessages,
-      icon: MessageSquare,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
-      change: "0%",
-    },
-  ]
-
-  if (status === "loading" || loading) {
+  if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading dashboard...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
-  if (status === "unauthenticated") {
+  if (!session || !["admin", "super_admin"].includes(session.user?.role || "")) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
           <p className="text-gray-600">Redirecting to sign in...</p>
         </div>
       </div>
     )
   }
 
+  // Mock data for dashboard
+  const stats = {
+    totalClients: 156,
+    activeClients: 142,
+    todayAppointments: 12,
+    pendingAppointments: 8,
+    unreadMessages: 5,
+    monthlyRevenue: 45600,
+    revenueGrowth: 12.5,
+    systemAlerts: 2,
+  }
+
+  const recentActivity = [
+    {
+      id: 1,
+      type: "appointment",
+      message: "New appointment scheduled with John Smith",
+      time: "10 minutes ago",
+      icon: Calendar,
+      color: "text-blue-600",
+    },
+    {
+      id: 2,
+      type: "message",
+      message: "Message received from Jane Doe",
+      time: "25 minutes ago",
+      icon: MessageSquare,
+      color: "text-green-600",
+    },
+    {
+      id: 3,
+      type: "client",
+      message: "New client registration: Robert Wilson",
+      time: "1 hour ago",
+      icon: Users,
+      color: "text-purple-600",
+    },
+    {
+      id: 4,
+      type: "alert",
+      message: "System backup completed successfully",
+      time: "2 hours ago",
+      icon: CheckCircle,
+      color: "text-emerald-600",
+    },
+  ]
+
+  const upcomingAppointments = [
+    {
+      id: 1,
+      client: "John Smith",
+      time: "10:00 AM",
+      type: "Initial Consultation",
+      status: "confirmed",
+    },
+    {
+      id: 2,
+      client: "Jane Doe",
+      time: "11:30 AM",
+      type: "Follow-up Session",
+      status: "confirmed",
+    },
+    {
+      id: 3,
+      client: "Robert Wilson",
+      time: "2:00 PM",
+      type: "Therapy Session",
+      status: "pending",
+    },
+    {
+      id: 4,
+      client: "Sarah Johnson",
+      time: "3:30 PM",
+      type: "Assessment",
+      status: "confirmed",
+    },
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="flex">
-        {/* Sidebar placeholder */}
-        <div className="w-64 bg-white shadow-sm border-r">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold">Admin Portal</h2>
-          </div>
-          <nav className="mt-6">
-            <div className="px-6 py-2 text-sm font-medium text-gray-900 bg-blue-50 border-r-2 border-blue-600">
-              Dashboard
-            </div>
-            <div className="px-6 py-2 text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">Clients</div>
-            <div className="px-6 py-2 text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">Appointments</div>
-            <div className="px-6 py-2 text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">Messages</div>
-          </nav>
+    <div className="space-y-8">
+      {/* Welcome Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Welcome back, {session.user?.name}!</h1>
+          <p className="text-gray-600 mt-2">Here's what's happening with your practice today.</p>
         </div>
+        <div className="flex items-center space-x-2">
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Activity className="h-3 w-3 mr-1" />
+            System Online
+          </Badge>
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            Role: {session.user?.role}
+          </Badge>
+        </div>
+      </div>
 
-        {/* Main content */}
-        <div className="flex-1 p-8">
-          <div className="space-y-8">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-                <p className="text-slate-600 mt-2">Welcome to the Inner Clarity Admin Portal</p>
-                {session?.user?.email && (
-                  <p className="text-sm text-slate-500 mt-1">Signed in as: {session.user.email}</p>
-                )}
-              </div>
-              <div className="flex items-center space-x-2">
-                <Badge
-                  variant={stats.systemHealth === "healthy" ? "default" : "destructive"}
-                  className="flex items-center space-x-1"
-                >
-                  {stats.systemHealth === "healthy" ? (
-                    <CheckCircle className="h-3 w-3" />
-                  ) : (
-                    <AlertCircle className="h-3 w-3" />
-                  )}
-                  <span>System {stats.systemHealth}</span>
-                </Badge>
-              </div>
-            </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalClients}</div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-green-600">{stats.activeClients} active</span>
+            </p>
+          </CardContent>
+        </Card>
 
-            {/* Error message */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-                  <p className="text-red-700">{error}</p>
-                  <Button onClick={loadDashboardData} variant="outline" size="sm" className="ml-auto">
-                    Retry
-                  </Button>
-                </div>
-              </div>
-            )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Appointments</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.todayAppointments}</div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-orange-600">{stats.pendingAppointments} pending</span>
+            </p>
+          </CardContent>
+        </Card>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {statCards.map((stat, index) => {
-                const Icon = stat.icon
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unread Messages</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.unreadMessages}</div>
+            <p className="text-xs text-muted-foreground">Requires attention</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${stats.monthlyRevenue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-green-600 flex items-center">
+                <TrendingUp className="h-3 w-3 mr-1" />+{stats.revenueGrowth}% from last month
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Latest updates and notifications</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {recentActivity.map((activity) => {
+                const Icon = activity.icon
                 return (
-                  <Card key={index} className="hover:shadow-lg transition-shadow duration-200">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-slate-600">{stat.title}</p>
-                          <p className="text-3xl font-bold text-slate-900 mt-2">{stat.value}</p>
-                          <div className="flex items-center mt-2">
-                            <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                            <span className="text-sm text-green-600">{stat.change}</span>
-                          </div>
-                        </div>
-                        <div className={`p-3 rounded-full ${stat.bgColor}`}>
-                          <Icon className={`h-6 w-6 ${stat.color}`} />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div key={activity.id} className="flex items-start space-x-3">
+                    <div className={`p-2 rounded-full bg-gray-100 ${activity.color}`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{activity.message}</p>
+                      <p className="text-xs text-gray-500">{activity.time}</p>
+                    </div>
+                  </div>
                 )
               })}
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Clock className="h-5 w-5" />
-                    <span>Quick Actions</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button className="w-full justify-start" variant="outline">
-                    <Users className="mr-2 h-4 w-4" />
-                    Add New Client
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Schedule Appointment
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Send Message
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <Ticket className="mr-2 h-4 w-4" />
-                    Create Support Ticket
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">New client registration</p>
-                        <p className="text-xs text-slate-500">2 minutes ago</p>
-                      </div>
+        {/* Upcoming Appointments */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Today's Schedule</CardTitle>
+            <CardDescription>Upcoming appointments and sessions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {upcomingAppointments.map((appointment) => (
+                <div key={appointment.id} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
+                      <Clock className="h-4 w-4 text-blue-600" />
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Appointment scheduled</p>
-                        <p className="text-xs text-slate-500">15 minutes ago</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Support ticket created</p>
-                        <p className="text-xs text-slate-500">1 hour ago</p>
-                      </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{appointment.client}</p>
+                      <p className="text-xs text-gray-500">{appointment.type}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="text-right">
+                    <p className="text-sm font-medium">{appointment.time}</p>
+                    <Badge variant={appointment.status === "confirmed" ? "default" : "secondary"} className="text-xs">
+                      {appointment.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common tasks and shortcuts</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button
+              onClick={() => router.push("/admin/clients")}
+              className="h-20 flex flex-col items-center justify-center space-y-2"
+            >
+              <Users className="h-6 w-6" />
+              <span>Manage Clients</span>
+            </Button>
+            <Button
+              onClick={() => router.push("/admin/appointments")}
+              variant="outline"
+              className="h-20 flex flex-col items-center justify-center space-y-2"
+            >
+              <Calendar className="h-6 w-6" />
+              <span>Schedule Appointment</span>
+            </Button>
+            <Button
+              onClick={() => router.push("/admin/messages")}
+              variant="outline"
+              className="h-20 flex flex-col items-center justify-center space-y-2"
+            >
+              <MessageSquare className="h-6 w-6" />
+              <span>View Messages</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* System Alerts */}
+      {stats.systemAlerts > 0 && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader>
+            <CardTitle className="flex items-center text-orange-800">
+              <AlertTriangle className="h-5 w-5 mr-2" />
+              System Alerts ({stats.systemAlerts})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Scheduled maintenance reminder</p>
+                  <p className="text-xs text-gray-600">System maintenance scheduled for this weekend</p>
+                </div>
+                <Button size="sm" variant="outline">
+                  View Details
+                </Button>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Security update available</p>
+                  <p className="text-xs text-gray-600">New security patch ready for installation</p>
+                </div>
+                <Button size="sm" variant="outline">
+                  Update Now
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

@@ -5,6 +5,8 @@ import { getToken } from "next-auth/jwt"
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  console.log("🔍 Middleware checking:", pathname)
+
   // Public paths that don't require authentication
   const publicPaths = [
     "/",
@@ -19,6 +21,9 @@ export async function middleware(request: NextRequest) {
     "/privacy-policy",
     "/terms-of-service",
     "/hipaa-notice",
+    "/portal/auth/signin",
+    "/portal/auth/signup",
+    "/portal/auth/forgot-password",
   ]
 
   // Allow public paths and static files
@@ -44,13 +49,12 @@ export async function middleware(request: NextRequest) {
     if (!token) {
       console.log("❌ No admin token found, redirecting to signin")
       const url = new URL("/auth/signin", request.url)
-      url.searchParams.set("tab", "admin")
       url.searchParams.set("callbackUrl", request.url)
       return NextResponse.redirect(url)
     }
 
     // Check if user has admin role
-    if (token.role !== "admin") {
+    if (!["admin", "super_admin"].includes(token.role as string)) {
       console.log("❌ User is not admin, redirecting to unauthorized")
       return NextResponse.redirect(new URL("/unauthorized", request.url))
     }
@@ -59,25 +63,33 @@ export async function middleware(request: NextRequest) {
   }
 
   // Handle PATIENT PORTAL routes with Supabase Auth
-  if (pathname.startsWith("/portal")) {
+  if (pathname.startsWith("/portal") && !pathname.startsWith("/portal/auth")) {
+    console.log("🔒 Checking patient authentication for:", pathname)
+
     // Get Supabase session from cookies
     const supabaseToken =
-      request.cookies.get("sb-access-token")?.value || request.cookies.get("supabase-auth-token")?.value
+      request.cookies.get("sb-access-token")?.value ||
+      request.cookies.get("supabase-auth-token")?.value ||
+      request.cookies.get("supabase.auth.token")?.value
 
     // Check for Supabase session in various cookie formats
     const hasSupabaseSession = request.cookies
       .getAll()
       .some(
         (cookie) =>
-          cookie.name.includes("supabase") || cookie.name.includes("sb-") || cookie.name === "supabase.auth.token",
+          cookie.name.includes("supabase") ||
+          cookie.name.includes("sb-") ||
+          (cookie.name.includes("auth") && cookie.value.includes("access_token")),
       )
 
     if (!hasSupabaseSession && !supabaseToken) {
-      const url = new URL("/auth/signin", request.url)
-      url.searchParams.set("tab", "patient")
+      console.log("❌ No patient session found, redirecting to signin")
+      const url = new URL("/portal/auth/signin", request.url)
       url.searchParams.set("callbackUrl", request.url)
       return NextResponse.redirect(url)
     }
+
+    console.log("✅ Patient authentication check passed")
   }
 
   return NextResponse.next()

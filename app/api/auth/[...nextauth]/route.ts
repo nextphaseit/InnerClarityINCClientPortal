@@ -6,7 +6,7 @@ import type { NextAuthOptions } from "next-auth"
 // Demo admin credentials for testing
 const DEMO_ADMIN = {
   id: "demo-admin-001",
-  email: "admin@innerclarityinc.com",
+  email: "admin@nextphaseit.org",
   name: "Demo Administrator",
   role: "super_admin",
   password: "Admin123!",
@@ -16,7 +16,7 @@ const DEMO_ADMIN = {
 const adminUsers = [
   {
     id: "admin-1",
-    email: "admin@innerclarityinc.com",
+    email: "admin@nextphaseit.org",
     name: "Adrian Knight",
     password: "Admin123!",
     role: "super_admin",
@@ -33,11 +33,12 @@ const adminUsers = [
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "dummy",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "dummy",
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       authorization: {
         params: {
           scope: "openid email profile",
+          prompt: "select_account",
         },
       },
     }),
@@ -54,7 +55,7 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        console.log("🔍 Attempting login for:", credentials.email)
+        console.log("🔍 Attempting admin login for:", credentials.email)
 
         // Find admin user
         const adminUser = adminUsers.find((user) => user.email.toLowerCase() === credentials.email.toLowerCase())
@@ -87,15 +88,16 @@ export const authOptions: NextAuthOptions = {
     maxAge: 8 * 60 * 60, // 8 hours
   },
   pages: {
-    signIn: "/admin/login",
+    signIn: "/auth/signin",
     error: "/auth/error",
   },
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       try {
         console.log("🔐 Sign-in attempt:", {
           provider: account?.provider,
           email: user.email,
+          domain: user.email?.split("@")[1],
         })
 
         // Allow admin credentials login
@@ -112,6 +114,7 @@ export const authOptions: NextAuthOptions = {
               "innerclaritycounseling.com",
               "innerclarity.org",
               "innerclarityinc.com",
+              "gmail.com", // Allow Gmail for demo purposes
             ]
 
             if (!authorizedDomains.includes(domain)) {
@@ -121,12 +124,13 @@ export const authOptions: NextAuthOptions = {
 
             // Set role to admin for Google logins
             user.role = "admin"
+            console.log("✅ Google admin login authorized for:", user.email)
           }
         }
 
         return true
       } catch (error) {
-        console.error("Sign-in callback error:", error)
+        console.error("❌ Sign-in callback error:", error)
         return false
       }
     },
@@ -138,6 +142,8 @@ export const authOptions: NextAuthOptions = {
         token.picture = user.image
         token.role = user.role || "admin"
         token.provider = account.provider
+
+        console.log("🎫 JWT token created for:", token.email, "Role:", token.role)
       }
       return token
     },
@@ -149,11 +155,15 @@ export const authOptions: NextAuthOptions = {
         session.user.image = token.picture as string
         session.user.role = token.role as string
         session.user.provider = token.provider as string
+
+        console.log("👤 Session created for:", session.user.email, "Role:", session.user.role)
       }
       return session
     },
 
     async redirect({ url, baseUrl }) {
+      console.log("🔄 Redirect callback:", { url, baseUrl })
+
       // Handle redirects after sign in
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`
@@ -166,6 +176,14 @@ export const authOptions: NextAuthOptions = {
 
       // Default redirect to admin dashboard
       return `${baseUrl}/admin/dashboard`
+    },
+  },
+  events: {
+    async signIn({ user, account, isNewUser }) {
+      console.log(`✅ User signed in: ${user.email} via ${account?.provider} (Role: ${user.role})`)
+    },
+    async signOut({ session, token }) {
+      console.log(`👋 User signed out: ${session?.user?.email || token?.email}`)
     },
   },
   debug: process.env.NODE_ENV === "development",
