@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -39,17 +41,42 @@ export default function BillingPage() {
   const [payingInvoice, setPayingInvoice] = useState<string | null>(null)
 
   useEffect(() => {
-    if (status === "loading") return // Still loading
-
-    if (status === "unauthenticated") {
-      router.push("/auth/signin")
-      return
-    }
-
-    if (session?.user) {
+    if (status !== "loading" && session?.user) {
       fetchInvoices()
     }
-  }, [session, status, router])
+  }, [session, status])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500" />
+              <p className="mt-2 text-gray-600 dark:text-gray-400">Loading...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Sign In Required</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to view your billing information.</p>
+              <Button onClick={() => router.push("/auth/signin")}>Sign In</Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   const fetchInvoices = async () => {
     try {
@@ -162,40 +189,6 @@ export default function BillingPage() {
       default:
         return <FileText className="h-4 w-4" />
     }
-  }
-
-  // Show loading state while session is loading
-  if (status === "loading" || isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500" />
-              <p className="mt-2 text-gray-600 dark:text-gray-400">Loading billing information...</p>
-            </div>
-          </div>
-        </main>
-      </div>
-    )
-  }
-
-  // Show sign-in prompt if not authenticated
-  if (status === "unauthenticated") {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Authentication Required</h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to view your billing information.</p>
-              <Button onClick={() => router.push("/auth/signin")}>Sign In</Button>
-            </div>
-          </div>
-        </main>
-      </div>
-    )
   }
 
   const totalUnpaid = invoices

@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { useAuth } from "@/components/auth-provider"
+import { useSession } from "next-auth/react"
 import { MessageSquare, Send, Plus, Loader2, Mail, Calendar, User, Shield, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -25,7 +27,7 @@ interface Message {
 }
 
 export default function MessageCenterPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -44,18 +46,17 @@ export default function MessageCenterPage() {
     body: "",
   })
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin")
-      return
-    }
-  }, [user, authLoading, router])
+  const [hasMounted, setHasMounted] = useState(false)
 
   useEffect(() => {
-    if (user) {
+    setHasMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (hasMounted && session?.user) {
       fetchMessages()
     }
-  }, [user])
+  }, [session, hasMounted])
 
   const fetchMessages = async () => {
     try {
@@ -175,16 +176,28 @@ export default function MessageCenterPage() {
 
   const unreadCount = messages.filter((msg) => msg.status === "unread").length
 
-  if (authLoading) {
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
       </div>
     )
   }
 
-  if (!user) {
-    return null
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <MessageSquare className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Sign In Required</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to view your messages.</p>
+          <Button onClick={() => router.push("/auth/signin")}>Sign In</Button>
+        </div>
+      </div>
+    )
   }
 
   return (

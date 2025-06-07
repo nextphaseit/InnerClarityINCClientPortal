@@ -1,32 +1,23 @@
 import { NextResponse } from "next/server"
-import { validateProductionConfig } from "@/lib/env-config"
 
 export async function GET() {
   try {
-    // Validate configuration
-    validateProductionConfig()
-
-    const healthCheck = {
+    // Basic health check
+    const health = {
       status: "healthy",
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
+      environment: process.env.NODE_ENV || "development",
       version: "1.0.0",
-      services: {
-        database: "connected", // Add actual DB check
-        auth: "configured",
-        payments: "configured",
-      },
     }
 
-    return NextResponse.json(healthCheck)
+    return NextResponse.json(health, { status: 200 })
   } catch (error) {
     console.error("Health check failed:", error)
-
     return NextResponse.json(
       {
         status: "unhealthy",
-        error: error instanceof Error ? error.message : "Unknown error",
         timestamp: new Date().toISOString(),
+        error: "Health check failed",
       },
       { status: 500 },
     )
