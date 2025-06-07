@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Save, User, Phone, MapPin, Shield, AlertCircle, Camera, Upload, Loader2 } from "lucide-react"
+import { User, Phone, MapPin, Shield, AlertCircle, Camera, Upload, Loader2 } from "lucide-react"
 
 interface Profile {
   id: string
@@ -47,16 +47,45 @@ export default function ProfilePage() {
   const [error, setError] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const [hasSession, setHasSession] = useState(false)
 
   useEffect(() => {
-    if (status !== "loading") {
-      if (!session) {
-        router.push("/portal/auth/signin")
-      } else if (session?.user) {
-        loadProfile()
-      }
+    setHasSession(!!session?.user)
+  }, [session])
+
+  useEffect(() => {
+    if (hasSession) {
+      loadProfile()
     }
-  }, [session, status, router])
+  }, [hasSession])
+
+  // Handle loading state
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-teal-600" />
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Handle unauthenticated state
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
+          <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-4">Please sign in to view your profile.</p>
+          <Button onClick={() => router.push("/portal/auth/signin")} className="bg-teal-600 hover:bg-teal-700">
+            Sign In
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   const loadProfile = async () => {
     if (!session?.user?.id) return
@@ -251,34 +280,6 @@ export default function ProfilePage() {
   const updateProfile = (field: keyof Profile, value: string) => {
     if (!profile) return
     setProfile({ ...profile, [field]: value })
-  }
-
-  // Handle loading state
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-teal-600" />
-          <p className="text-gray-600">Loading your profile...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Handle unauthenticated state
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
-          <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
-          <p className="text-gray-600 mb-4">Please sign in to view your profile.</p>
-          <Button onClick={() => router.push("/portal/auth/signin")} className="bg-teal-600 hover:bg-teal-700">
-            Sign In
-          </Button>
-        </div>
-      </div>
-    )
   }
 
   if (loading) {
@@ -557,7 +558,7 @@ export default function ProfilePage() {
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4 mr-2" />
+                  <Upload className="h-4 w-4 mr-2" />
                   Save Changes
                 </>
               )}
