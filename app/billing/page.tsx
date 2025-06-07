@@ -33,7 +33,9 @@ interface Invoice {
 }
 
 export default function BillingPage() {
-  const { data: session, status } = useSession()
+  const session = useSession()
+  const sessionData = session?.data
+  const status = session?.status || "loading"
   const router = useRouter()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -41,10 +43,10 @@ export default function BillingPage() {
   const [payingInvoice, setPayingInvoice] = useState<string | null>(null)
 
   useEffect(() => {
-    if (status !== "loading" && session?.user) {
+    if (status !== "loading" && sessionData?.user) {
       fetchInvoices()
     }
-  }, [session, status])
+  }, [sessionData, status])
 
   if (status === "loading") {
     return (
@@ -61,7 +63,7 @@ export default function BillingPage() {
     )
   }
 
-  if (!session) {
+  if (!sessionData) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -144,7 +146,7 @@ export default function BillingPage() {
       }
     } catch (err) {
       console.error("Error creating payment session:", err)
-      alert("Unable to process payment. Please try again.")
+      alert("Unable toprocess payment. Please try again.")
     } finally {
       setPayingInvoice(null)
     }
