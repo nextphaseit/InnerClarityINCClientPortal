@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { User, Phone, MapPin, Shield, AlertCircle, Camera, Upload, Loader2 } from "lucide-react"
+import { Save, User, Phone, MapPin, Shield, AlertCircle, Camera, Upload, Loader2 } from "lucide-react"
 
 interface Profile {
   id: string
@@ -48,39 +48,15 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  // Handle loading state
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-teal-600" />
-          <p className="text-gray-600">Loading your profile...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Handle unauthenticated state
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
-          <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
-          <p className="text-gray-600 mb-4">Please sign in to view your profile.</p>
-          <Button onClick={() => router.push('/portal/auth/signin')} className="bg-teal-600 hover:bg-teal-700">
-            Sign In
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
   useEffect(() => {
-    if (session?.user) {
-      loadProfile()
+    if (status !== "loading") {
+      if (!session) {
+        router.push("/portal/auth/signin")
+      } else if (session?.user) {
+        loadProfile()
+      }
     }
-  }, [session])
+  }, [session, status, router])
 
   const loadProfile = async () => {
     if (!session?.user?.id) return
@@ -275,6 +251,34 @@ export default function ProfilePage() {
   const updateProfile = (field: keyof Profile, value: string) => {
     if (!profile) return
     setProfile({ ...profile, [field]: value })
+  }
+
+  // Handle loading state
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-teal-600" />
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Handle unauthenticated state
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
+          <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-4">Please sign in to view your profile.</p>
+          <Button onClick={() => router.push("/portal/auth/signin")} className="bg-teal-600 hover:bg-teal-700">
+            Sign In
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -514,4 +518,53 @@ export default function ProfilePage() {
                   <Input
                     id="emergency_contact_name"
                     value={profile?.emergency_contact_name || ""}
-                    onChange\
+                    onChange={(e) => updateProfile("emergency_contact_name", e.target.value)}
+                    placeholder="John Doe"
+                    className="bg-white/50"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="emergency_contact_phone">Contact Phone</Label>
+                  <Input
+                    id="emergency_contact_phone"
+                    value={profile?.emergency_contact_phone || ""}
+                    onChange={(e) => updateProfile("emergency_contact_phone", e.target.value)}
+                    placeholder="(555) 987-6543"
+                    className="bg-white/50"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="emergency_contact_relationship">Relationship</Label>
+                <Input
+                  id="emergency_contact_relationship"
+                  value={profile?.emergency_contact_relationship || ""}
+                  onChange={(e) => updateProfile("emergency_contact_relationship", e.target.value)}
+                  placeholder="Spouse, Parent, Sibling, etc."
+                  className="bg-white/50"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">
+              {saving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
