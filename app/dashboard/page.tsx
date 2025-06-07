@@ -11,7 +11,10 @@ import ProtectedRoute from "@/components/protected-route"
 import { LogOut, User, Mail, Calendar } from "lucide-react"
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession()
+  // Use safer destructuring pattern to prevent build errors
+  const session = useSession()
+  const sessionData = session?.data
+  const status = session?.status || "loading"
 
   // Handle loading state
   if (status === "loading") {
@@ -26,7 +29,7 @@ export default function DashboardPage() {
   }
 
   // Handle unauthenticated state
-  if (!session) {
+  if (!sessionData) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -73,16 +76,16 @@ export default function DashboardPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-4">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={session.user?.image || ""} />
-                  <AvatarFallback>{session.user?.name?.charAt(0)?.toUpperCase() || "U"}</AvatarFallback>
+                  <AvatarImage src={sessionData.user?.image || ""} />
+                  <AvatarFallback>{sessionData.user?.name?.charAt(0)?.toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
                 <div className="space-y-1">
-                  <h3 className="text-lg font-semibold">{session.user?.name || "Unknown User"}</h3>
+                  <h3 className="text-lg font-semibold">{sessionData.user?.name || "Unknown User"}</h3>
                   <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
                     <Mail className="h-4 w-4" />
-                    <span>{session.user?.email || "No email"}</span>
+                    <span>{sessionData.user?.email || "No email"}</span>
                   </div>
-                  <Badge variant="secondary">{session.user?.role || "User"}</Badge>
+                  <Badge variant="secondary">{sessionData.user?.role || "User"}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -100,15 +103,15 @@ export default function DashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-medium">User ID:</span>
-                  <p className="text-gray-600 dark:text-gray-400 break-all">{session.user?.id || "N/A"}</p>
+                  <p className="text-gray-600 dark:text-gray-400 break-all">{sessionData.user?.id || "N/A"}</p>
                 </div>
                 <div>
                   <span className="font-medium">Provider:</span>
-                  <p className="text-gray-600 dark:text-gray-400">{session.user?.provider || "N/A"}</p>
+                  <p className="text-gray-600 dark:text-gray-400">{sessionData.user?.provider || "N/A"}</p>
                 </div>
                 <div>
                   <span className="font-medium">Role:</span>
-                  <p className="text-gray-600 dark:text-gray-400">{session.user?.role || "N/A"}</p>
+                  <p className="text-gray-600 dark:text-gray-400">{sessionData.user?.role || "N/A"}</p>
                 </div>
                 <div>
                   <span className="font-medium">Status:</span>
