@@ -1,9 +1,12 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { supabase } from "@/lib/supabase"
 import { Send, MessageCircle, Clock, User, Paperclip } from "lucide-react"
 import { PortalNavigation } from "@/components/portal-navigation"
@@ -27,155 +30,241 @@ interface MessageThread {
 }
 
 export default function MessagesPage() {
+  const { data: session, status } = useSession()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
   const [messageThreads, setMessageThreads] = useState<MessageThread[]>([])
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState("")
   const [isSending, setIsSending] = useState(false)
 
-  // Mock message data
-  const mockThreads: MessageThread[] = [
-    {
-      id: "thread-1",
-      subject: "Appointment Follow-up",
-      lastMessage: new Date("2024-01-15T14:30:00"),
-      unreadCount: 1,
-      messages: [
-        {
-          id: "msg-1",
-          staffName: "Dr. Sarah Johnson",
-          staffRole: "Licensed Therapist",
-          content:
-            "Hi! I wanted to follow up on our session yesterday. How are you feeling about the coping strategies we discussed?",
-          timestamp: new Date("2024-01-14T10:00:00"),
-          isFromStaff: true,
-          isRead: true,
-        },
-        {
-          id: "msg-2",
-          staffName: "You",
-          staffRole: "Patient",
-          content:
-            "Thank you for checking in! I've been practicing the breathing exercises and they're really helping with my anxiety.",
-          timestamp: new Date("2024-01-14T15:30:00"),
-          isFromStaff: false,
-          isRead: true,
-        },
-        {
-          id: "msg-3",
-          staffName: "Dr. Sarah Johnson",
-          staffRole: "Licensed Therapist",
-          content:
-            "That's wonderful to hear! Keep practicing those techniques. I'd like to schedule a check-in next week to see how you're progressing.",
-          timestamp: new Date("2024-01-15T14:30:00"),
-          isFromStaff: true,
-          isRead: false,
-        },
-      ],
-    },
-    {
-      id: "thread-2",
-      subject: "Insurance and Billing",
-      lastMessage: new Date("2024-01-12T11:15:00"),
-      unreadCount: 0,
-      messages: [
-        {
-          id: "msg-4",
-          staffName: "Maria Rodriguez",
-          staffRole: "Patient Coordinator",
-          content:
-            "Hello! I wanted to let you know that your insurance has approved coverage for your upcoming sessions. You'll have a $25 copay per visit.",
-          timestamp: new Date("2024-01-12T09:00:00"),
-          isFromStaff: true,
-          isRead: true,
-        },
-        {
-          id: "msg-5",
-          staffName: "You",
-          staffRole: "Patient",
-          content: "Perfect, thank you for handling that! When will I receive the updated billing information?",
-          timestamp: new Date("2024-01-12T11:15:00"),
-          isFromStaff: false,
-          isRead: true,
-        },
-      ],
-    },
-    {
-      id: "thread-3",
-      subject: "Wellness Resources",
-      lastMessage: new Date("2024-01-10T16:45:00"),
-      unreadCount: 0,
-      messages: [
-        {
-          id: "msg-6",
-          staffName: "Dr. Michael Chen",
-          staffRole: "Clinical Director",
-          content:
-            "I've compiled some additional resources that might be helpful for your journey. These include meditation apps and local support groups.",
-          timestamp: new Date("2024-01-10T16:45:00"),
-          isFromStaff: true,
-          isRead: true,
-        },
-      ],
-    },
-  ]
-
   useEffect(() => {
-    checkUserSession()
-  }, [])
+    if (status !== "loading") {
+      if (!session) {
+        router.push("/portal/auth/signin")
+      } else if (session?.user) {
+        checkUserSession()
+      }
+    }
+  }, [session, status, router])
 
   const checkUserSession = async () => {
     try {
+      setIsLoading(true)
       console.log("🔐 Checking user session...")
 
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
-
-      if (error) {
-        console.error("❌ Session error:", error)
-        router.push("/auth/login?message=Please sign in to access your messages")
-        return
-      }
-
-      if (!user) {
+      if (!session?.user?.id) {
         console.log("❌ No user session found")
-        router.push("/auth/login?message=Please sign in to access your messages")
+        router.push("/portal/auth/signin?message=Please sign in to access your messages")
         return
       }
 
-      console.log("✅ User session verified:", user.email)
-      setUser(user)
-      setMessageThreads(mockThreads)
+      console.log("✅ User session verified:", session.user.email)
 
-      // Auto-select first thread if available
-      if (mockThreads.length > 0) {
-        setSelectedThread(mockThreads[0].id)
+      // Load message threads from Supabase
+      const { data: threadsData, error: threadsError } = await supabase
+        .from("message_threads")
+        .select("*")
+        .eq("patient_id", session.user.id)
+        .order("last_message_at", { ascending: false })
+
+      if (threadsError) {
+        console.error("Error loading message threads:", threadsError)
+        // Fallback to mock data for demo
+        loadMockThreads()
+        return
+      }
+
+      if (threadsData && threadsData.length > 0) {
+        // Transform the data to match our interface
+        const formattedThreads = threadsData.map((thread) => ({
+          id: thread.id,
+          subject: thread.subject,
+          lastMessage: new Date(thread.last_message_at),
+          unreadCount: thread.unread_count || 0,
+          messages: [], // We'll load these when a thread is selected
+        }))
+
+        setMessageThreads(formattedThreads)
+
+        // Auto-select first thread if available
+        if (formattedThreads.length > 0) {
+          setSelectedThread(formattedThreads[0].id)
+          loadThreadMessages(formattedThreads[0].id)
+        }
+      } else {
+        // No threads found, use mock data
+        loadMockThreads()
       }
     } catch (error) {
       console.error("❌ Unexpected error checking session:", error)
-      router.push("/auth/login?message=An error occurred. Please sign in again.")
+      loadMockThreads()
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadThreadMessages = async (threadId: string) => {
+    if (!session?.user?.id) return
+
+    try {
+      const { data: messagesData, error: messagesError } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("thread_id", threadId)
+        .order("created_at", { ascending: true })
+
+      if (messagesError) {
+        console.error("Error loading messages:", messagesError)
+        return
+      }
+
+      if (messagesData) {
+        // Transform messages to match our interface
+        const formattedMessages = messagesData.map((msg) => ({
+          id: msg.id,
+          staffName: msg.is_from_staff ? msg.staff_name || "Staff Member" : "You",
+          staffRole: msg.staff_role || "",
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          isFromStaff: msg.is_from_staff,
+          isRead: msg.is_read,
+        }))
+
+        // Update the thread with messages
+        setMessageThreads((prev) =>
+          prev.map((thread) => (thread.id === threadId ? { ...thread, messages: formattedMessages } : thread)),
+        )
+      }
+    } catch (error) {
+      console.error("Error loading thread messages:", error)
+    }
+  }
+
+  const loadMockThreads = () => {
+    // Mock message data
+    const mockThreads: MessageThread[] = [
+      {
+        id: "thread-1",
+        subject: "Appointment Follow-up",
+        lastMessage: new Date("2024-01-15T14:30:00"),
+        unreadCount: 1,
+        messages: [
+          {
+            id: "msg-1",
+            staffName: "Dr. Sarah Johnson",
+            staffRole: "Licensed Therapist",
+            content:
+              "Hi! I wanted to follow up on our session yesterday. How are you feeling about the coping strategies we discussed?",
+            timestamp: new Date("2024-01-14T10:00:00"),
+            isFromStaff: true,
+            isRead: true,
+          },
+          {
+            id: "msg-2",
+            staffName: "You",
+            staffRole: "Patient",
+            content:
+              "Thank you for checking in! I've been practicing the breathing exercises and they're really helping with my anxiety.",
+            timestamp: new Date("2024-01-14T15:30:00"),
+            isFromStaff: false,
+            isRead: true,
+          },
+          {
+            id: "msg-3",
+            staffName: "Dr. Sarah Johnson",
+            staffRole: "Licensed Therapist",
+            content:
+              "That's wonderful to hear! Keep practicing those techniques. I'd like to schedule a check-in next week to see how you're progressing.",
+            timestamp: new Date("2024-01-15T14:30:00"),
+            isFromStaff: true,
+            isRead: false,
+          },
+        ],
+      },
+      {
+        id: "thread-2",
+        subject: "Insurance and Billing",
+        lastMessage: new Date("2024-01-12T11:15:00"),
+        unreadCount: 0,
+        messages: [
+          {
+            id: "msg-4",
+            staffName: "Maria Rodriguez",
+            staffRole: "Patient Coordinator",
+            content:
+              "Hello! I wanted to let you know that your insurance has approved coverage for your upcoming sessions. You'll have a $25 copay per visit.",
+            timestamp: new Date("2024-01-12T09:00:00"),
+            isFromStaff: true,
+            isRead: true,
+          },
+          {
+            id: "msg-5",
+            staffName: "You",
+            staffRole: "Patient",
+            content: "Perfect, thank you for handling that! When will I receive the updated billing information?",
+            timestamp: new Date("2024-01-12T11:15:00"),
+            isFromStaff: false,
+            isRead: true,
+          },
+        ],
+      },
+      {
+        id: "thread-3",
+        subject: "Wellness Resources",
+        lastMessage: new Date("2024-01-10T16:45:00"),
+        unreadCount: 0,
+        messages: [
+          {
+            id: "msg-6",
+            staffName: "Dr. Michael Chen",
+            staffRole: "Clinical Director",
+            content:
+              "I've compiled some additional resources that might be helpful for your journey. These include meditation apps and local support groups.",
+            timestamp: new Date("2024-01-10T16:45:00"),
+            isFromStaff: true,
+            isRead: true,
+          },
+        ],
+      },
+    ]
+
+    setMessageThreads(mockThreads)
+
+    // Auto-select first thread if available
+    if (mockThreads.length > 0) {
+      setSelectedThread(mockThreads[0].id)
     }
   }
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!newMessage.trim() || !selectedThread) return
+    if (!newMessage.trim() || !selectedThread || !session?.user?.id) return
 
     setIsSending(true)
 
     try {
-      // Mock sending message - in real implementation, this would call Supabase
-      console.log("📤 Sending message:", newMessage)
+      // Send message to Supabase
+      const { error } = await supabase.from("messages").insert({
+        thread_id: selectedThread,
+        patient_id: session.user.id,
+        content: newMessage.trim(),
+        is_from_staff: false,
+        is_read: true,
+        created_at: new Date().toISOString(),
+      })
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      if (error) {
+        console.error("Error sending message:", error)
+        throw error
+      }
+
+      // Update the thread's last_message_at
+      await supabase
+        .from("message_threads")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", selectedThread)
 
       // Add message to selected thread
       const updatedThreads = messageThreads.map((thread) => {
@@ -269,7 +358,13 @@ export default function MessagesPage() {
                     messageThreads.map((thread) => (
                       <button
                         key={thread.id}
-                        onClick={() => setSelectedThread(thread.id)}
+                        onClick={() => {
+                          setSelectedThread(thread.id)
+                          // Load messages if they haven't been loaded yet
+                          if (thread.messages.length === 0) {
+                            loadThreadMessages(thread.id)
+                          }
+                        }}
                         className={`w-full p-4 text-left border-b border-gray-200 hover:bg-white transition-colors ${
                           selectedThread === thread.id ? "bg-white border-l-4 border-l-teal-500" : ""
                         }`}

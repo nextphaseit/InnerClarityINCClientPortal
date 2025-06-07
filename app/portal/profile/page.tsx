@@ -1,18 +1,20 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import Image from "next/image"
-import { supabase, isSupabaseConfigured } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Save, User, Phone, MapPin, Shield, AlertCircle, Camera, Upload } from "lucide-react"
-import { usePatientAuth } from "@/components/patient-auth-provider"
+import { User, Phone, MapPin, Shield, AlertCircle, Camera, Upload, Loader2 } from "lucide-react"
 
 interface Profile {
   id: string
@@ -36,7 +38,7 @@ interface Profile {
 }
 
 export default function ProfilePage() {
-  const { user } = usePatientAuth()
+  const { data: session, status } = useSession()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -46,51 +48,52 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
+  // Handle loading state
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-teal-600" />
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Handle unauthenticated state
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
+          <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-4">Please sign in to view your profile.</p>
+          <Button onClick={() => router.push('/portal/auth/signin')} className="bg-teal-600 hover:bg-teal-700">
+            Sign In
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   useEffect(() => {
-    if (!user) {
-      router.push("/portal/auth/signin")
-      return
+    if (session?.user) {
+      loadProfile()
     }
-    loadProfile()
-  }, [user, router])
+  }, [session])
 
   const loadProfile = async () => {
-    if (!user) return
+    if (!session?.user?.id) return
 
     try {
-      if (!isSupabaseConfigured()) {
-        // Create mock profile for demo
-        const mockProfile: Profile = {
-          id: user.id,
-          user_id: user.id,
-          email: user.email || "",
-          full_name: user.user_metadata?.full_name || "Demo Patient",
-          phone: "",
-          address: "",
-          city: "",
-          state: "",
-          zip: "",
-          insurance_provider: "",
-          insurance_id: "",
-          emergency_contact_name: "",
-          emergency_contact_phone: "",
-          emergency_contact_relationship: "",
-          date_of_birth: "",
-          avatar_url: user.user_metadata?.avatar_url,
-          updated_at: new Date().toISOString(),
-        }
-        setProfile(mockProfile)
-        setLoading(false)
-        return
-      }
-
-      console.log("Loading profile for user:", user.id)
+      setLoading(true)
+      console.log("Loading profile for user:", session.user.id)
 
       // Try to get profile by id first
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
+        .eq("id", session.user.id)
         .single()
 
       if (profileError) {
@@ -100,7 +103,7 @@ export default function ProfilePage() {
         const { data: altProfileData, error: altProfileError } = await supabase
           .from("profiles")
           .select("*")
-          .or(`user_id.eq.${user.id},client_id.eq.${user.id}`)
+          .or(`user_id.eq.${session.user.id},client_id.eq.${session.user.id}`)
           .single()
 
         if (altProfileError) {
@@ -127,14 +130,14 @@ export default function ProfilePage() {
   }
 
   const createDefaultProfile = async () => {
-    if (!user) return
+    if (!session?.user) return
 
     const defaultProfile: Profile = {
-      id: user.id,
-      user_id: user.id,
-      client_id: user.id,
-      email: user.email || "",
-      full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
+      id: session.user.id,
+      user_id: session.user.id,
+      client_id: session.user.id,
+      email: session.user.email || "",
+      full_name: session.user.name || session.user.email?.split("@")[0] || "",
       phone: "",
       address: "",
       city: "",
@@ -146,25 +149,23 @@ export default function ProfilePage() {
       emergency_contact_phone: "",
       emergency_contact_relationship: "",
       date_of_birth: "",
-      avatar_url: user.user_metadata?.avatar_url,
+      avatar_url: session.user.image,
       updated_at: new Date().toISOString(),
     }
 
-    if (isSupabaseConfigured()) {
-      try {
-        console.log("Creating default profile:", defaultProfile)
+    try {
+      console.log("Creating default profile:", defaultProfile)
 
-        // Try to insert the default profile
-        const { error: insertError } = await supabase.from("profiles").insert(defaultProfile)
+      // Try to insert the default profile
+      const { error: insertError } = await supabase.from("profiles").insert(defaultProfile)
 
-        if (insertError) {
-          console.error("Error creating default profile:", insertError)
-        } else {
-          console.log("Default profile created successfully")
-        }
-      } catch (error) {
-        console.error("Error inserting profile:", error)
+      if (insertError) {
+        console.error("Error creating default profile:", insertError)
+      } else {
+        console.log("Default profile created successfully")
       }
+    } catch (error) {
+      console.error("Error inserting profile:", error)
     }
 
     setProfile(defaultProfile)
@@ -172,22 +173,12 @@ export default function ProfilePage() {
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file || !user) return
+    if (!file || !session?.user?.id) return
 
     setUploading(true)
     setError("")
 
     try {
-      if (!isSupabaseConfigured()) {
-        // Mock upload for demo
-        const mockUrl = URL.createObjectURL(file)
-        setProfile((prev) => (prev ? { ...prev, avatar_url: mockUrl } : null))
-        setMessage("Profile picture uploaded successfully! (Demo mode)")
-        setTimeout(() => setMessage(""), 3000)
-        setUploading(false)
-        return
-      }
-
       // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         throw new Error("File size must be less than 5MB")
@@ -251,20 +242,13 @@ export default function ProfilePage() {
   }
 
   const handleSave = async () => {
-    if (!profile || !user) return
+    if (!profile || !session?.user?.id) return
 
     setSaving(true)
     setMessage("")
     setError("")
 
     try {
-      if (!isSupabaseConfigured()) {
-        setMessage("Profile updated successfully! (Demo mode)")
-        setTimeout(() => setMessage(""), 3000)
-        setSaving(false)
-        return
-      }
-
       console.log("Saving profile:", profile)
 
       const { error: saveError } = await supabase.from("profiles").upsert({
@@ -530,57 +514,4 @@ export default function ProfilePage() {
                   <Input
                     id="emergency_contact_name"
                     value={profile?.emergency_contact_name || ""}
-                    onChange={(e) => updateProfile("emergency_contact_name", e.target.value)}
-                    placeholder="John Doe"
-                    className="bg-white/50"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="emergency_contact_phone">Contact Phone</Label>
-                  <Input
-                    id="emergency_contact_phone"
-                    value={profile?.emergency_contact_phone || ""}
-                    onChange={(e) => updateProfile("emergency_contact_phone", e.target.value)}
-                    placeholder="(555) 987-6543"
-                    className="bg-white/50"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="emergency_contact_relationship">Relationship</Label>
-                <Input
-                  id="emergency_contact_relationship"
-                  value={profile?.emergency_contact_relationship || ""}
-                  onChange={(e) => updateProfile("emergency_contact_relationship", e.target.value)}
-                  placeholder="Spouse, Parent, Sibling, etc."
-                  className="bg-white/50"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Save Button */}
-          <div className="flex justify-end">
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
-            >
-              {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+                    onChange\

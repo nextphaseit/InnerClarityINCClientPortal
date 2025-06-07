@@ -1,13 +1,15 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { usePatientAuth } from "@/components/patient-auth-provider"
-import { supabase, isSupabaseConfigured } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase"
 import {
   CreditCard,
   Download,
@@ -19,6 +21,7 @@ import {
   Calendar,
   TrendingUp,
   ExternalLink,
+  Loader2,
 } from "lucide-react"
 
 interface Payment {
@@ -42,7 +45,7 @@ interface BillingSummary {
 }
 
 export default function BillingPage() {
-  const { user, loading: authLoading } = usePatientAuth()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [paymentLoading, setPaymentLoading] = useState(false)
@@ -58,46 +61,34 @@ export default function BillingPage() {
   const [success, setSuccess] = useState("")
 
   useEffect(() => {
-    if (authLoading) return
-
-    if (!user) {
-      router.push("/portal/auth/signin")
-      return
+    if (session?.user) {
+      loadBillingData()
     }
-
-    loadBillingData()
-  }, [user, authLoading, router])
+  }, [session])
 
   const loadBillingData = async () => {
-    if (!user?.id) return
+    if (!session?.user?.id) return
 
     setLoading(true)
     setError("")
 
     try {
-      if (isSupabaseConfigured()) {
-        console.log("Loading billing data for patient:", user.id)
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("patient_id", session.user.id)
+        .order("created_at", { ascending: false })
 
-        const { data: paymentsData, error: paymentsError } = await supabase
-          .from("payments")
-          .select("*")
-          .eq("patient_id", user.id)
-          .order("created_at", { ascending: false })
-
-        if (paymentsError) {
-          console.error("Error fetching payments:", paymentsError)
-          throw new Error(`Failed to load payment history: ${paymentsError.message}`)
-        }
-
-        console.log("Loaded payments:", paymentsData)
-        setPayments(paymentsData || [])
-
-        const summary = calculateBillingSummary(paymentsData || [])
-        setBillingSummary(summary)
-      } else {
-        console.log("Supabase not configured")
-        setError("Payment system is not configured. Please contact support.")
+      if (paymentsError) {
+        console.error("Error fetching payments:", paymentsError)
+        throw new Error(`Failed to load payment history: ${paymentsError.message}`)
       }
+
+      console.log("Loaded payments:", paymentsData)
+      setPayments(paymentsData || [])
+
+      const summary = calculateBillingSummary(paymentsData || [])
+      setBillingSummary(summary)
     } catch (error) {
       console.error("Error loading billing data:", error)
       setError(error instanceof Error ? error.message : "Failed to load billing information")
@@ -125,7 +116,7 @@ export default function BillingPage() {
   }
 
   const handlePayNow = async (amount = 10000, description = "Medical Services Payment") => {
-    if (!user?.id) return
+    if (!session?.user?.id) return
 
     setPaymentLoading(true)
     setError("")
@@ -139,7 +130,7 @@ export default function BillingPage() {
         body: JSON.stringify({
           amount: amount / 100,
           description,
-          patientId: user.id,
+          patientId: session.user.id,
         }),
       })
 
@@ -163,7 +154,7 @@ export default function BillingPage() {
   }
 
   const handleOpenCustomerPortal = async () => {
-    if (!user?.id) return
+    if (!session?.user?.id) return
 
     setPortalLoading(true)
     setError("")
@@ -261,7 +252,35 @@ export default function BillingPage() {
     return `${paymentIntent.slice(0, 8)}...${paymentIntent.slice(-4)}`
   }
 
-  if (authLoading || loading) {
+  // Handle loading state
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-teal-600" />
+          <p className="text-gray-600">Loading your billing information...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Handle unauthenticated state
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-4">Please sign in to view your billing information.</p>
+          <Button onClick={() => router.push("/portal/auth/signin")} className="bg-teal-600 hover:bg-teal-700">
+            Sign In
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
