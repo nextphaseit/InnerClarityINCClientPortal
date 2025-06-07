@@ -1,40 +1,42 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 // Mock clients data with tenant information
-const mockClients = [
-  {
-    id: "client-1",
-    name: "Jayda Smith",
-    email: "jayda@innerclarity.org",
-    dateRegistered: "2024-01-15",
-    tenantId: "inner-clarity",
-    status: "Active",
-  },
-  {
-    id: "client-2",
-    name: "Michael Johnson",
-    email: "michael.j@innerclarity.org",
-    dateRegistered: "2024-01-20",
-    tenantId: "inner-clarity",
-    status: "Active",
-  },
-  {
-    id: "client-3",
-    name: "Sarah Wilson",
-    email: "sarah.w@innerclarity.org",
-    dateRegistered: "2024-02-01",
-    tenantId: "inner-clarity",
-    status: "Active",
-  },
-  {
-    id: "client-4",
-    name: "David Brown",
-    email: "david.b@otherorg.com",
-    dateRegistered: "2024-01-10",
-    tenantId: "other-org",
-    status: "Active",
-  },
-]
+// const mockClients = [
+//   {
+//     id: "client-1",
+//     name: "Jayda Smith",
+//     email: "jayda@innerclarity.org",
+//     dateRegistered: "2024-01-15",
+//     tenantId: "inner-clarity",
+//     status: "Active",
+//   },
+//   {
+//     id: "client-2",
+//     name: "Michael Johnson",
+//     email: "michael.j@innerclarity.org",
+//     dateRegistered: "2024-01-20",
+//     tenantId: "inner-clarity",
+//     status: "Active",
+//   },
+//   {
+//     id: "client-3",
+//     name: "Sarah Wilson",
+//     email: "sarah.w@innerclarity.org",
+//     dateRegistered: "2024-02-01",
+//     tenantId: "inner-clarity",
+//     status: "Active",
+//   },
+//   {
+//     id: "client-4",
+//     name: "David Brown",
+//     email: "david.b@otherorg.com",
+//     dateRegistered: "2024-01-10",
+//     tenantId: "other-org",
+//     status: "Active",
+//   },
+// ]
+
+const mockClients: any[] = [] // Replace with database connection later
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,7 +49,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter clients by tenantId
-    const filteredClients = mockClients.filter((client) => client.tenantId === tenantId)
+    // const filteredClients = mockClients.filter((client) => client.tenantId === tenantId)
+    let filteredClients
+    try {
+      // Replace with actual database query
+      filteredClients = mockClients.filter((client) => client.tenantId === tenantId)
+    } catch (dbError: any) {
+      console.error("Database error:", dbError)
+      return NextResponse.json({ error: "Failed to fetch clients from the database" }, { status: 500 })
+    }
 
     return NextResponse.json(filteredClients, { status: 200 })
   } catch (error) {

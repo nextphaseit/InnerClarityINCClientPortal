@@ -19,6 +19,7 @@ import {
   Calendar,
   TrendingUp,
   ExternalLink,
+  Database,
 } from "lucide-react"
 
 interface Payment {
@@ -56,6 +57,7 @@ export default function BillingPage() {
   })
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [databaseSetupNeeded, setDatabaseSetupNeeded] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -73,11 +75,30 @@ export default function BillingPage() {
 
     setLoading(true)
     setError("")
+    setDatabaseSetupNeeded(false)
 
     try {
       if (isSupabaseConfigured()) {
         console.log("Loading billing data for patient:", user.id)
 
+        // First, check if the payments table exists
+        const { data: tableCheck, error: tableError } = await supabase.from("payments").select("id").limit(1)
+
+        if (tableError) {
+          console.error("Payments table error:", tableError)
+
+          // Check if it's a "relation does not exist" error
+          if (tableError.message.includes('relation "public.payments" does not exist') || tableError.code === "42P01") {
+            console.log("Payments table does not exist, showing setup message")
+            setDatabaseSetupNeeded(true)
+            loadMockData()
+            return
+          } else {
+            throw new Error(`Database error: ${tableError.message}`)
+          }
+        }
+
+        // If table exists, fetch payments from Supabase
         const { data: paymentsData, error: paymentsError } = await supabase
           .from("payments")
           .select("*")
@@ -92,18 +113,63 @@ export default function BillingPage() {
         console.log("Loaded payments:", paymentsData)
         setPayments(paymentsData || [])
 
+        // Calculate billing summary
         const summary = calculateBillingSummary(paymentsData || [])
         setBillingSummary(summary)
       } else {
-        console.log("Supabase not configured")
-        setError("Payment system is not configured. Please contact support.")
+        console.log("Supabase not configured, loading mock data")
+        loadMockData()
       }
     } catch (error) {
       console.error("Error loading billing data:", error)
       setError(error instanceof Error ? error.message : "Failed to load billing information")
+      // Fallback to mock data
+      loadMockData()
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadMockData = () => {
+    console.log("Loading mock billing data")
+    const mockPayments: Payment[] = [
+      {
+        id: "1",
+        amount: 15000, // $150.00 in cents
+        currency: "usd",
+        status: "paid",
+        description: "Individual Therapy Session - Dr. Sarah Johnson",
+        payment_method: "card",
+        stripe_payment_intent: "pi_1234567890abcdef",
+        created_at: "2024-01-15T10:30:00Z",
+        updated_at: "2024-01-15T10:30:00Z",
+      },
+      {
+        id: "2",
+        amount: 7500, // $75.00 in cents
+        currency: "usd",
+        status: "paid",
+        description: "Group Therapy Session - Anxiety Management",
+        payment_method: "card",
+        stripe_payment_intent: "pi_0987654321fedcba",
+        created_at: "2024-01-29T14:15:00Z",
+        updated_at: "2024-01-29T14:15:00Z",
+      },
+      {
+        id: "3",
+        amount: 30000, // $300.00 in cents
+        currency: "usd",
+        status: "pending",
+        description: "Psychological Assessment - Dr. Michael Chen",
+        payment_method: "card",
+        stripe_payment_intent: "pi_abcdef1234567890",
+        created_at: "2024-02-05T09:00:00Z",
+        updated_at: "2024-02-05T09:00:00Z",
+      },
+    ]
+
+    setPayments(mockPayments)
+    setBillingSummary(calculateBillingSummary(mockPayments))
   }
 
   const calculateBillingSummary = (payments: Payment[]): BillingSummary => {
@@ -137,7 +203,7 @@ export default function BillingPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: amount / 100,
+          amount: amount / 100, // Convert cents to dollars for API
           description,
           patientId: user.id,
         }),
@@ -149,6 +215,7 @@ export default function BillingPage() {
         throw new Error(data.error || "Failed to create payment session")
       }
 
+      // Redirect to Stripe Checkout
       if (data.url) {
         window.location.href = data.url
       } else {
@@ -184,6 +251,7 @@ export default function BillingPage() {
         throw new Error(data.error || "Failed to create customer portal session")
       }
 
+      // Redirect to Stripe Customer Portal
       if (data.url) {
         console.log("✅ Redirecting to customer portal:", data.url)
         window.location.href = data.url
@@ -284,6 +352,35 @@ export default function BillingPage() {
           <Alert className="mb-6 border-red-200 bg-red-50">
             <AlertTriangle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-800">{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Database Setup Alert */}
+        {databaseSetupNeeded && (
+          <Alert className="mb-6 border-blue-200 bg-blue-50">
+            <Database className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Database Setup Required:</strong> The payments table doesn't exist yet. Please run the database
+              setup script to enable payment tracking.
+              <div className="mt-2">
+                <code className="bg-blue-100 px-2 py-1 rounded text-sm">
+                  Run: scripts/23-create-payments-table-stripe.sql
+                </code>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Demo Mode Alert */}
+        {(!isSupabaseConfigured() || databaseSetupNeeded) && (
+          <Alert className="mb-6 border-orange-200 bg-orange-50">
+            <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <strong>Demo Mode:</strong> This page is showing mock data.
+              {!isSupabaseConfigured()
+                ? " Connect Supabase to see real payment history."
+                : " Set up the payments table to track real payments."}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -407,18 +504,28 @@ export default function BillingPage() {
               <Receipt className="h-5 w-5 mr-2" />
               Payment History
             </CardTitle>
-            <CardDescription>View your complete payment transaction history</CardDescription>
+            <CardDescription>
+              {databaseSetupNeeded
+                ? "Demo payment history (set up database to see real payments)"
+                : "View your complete payment transaction history"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {payments.length === 0 ? (
               <div className="text-center py-12">
                 <Receipt className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No payments found</h3>
-                <p className="text-gray-500 mb-6">You haven't made any payments yet.</p>
-                <Button onClick={() => handlePayNow()} className="bg-teal-600 hover:bg-teal-700">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Make Your First Payment
-                </Button>
+                <p className="text-gray-500 mb-6">
+                  {databaseSetupNeeded
+                    ? "Set up the payments table to start tracking payments."
+                    : "You haven't made any payments yet."}
+                </p>
+                {!databaseSetupNeeded && (
+                  <Button onClick={() => handlePayNow()} className="bg-teal-600 hover:bg-teal-700">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Make Your First Payment
+                  </Button>
+                )}
               </div>
             ) : (
               <>

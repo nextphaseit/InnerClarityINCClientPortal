@@ -14,15 +14,10 @@ export interface UserProfile {
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    // Google Provider
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: "openid email profile",
-          prompt: "select_account",
-        },
-      },
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
   ],
   pages: {
@@ -31,95 +26,75 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      try {
-        console.log("🔐 Production sign-in attempt:", {
-          provider: account?.provider,
-          email: user.email,
-          domain: user.email?.split("@")[1],
-        })
+      // For Google login, determine role based on email domain
+      if (account?.provider === "google") {
+        const email = user.email?.toLowerCase() || ""
+        const adminDomains = ["innerclarityinc.com", "nextphaseit.org"]
+        const domain = email.split("@")[1]
 
-        if (account?.provider === "google") {
-          if (user.email) {
-            const domain = user.email.split("@")[1]
-            const authorizedDomains = [
-              "nextphaseit.org",
-              "innerclaritycounseling.com",
-              "innerclarity.org",
-              "innerclarityinc.com",
-            ]
-
-            if (!authorizedDomains.includes(domain)) {
-              console.error(`❌ Unauthorized domain for admin access: ${domain}`)
-              return false
-            }
-
-            user.role = "admin"
-            console.log("✅ Admin login authorized for:", user.email)
-          }
+        if (adminDomains.includes(domain)) {
+          user.role = "admin"
+        } else {
+          user.role = "patient"
         }
-
-        return true
-      } catch (error) {
-        console.error("❌ Sign-in callback error:", error)
-        return false
       }
-    },
 
-    async jwt({ token, account, user }) {
-      if (account && user) {
-        token.email = user.email
-        token.name = user.name
-        token.picture = user.image
-        token.role = user.role || "admin"
-        token.provider = account.provider
+      return true
+    },
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.role = user.role
+        token.id = user.id
+        token.tenantId = user.tenantId
+        token.tenantName = user.tenantName
+        token.authProvider = account?.provider || "credentials"
       }
       return token
     },
-
     async session({ session, token }) {
-      if (token && session.user) {
-        session.user.email = token.email as string
-        session.user.name = token.name as string
-        session.user.image = token.picture as string
+      if (session.user) {
         session.user.role = token.role as string
-        session.user.provider = token.provider as string
+        session.user.id = token.id as string
+        session.user.tenantId = token.tenantId as string
+        session.user.tenantName = token.tenantName as string
+        session.user.authProvider = token.authProvider as string
       }
       return session
     },
-
     async redirect({ url, baseUrl }) {
-      // Handle redirects after sign in
+      // Handle role-based redirects after login
+      if (url.startsWith("/api/auth/signin") || url.startsWith("/auth/signin")) {
+        return baseUrl
+      }
+
+      // Allow relative URLs
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`
       }
 
-      // Allow callback URLs on same origin
+      // Allow same-origin URLs
       if (new URL(url).origin === baseUrl) {
         return url
       }
 
-      // Default redirect to admin dashboard
-      return `${baseUrl}/admin/dashboard`
+      return baseUrl
     },
   },
   events: {
     async signIn({ user, account, isNewUser }) {
-      console.log(`✅ User signed in: ${user.email} via ${account?.provider} (Role: ${user.role})`)
+      console.log(`User signed in: ${user.email} via ${account?.provider} (${user.role})`)
       await logAuditEvent("user_signin", "auth", user.id, {
         provider: account?.provider,
         isNewUser,
       })
     },
-    async signOut({ session, token }) {
-      console.log(`👋 User signed out: ${session?.user?.email || token?.email}`)
-    },
   },
   session: {
     strategy: "jwt",
-    maxAge: 8 * 60 * 60, // 8 hours for production security
+    maxAge: 24 * 60 * 60, // 24 hours
   },
-  secret: process.env.NEXTAUTH_SECRET!,
-  debug: false, // Disabled for production
+  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
+  debug: process.env.NODE_ENV === "development",
 }
 
 export async function getCurrentUser(): Promise<UserProfile | null> {
@@ -151,21 +126,21 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
 
 export async function requireAuth(requiredRole?: "admin" | "super_admin") {
   if (!isSupabaseConfigured()) {
-    throw new Error("Authentication not configured")
+    return null
   }
 
   const user = await getCurrentUser()
 
   if (!user) {
-    throw new Error("Authentication required")
+    return null
   }
 
   if (!["admin", "super_admin"].includes(user.role)) {
-    throw new Error("Admin access required")
+    return null
   }
 
   if (requiredRole === "super_admin" && user.role !== "super_admin") {
-    throw new Error("Super admin access required")
+    return null
   }
 
   return user
@@ -193,4 +168,16 @@ export async function logAuditEvent(action: string, resource: string, resourceId
   } catch (error) {
     console.error("Error logging audit event:", error)
   }
+}
+
+// Helper function to get tenant-filtered data
+export function getTenantFilteredData<T extends { tenantId?: string }>(data: T[], userTenantId?: string): T[] {
+  if (!userTenantId) return data
+  return data.filter((item) => item.tenantId === userTenantId)
+}
+
+// Helper function to check tenant access
+export function checkTenantAccess(userTenantId?: string, resourceTenantId?: string): boolean {
+  if (!userTenantId) return true
+  return userTenantId === resourceTenantId
 }

@@ -14,26 +14,7 @@ interface Appointment {
 }
 
 // Mock data for development - replace with database in production
-const mockAppointments: Appointment[] = [
-  {
-    id: "apt-001",
-    patient: "Current User",
-    provider: "Dr. Sarah Johnson",
-    datetime: "2024-06-15T10:30:00Z",
-    status: "Upcoming",
-    tenantId: "inner-clarity",
-    type: "Initial Consultation",
-  },
-  {
-    id: "apt-002",
-    patient: "Current User",
-    provider: "Dr. Michael Chen",
-    datetime: "2024-06-20T14:00:00Z",
-    status: "Confirmed",
-    tenantId: "inner-clarity",
-    type: "Follow-up Session",
-  },
-]
+const mockAppointments: Appointment[] = []
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,7 +25,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Get tenant ID from token or headers
-    const tenantId = token.tenantId || request.headers.get("X-Tenant-ID") || "inner-clarity"
+    const tenantId = token.tenantId || request.headers.get("X-Tenant-ID")
+
+    if (!tenantId) {
+      return NextResponse.json({ success: false, error: "Tenant ID is required" }, { status: 400 })
+    }
 
     // In production, replace with actual database query
     // const appointments = await db.appointments.findMany({
@@ -127,7 +112,7 @@ export async function POST(request: NextRequest) {
       provider: provider.trim(),
       datetime: appointmentDate.toISOString(),
       status: "Upcoming" as const,
-      tenantId: token.tenantId || "inner-clarity",
+      tenantId: token.tenantId,
       type: type?.trim(),
       notes: notes?.trim(),
       createdAt: new Date().toISOString(),

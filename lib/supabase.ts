@@ -8,55 +8,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 // Check if Supabase is configured
 export const isSupabaseConfigured = () => {
   const configured = !!(supabaseUrl && supabaseAnonKey)
-  console.log("🔍 Supabase configuration check:", {
-    hasUrl: !!supabaseUrl,
-    hasAnonKey: !!supabaseAnonKey,
-    configured,
-  })
   return configured
-}
-
-// Create a mock client for when Supabase is not configured
-const createMockClient = () => {
-  console.log("⚠️ Using mock Supabase client - Supabase not configured")
-  return {
-    auth: {
-      getUser: async () => ({ data: { user: null }, error: new Error("Supabase not configured") }),
-      getSession: async () => ({ data: { session: null }, error: new Error("Supabase not configured") }),
-      signUp: async () => ({ data: { user: null }, error: new Error("Supabase not configured") }),
-      signInWithPassword: async () => ({ data: { user: null }, error: new Error("Supabase not configured") }),
-      signInWithOAuth: async () => ({ data: { url: null }, error: new Error("Supabase not configured") }),
-      signOut: async () => ({ error: new Error("Supabase not configured") }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      resetPasswordForEmail: async () => ({ error: new Error("Supabase not configured") }),
-    },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: async () => ({ data: null, error: new Error("Supabase not configured") }),
-          data: [],
-          error: new Error("Supabase not configured"),
-        }),
-        data: [],
-        error: new Error("Supabase not configured"),
-      }),
-      insert: () => ({ data: null, error: new Error("Supabase not configured") }),
-      update: () => ({ data: null, error: new Error("Supabase not configured") }),
-      upsert: () => ({ data: null, error: new Error("Supabase not configured") }),
-      delete: () => ({ data: null, error: new Error("Supabase not configured") }),
-    }),
-    storage: {
-      from: () => ({
-        upload: async () => ({ data: null, error: new Error("Supabase not configured") }),
-        getPublicUrl: () => ({ data: { publicUrl: "" } }),
-        remove: async () => ({ data: null, error: new Error("Supabase not configured") }),
-      }),
-    },
-    channel: () => ({
-      on: () => ({ subscribe: () => {} }),
-      unsubscribe: () => {},
-    }),
-  }
 }
 
 // Export the createClient function
@@ -72,7 +24,11 @@ export const supabase = isSupabaseConfigured()
         flowType: "pkce",
       },
     })
-  : (createMockClient() as any)
+  : ((() => {
+      throw new Error(
+        "Supabase is not configured. Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment variables.",
+      )
+    })() as any)
 
 // Admin client for server-side operations
 export const supabaseAdmin =
@@ -83,7 +39,11 @@ export const supabaseAdmin =
           persistSession: false,
         },
       })
-    : (createMockClient() as any)
+    : ((() => {
+        throw new Error(
+          "Supabase Admin is not configured. Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your environment variables.",
+        )
+      })() as any)
 
 // Client-side Supabase client (singleton pattern)
 let supabaseClient: any = null
@@ -99,7 +59,11 @@ export const getSupabaseClient = () => {
             flowType: "pkce",
           },
         })
-      : createMockClient()
+      : ((() => {
+          throw new Error(
+            "Supabase is not configured. Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment variables.",
+          )
+        })() as any)
   }
   return supabaseClient
 }

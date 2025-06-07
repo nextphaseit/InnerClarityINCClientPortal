@@ -1,96 +1,91 @@
 # Production Deployment Guide
 
-## Pre-Deployment Checklist
+## Environment Variables
 
-### ✅ Authentication Configuration
-- [ ] Google OAuth configured with production client ID/secret
-- [ ] Authorized domains set to production domains only
-- [ ] Supabase Auth configured for patient portal
-- [ ] All demo credentials removed
+Set these environment variables in your Vercel project:
 
-### ✅ Environment Variables
-- [ ] `NEXTAUTH_URL` set to production domain
-- [ ] `NEXTAUTH_SECRET` set to strong production secret
-- [ ] All Stripe keys using live/production values
-- [ ] Supabase URLs pointing to production database
-- [ ] Email configuration using production SMTP
-
-### ✅ Database
-- [ ] Production Supabase project created
-- [ ] All migration scripts executed
-- [ ] RLS policies enabled and tested
-- [ ] Demo data removed (run scripts/99-remove-demo-data.sql)
-
-### ✅ Security
-- [ ] All demo mode references removed
-- [ ] Debug mode disabled
-- [ ] Error logging configured
-- [ ] CORS policies set correctly
-
-## Vercel Deployment
-
-### 1. Environment Variables in Vercel
-Set these in your Vercel project settings:
-
+### Authentication
 \`\`\`
 NEXTAUTH_URL=https://admin.nextphaseit.org
-NEXTAUTH_SECRET=[strong-production-secret]
-GOOGLE_CLIENT_ID=[production-google-client-id]
-GOOGLE_CLIENT_SECRET=[production-google-client-secret]
-NEXT_PUBLIC_SUPABASE_URL=[production-supabase-url]
-NEXT_PUBLIC_SUPABASE_ANON_KEY=[production-supabase-anon-key]
-SUPABASE_SERVICE_ROLE_KEY=[production-supabase-service-role-key]
-STRIPE_SECRET_KEY=sk_live_[production-stripe-key]
-STRIPE_WEBHOOK_SECRET=whsec_[production-webhook-secret]
+NEXTAUTH_SECRET=your-strong-production-secret-here
 \`\`\`
 
-### 2. Domain Configuration
+### Auth0 (Admin Portal)
+\`\`\`
+AUTH0_CLIENT_ID=your-auth0-client-id
+AUTH0_CLIENT_SECRET=your-auth0-client-secret
+AUTH0_DOMAIN=your-auth0-domain.auth0.com
+AUTH0_BASE_URL=https://admin.nextphaseit.org
+\`\`\`
+
+### Supabase (Patient Portal)
+\`\`\`
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-key
+\`\`\`
+
+### Stripe (Payments)
+\`\`\`
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+\`\`\`
+
+## Domain Configuration
+
 - Admin Portal: `admin.nextphaseit.org`
 - Patient Portal: `patients.nextphaseit.org`
 
-### 3. OAuth Callback URLs
-Configure these in your OAuth providers:
-- Google: `https://admin.nextphaseit.org/api/auth/callback/google`
-- Supabase: `https://patients.nextphaseit.org/auth/callback`
+## Pre-Deployment Checklist
 
-### 4. Stripe Webhook Endpoints
-- Production webhook: `https://patients.nextphaseit.org/api/stripe/webhook`
+- [ ] All demo content removed
+- [ ] Production environment variables set
+- [ ] OAuth providers configured for production domains
+- [ ] Database tables created with proper RLS policies
+- [ ] Stripe webhook endpoints configured
+- [ ] SSL certificates configured
+- [ ] DNS records pointing to Vercel
 
-## Post-Deployment Verification
+## Post-Deployment
 
-### Admin Portal Testing
-1. Visit `https://admin.nextphaseit.org/auth/signin`
-2. Test Google OAuth login
-3. Verify admin dashboard loads
-4. Test key admin functions
+1. Test admin login with authorized Google accounts
+2. Test patient portal registration and login
+3. Verify database connectivity
+4. Test payment processing
+5. Monitor error logs and performance
+\`\`\`
 
-### Patient Portal Testing
-1. Visit `https://patients.nextphaseit.org/portal/auth/signin`
-2. Test Supabase authentication
-3. Verify patient dashboard loads
-4. Test key patient functions
+```plaintext file=".env.production.example"
+# Production Environment Variables Template
+# Copy to .env.local for local development or set in Vercel dashboard
 
-### Security Testing
-1. Verify unauthorized access is blocked
-2. Test logout functionality
-3. Verify session management
-4. Test CORS policies
+# NextAuth Configuration
+NEXTAUTH_URL=https://admin.nextphaseit.org
+NEXTAUTH_SECRET=your-strong-production-secret-here
 
-## Monitoring
+# Auth0 Configuration (Admin Portal)
+AUTH0_CLIENT_ID=your-auth0-client-id
+AUTH0_CLIENT_SECRET=your-auth0-client-secret
+AUTH0_DOMAIN=your-domain.auth0.com
+AUTH0_BASE_URL=https://admin.nextphaseit.org
 
-### Error Tracking
-- Vercel Analytics enabled
-- Error logging configured
-- Performance monitoring active
+# Supabase Configuration (Patient Portal)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-key
 
-### Health Checks
-- `/api/health` endpoint monitoring
-- Database connectivity checks
-- Authentication service status
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 
-## Support
+# Stripe Configuration
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 
-For deployment issues:
-- Email: support@innerclarityinc.com
-- Documentation: See `/docs` folder
-- Logs: Check Vercel dashboard
+# Email Configuration (Optional)
+EMAIL_FROM=noreply@nextphaseit.org
+EMAIL_PASSWORD=your-email-password
+OUTLOOK_SMTP_SERVER=smtp-mail.outlook.com
+
+# Feature Flags
+NODE_ENV=production
