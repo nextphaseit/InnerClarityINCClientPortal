@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -27,7 +28,7 @@ export default function PatientSignInPage() {
     setError("")
 
     if (!isConfigured) {
-      setError("Authentication is not configured. Please contact support.")
+      setError("Authentication service is currently unavailable. Please contact support.")
       setLoading(false)
       return
     }
@@ -63,25 +64,15 @@ export default function PatientSignInPage() {
             className="mx-auto mb-4"
           />
           <h1 className="text-2xl font-bold text-gray-900">Patient Portal</h1>
-          <p className="text-gray-600">Sign in to access your account</p>
+          <p className="text-gray-600">Secure access to your healthcare information</p>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Welcome Back</CardTitle>
-            <CardDescription>Enter your credentials to access your patient portal</CardDescription>
+            <CardDescription>Sign in to access your patient portal</CardDescription>
           </CardHeader>
           <CardContent>
-            {!isConfigured && (
-              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-center space-x-2 text-amber-800">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">Demo Mode</span>
-                </div>
-                <p className="text-sm text-amber-700 mt-1">Authentication is not configured. This is a demo version.</p>
-              </div>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">

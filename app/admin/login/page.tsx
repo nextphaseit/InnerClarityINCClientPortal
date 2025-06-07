@@ -13,11 +13,6 @@ export default function AdminLoginPage() {
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showPassword, setShowPassword] = useState(false)
-  const [credentials, setCredentials] = useState({
-    email: "",
-    password: "",
-  })
 
   const callbackUrl = searchParams?.get("callbackUrl") || "/admin/dashboard"
   const errorParam = searchParams?.get("error")
@@ -35,9 +30,6 @@ export default function AdminLoginPage() {
   useEffect(() => {
     if (errorParam) {
       switch (errorParam) {
-        case "CredentialsSignin":
-          setError("Invalid email or password. Please try again.")
-          break
         case "OAuthSignin":
           setError("Error occurred during sign-in. Please try again.")
           break
@@ -45,7 +37,7 @@ export default function AdminLoginPage() {
           setError("Error occurred during authentication callback.")
           break
         case "AccessDenied":
-          setError("Access denied. Please use an authorized email address.")
+          setError("Access denied. Please use an authorized email address from an approved domain.")
           break
         case "Configuration":
           setError("Authentication configuration error. Please contact support.")
@@ -91,10 +83,8 @@ export default function AdminLoginPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <CardTitle className="text-2xl font-bold text-slate-800">Admin Portal</CardTitle>
-              <CardDescription className="text-slate-600">
-                Sign in to manage clients, appointments, and practice operations
-              </CardDescription>
+              <CardTitle className="text-2xl font-bold text-slate-800">Inner Clarity Admin</CardTitle>
+              <CardDescription className="text-slate-600">Secure access for authorized administrators</CardDescription>
             </div>
           </CardHeader>
 
@@ -141,25 +131,16 @@ export default function AdminLoginPage() {
                 </>
               )}
             </Button>
+
+            <div className="text-center space-y-3">
+              <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+                <p className="font-medium mb-1">Authorized Email Domains</p>
+                <p>@nextphaseit.org • @innerclaritycounseling.com</p>
+                <p>@innerclarity.org • @innerclarityinc.com</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
-
-        <div className="text-center space-y-3">
-          <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
-            <p className="font-medium mb-1">Authorized Domains for Google Sign-In</p>
-            <p>@nextphaseit.org • @innerclaritycounseling.com</p>
-            <p>@innerclarity.org • @innerclarityinc.com</p>
-          </div>
-        </div>
-
-        <div className="text-center space-y-2">
-          <p className="text-sm text-slate-600">
-            Need patient portal access?{" "}
-            <a href="/portal/auth/signin" className="text-blue-600 hover:underline font-medium">
-              Patient Portal
-            </a>
-          </p>
-        </div>
 
         <div className="text-center">
           <p className="text-xs text-slate-500">
