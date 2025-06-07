@@ -1,16 +1,12 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { signIn, getSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Shield, AlertCircle, Eye, EyeOff, TestTube } from "lucide-react"
+import { Loader2, Shield, AlertCircle } from "lucide-react"
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -60,36 +56,6 @@ export default function AdminLoginPage() {
     }
   }, [errorParam])
 
-  const handleCredentialsSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    try {
-      console.log("🔑 Attempting credentials login...")
-
-      const result = await signIn("admin-credentials", {
-        email: credentials.email,
-        password: credentials.password,
-        callbackUrl,
-        redirect: false,
-      })
-
-      if (result?.error) {
-        console.error("❌ Credentials sign-in error:", result.error)
-        setError("Invalid email or password. Please check your credentials.")
-      } else if (result?.url) {
-        console.log("✅ Login successful, redirecting...")
-        window.location.href = result.url
-      }
-    } catch (err) {
-      console.error("❌ Credentials sign-in exception:", err)
-      setError("An unexpected error occurred during login.")
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true)
@@ -112,13 +78,6 @@ export default function AdminLoginPage() {
       setError("Google sign-in failed. Please try again.")
       setLoading(false)
     }
-  }
-
-  const fillDemoCredentials = () => {
-    setCredentials({
-      email: "admin@innerclarityinc.com",
-      password: "Admin123!",
-    })
   }
 
   return (
@@ -147,81 +106,10 @@ export default function AdminLoginPage() {
               </Alert>
             )}
 
-            <form onSubmit={handleCredentialsSignIn} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={credentials.email}
-                  onChange={(e) => setCredentials((prev) => ({ ...prev, email: e.target.value }))}
-                  placeholder="admin@innerclarityinc.com"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={credentials.password}
-                    onChange={(e) => setCredentials((prev) => ({ ...prev, password: e.target.value }))}
-                    placeholder="Enter your password"
-                    className="pr-10"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  <>
-                    <Shield className="mr-2 h-5 w-5" />
-                    Sign In
-                  </>
-                )}
-              </Button>
-            </form>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-muted-foreground">Or continue with</span>
-              </div>
-            </div>
-
             <Button
               onClick={handleGoogleSignIn}
               disabled={loading}
-              variant="outline"
-              className="w-full h-12 border-slate-300 hover:bg-slate-50"
+              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
               size="lg"
             >
               {loading ? (
@@ -252,48 +140,6 @@ export default function AdminLoginPage() {
                   Sign in with Google
                 </>
               )}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-200 bg-amber-50/50">
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <TestTube className="h-5 w-5 text-amber-600" />
-              <CardTitle className="text-lg text-amber-800">Demo Credentials</CardTitle>
-            </div>
-            <CardDescription className="text-amber-700">Use these credentials to test the admin portal</CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            <div className="text-sm text-amber-700 bg-amber-100 p-3 rounded-lg">
-              <div className="font-medium mb-2">Available Demo Accounts:</div>
-              <div className="space-y-2 text-xs">
-                <div>
-                  <strong>Super Admin:</strong>
-                  <br />
-                  Email: admin@innerclarityinc.com
-                  <br />
-                  Password: Admin123!
-                </div>
-                <div>
-                  <strong>Demo Admin:</strong>
-                  <br />
-                  Email: demo@admin.nextphaseit.org
-                  <br />
-                  Password: DemoAdmin123!
-                </div>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={fillDemoCredentials}
-              className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
-            >
-              <TestTube className="mr-2 h-4 w-4" />
-              Fill Demo Credentials
             </Button>
           </CardContent>
         </Card>

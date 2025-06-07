@@ -1,5 +1,4 @@
 import type { NextAuthOptions } from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
 import { supabase, isSupabaseConfigured } from "./supabase"
 
@@ -13,90 +12,12 @@ export interface UserProfile {
   status: "active" | "inactive" | "suspended"
 }
 
-// Demo users for testing
-const demoUsers = [
-  {
-    id: "admin-1",
-    name: "Adrian Knight",
-    email: "admin@innerclarityinc.com",
-    password: "Admin123!",
-    role: "super_admin",
-    tenantId: "inner-clarity-main",
-    tenantName: "Inner Clarity - Main Office",
-  },
-  {
-    id: "admin-2",
-    name: "Demo Admin",
-    email: "demo@admin.nextphaseit.org",
-    password: "DemoAdmin123!",
-    role: "admin",
-    tenantId: "inner-clarity-demo",
-    tenantName: "Inner Clarity - Demo",
-  },
-]
-
 export const authOptions: NextAuthOptions = {
   providers: [
     // Google Provider
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-    }),
-
-    // Credentials Provider for demo/testing
-    CredentialsProvider({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password are required")
-        }
-
-        // Check demo users first
-        const demoUser = demoUsers.find((u) => u.email.toLowerCase() === credentials.email.toLowerCase())
-
-        if (demoUser && demoUser.password === credentials.password) {
-          return {
-            id: demoUser.id,
-            name: demoUser.name,
-            email: demoUser.email,
-            role: demoUser.role,
-            tenantId: demoUser.tenantId,
-            tenantName: demoUser.tenantName,
-          }
-        }
-
-        // If Supabase is configured, check database
-        if (isSupabaseConfigured()) {
-          try {
-            const { data: profile, error } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("email", credentials.email.toLowerCase())
-              .single()
-
-            if (error || !profile) {
-              throw new Error("No account found with this email address")
-            }
-
-            // In a real app, you'd verify the password hash here
-            // For demo purposes, we'll accept any password for database users
-            return {
-              id: profile.id,
-              name: profile.full_name,
-              email: profile.email,
-              role: profile.role,
-            }
-          } catch (error) {
-            console.error("Database auth error:", error)
-          }
-        }
-
-        throw new Error("Invalid login credentials")
-      },
     }),
   ],
   pages: {
