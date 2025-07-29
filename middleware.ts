@@ -5,96 +5,120 @@ import { getToken } from "next-auth/jwt"
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  console.log("🔍 Middleware checking:", pathname)
-
   // Public paths that don't require authentication
-  const publicPaths = [
-    "/",
-    "/auth/signin",
-    "/auth/signup",
-    "/auth/reset-password",
-    "/auth/error",
-    "/api/auth",
-    "/about",
-    "/services",
-    "/contact",
-    "/privacy-policy",
-    "/terms-of-service",
-    "/hipaa-notice",
-    "/portal/auth/signin",
-    "/portal/auth/signup",
-    "/portal/auth/forgot-password",
-  ]
+  const publicPaths = ["/", "/register", "/auth/signin", "/auth/error", "/auth/callback", "/unauthorized", "/not-found"]
 
-  // Allow public paths and static files
+  // API paths that don't require authentication
+  const publicApiPaths = ["/api/auth", "/api/register", "/api/health", "/api/stripe/webhook"]
+
+  // Static files and Next.js internals
   if (
-    publicPaths.some((path) => pathname.startsWith(path)) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/images") ||
     pathname.startsWith("/favicon") ||
-    pathname.includes(".")
+    pathname.includes(".") ||
+    publicPaths.some((path) => pathname === path || pathname.startsWith(path)) ||
+    publicApiPaths.some((path) => pathname.startsWith(path))
   ) {
     return NextResponse.next()
   }
 
-  // Handle ADMIN routes with NextAuth
-  if (pathname.startsWith("/admin")) {
-    console.log("🔒 Checking admin authentication for:", pathname)
+  // Get the user's session token
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  })
 
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    })
+  // Create response with security headers
+  const response = NextResponse.next()
 
-    if (!token) {
-      console.log("❌ No admin token found, redirecting to signin")
-      const url = new URL("/auth/signin", request.url)
-      url.searchParams.set("callbackUrl", request.url)
-      return NextResponse.redirect(url)
-    }
+  // Add security headers for HIPAA compliance
+  response.headers.set("X-Frame-Options", "DENY")
+  response.headers.set("X-Content-Type-Options", "nosniff")
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+  response.headers.set("X-XSS-Protection", "1; mode=block")
 
-    // Check if user has admin role
-    if (!["admin", "super_admin"].includes(token.role as string)) {
-      console.log("❌ User is not admin, redirecting to unauthorized")
-      return NextResponse.redirect(new URL("/unauthorized", request.url))
-    }
-
-    console.log("✅ Admin authentication successful for:", token.email)
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
   }
 
-  // Handle PATIENT PORTAL routes with Supabase Auth
-  if (pathname.startsWith("/portal") && !pathname.startsWith("/portal/auth")) {
-    console.log("🔒 Checking patient authentication for:", pathname)
-
-    // Get Supabase session from cookies
-    const supabaseToken =
-      request.cookies.get("sb-access-token")?.value ||
-      request.cookies.get("supabase-auth-token")?.value ||
-      request.cookies.get("supabase.auth.token")?.value
-
-    // Check for Supabase session in various cookie formats
-    const hasSupabaseSession = request.cookies
-      .getAll()
-      .some(
-        (cookie) =>
-          cookie.name.includes("supabase") ||
-          cookie.name.includes("sb-") ||
-          (cookie.name.includes("auth") && cookie.value.includes("access_token")),
-      )
-
-    if (!hasSupabaseSession && !supabaseToken) {
-      console.log("❌ No patient session found, redirecting to signin")
-      const url = new URL("/portal/auth/signin", request.url)
-      url.searchParams.set("callbackUrl", request.url)
-      return NextResponse.redirect(url)
+  // Check if user is authenticated
+  if (!token) {
+    // Redirect unauthenticated users based on the route they're trying to access
+    if (pathname.startsWith("/admin")) {
+      return NextResponse.redirect(new URL("/api/auth/signin/azure-ad", request.url))
+    } else if (
+      pathname.startsWith("/appointments") ||
+      pathname.startsWith("/billing") ||
+      pathname.startsWith("/messages") ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/documents") ||
+      pathname.startsWith("/forms") ||
+      pathname.startsWith("/profile")
+    ) {
+      return NextResponse.redirect(new URL("/api/auth/signin/auth0", request.url))
+    } else {
+      // Default to Auth0 for other protected routes
+      return NextResponse.redirect(new URL("/auth/signin", request.url))
     }
-
-    console.log("✅ Patient authentication check passed")
   }
 
-  return NextResponse.next()
+  // Role-based access control for authenticated users
+  if (token) {
+    // Admin routes - require admin role and Azure AD authentication
+    if (pathname.startsWith("/admin")) {
+      if (token.role !== "admin") {
+        return NextResponse.redirect(new URL("/unauthorized", request.url))
+      }
+      // Optionally check for Azure AD provider
+      if (token.provider && token.provider !== "azure-ad" && token.provider !== "credentials") {
+        return NextResponse.redirect(new URL("/unauthorized", request.url))
+      }
+    }
+
+    // Patient routes - require patient role
+    if (
+      pathname.startsWith("/appointments") ||
+      pathname.startsWith("/billing") ||
+      pathname.startsWith("/messages") ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/documents") ||
+      pathname.startsWith("/forms") ||
+      pathname.startsWith("/profile")
+    ) {
+      if (token.role !== "patient") {
+        return NextResponse.redirect(new URL("/unauthorized", request.url))
+      }
+    }
+
+    // Add tenant information to headers for API routes
+    if (pathname.startsWith("/api") && token.tenantId) {
+      response.headers.set("X-Tenant-ID", token.tenantId as string)
+    }
+
+    // Redirect authenticated users away from auth pages
+    if (pathname === "/" || pathname === "/auth/signin" || pathname === "/register") {
+      if (token.role === "admin") {
+        return NextResponse.redirect(new URL("/admin", request.url))
+      } else if (token.role === "patient") {
+        return NextResponse.redirect(new URL("/dashboard", request.url))
+      }
+    }
+  }
+
+  return response
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api/auth (NextAuth.js routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - images (public images)
+     */
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|images).*)",
+  ],
 }

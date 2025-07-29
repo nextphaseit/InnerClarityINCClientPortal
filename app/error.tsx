@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, Home, RefreshCw } from "lucide-react"
+import { AlertTriangle } from "lucide-react"
 
 export default function Error({
   error,
@@ -12,71 +12,25 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error("Application error details:", {
-      message: error.message,
-      stack: error.stack,
-      digest: error.digest,
-      name: error.name,
-    })
+    // Log the error to an error reporting service
+    console.error("Application error:", error)
   }, [error])
 
-  const getErrorMessage = () => {
-    const message = error?.message || ""
-
-    if (message.includes("response")) {
-      return "There was a problem with the server response. Please try again."
-    }
-    if (message.includes("fetch")) {
-      return "Network error occurred. Please check your connection."
-    }
-    if (message.includes("auth")) {
-      return "Authentication error occurred. Please try signing in again."
-    }
-    return "An unexpected error occurred. Our team has been notified."
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="bg-white shadow-lg rounded-xl p-8 max-w-md w-full text-center">
-        <div className="text-red-600 mb-6">
-          <AlertTriangle className="h-12 w-12 mx-auto" />
-        </div>
-
-        <h1 className="text-2xl font-semibold mb-2 text-gray-900">Something went wrong</h1>
-        <p className="text-gray-600 mb-6">{getErrorMessage()}</p>
-
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <h2 className="text-lg font-semibold text-red-800 mb-2">Error Information</h2>
-          <p className="text-sm text-red-700 mb-2">
-            <strong>Type:</strong> {error?.name || "Application Error"}
-          </p>
-          {error?.digest && (
-            <p className="text-sm text-red-700 mb-2">
-              <strong>ID:</strong> {error.digest}
-            </p>
-          )}
-          <p className="text-sm text-red-700">
-            <strong>Time:</strong> {new Date().toLocaleString()}
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <Button onClick={reset} className="w-full bg-gray-900 hover:bg-gray-800">
-            <RefreshCw className="mr-2 h-4 w-4" />
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg p-8 text-center">
+        <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Something went wrong</h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
+          We're sorry, but there was an error loading this page. Our team has been notified.
+        </p>
+        <div className="space-y-4">
+          <Button onClick={() => reset()} className="w-full">
             Try again
           </Button>
-
-          <Button asChild variant="outline" className="w-full">
-            <a href="/">
-              <Home className="mr-2 h-4 w-4" />
-              Return to home page
-            </a>
+          <Button variant="outline" onClick={() => (window.location.href = "/")} className="w-full">
+            Return to home page
           </Button>
-        </div>
-
-        <div className="mt-6 text-xs text-gray-500">
-          <p>If this problem persists, please contact support at:</p>
-          <p className="font-medium">support@nextphaseit.org</p>
         </div>
       </div>
     </div>

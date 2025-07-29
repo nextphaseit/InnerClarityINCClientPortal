@@ -1,111 +1,99 @@
 import NextAuth from "next-auth"
-import GoogleProvider from "next-auth/providers/google"
 import type { NextAuthOptions } from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import Auth0Provider from "next-auth/providers/auth0"
+import AzureADProvider from "next-auth/providers/azure-ad"
+
+// Force dynamic rendering
+export const dynamic = "force-dynamic"
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: "openid email profile",
-          prompt: "select_account",
-        },
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        // Mock user validation - replace with real authentication
+        if (credentials.email === "admin@innerclarity.org" && credentials.password === "admin123") {
+          return {
+            id: "1",
+            email: "admin@innerclarity.org",
+            name: "Admin User",
+            role: "admin",
+            tenantId: "inner-clarity-main",
+          }
+        }
+
+        if (credentials.email === "patient@example.com" && credentials.password === "patient123") {
+          return {
+            id: "2",
+            email: "patient@example.com",
+            name: "Patient User",
+            role: "patient",
+            tenantId: "inner-clarity-main",
+          }
+        }
+
+        return null
       },
     }),
+    ...(process.env.AUTH0_CLIENT_ID && process.env.AUTH0_CLIENT_SECRET && process.env.AUTH0_DOMAIN
+      ? [
+          Auth0Provider({
+            clientId: process.env.AUTH0_CLIENT_ID,
+            clientSecret: process.env.AUTH0_CLIENT_SECRET,
+            issuer: `https://${process.env.AUTH0_DOMAIN}`,
+            authorization: {
+              params: {
+                audience: process.env.AUTH0_AUDIENCE || `https://${process.env.AUTH0_DOMAIN}/api/v2/`,
+              },
+            },
+          }),
+        ]
+      : []),
+    ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && process.env.MICROSOFT_TENANT_ID
+      ? [
+          AzureADProvider({
+            clientId: process.env.MICROSOFT_CLIENT_ID,
+            clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+            tenantId: process.env.MICROSOFT_TENANT_ID,
+          }),
+        ]
+      : []),
   ],
-  session: {
-    strategy: "jwt",
-    maxAge: 8 * 60 * 60, // 8 hours
-  },
   pages: {
     signIn: "/auth/signin",
     error: "/auth/error",
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
-      try {
-        console.log("🔐 Production sign-in attempt:", {
-          provider: account?.provider,
-          email: user.email,
-          domain: user.email?.split("@")[1],
-        })
-
-        if (account?.provider === "google") {
-          if (user.email) {
-            const domain = user.email.split("@")[1]
-            const authorizedDomains = [
-              "nextphaseit.org",
-              "innerclaritycounseling.com",
-              "innerclarity.org",
-              "innerclarityinc.com",
-            ]
-
-            if (!authorizedDomains.includes(domain)) {
-              console.error(`❌ Unauthorized domain for admin access: ${domain}`)
-              return false
-            }
-
-            user.role = "admin"
-            console.log("✅ Admin login authorized for:", user.email)
-          }
-        }
-
-        return true
-      } catch (error) {
-        console.error("❌ Sign-in callback error:", error)
-        return false
-      }
-    },
-
-    async jwt({ token, account, user }) {
-      if (account && user) {
-        token.email = user.email
-        token.name = user.name
-        token.picture = user.image
-        token.role = user.role || "admin"
-        token.provider = account.provider
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.role = user.role || "patient"
+        token.tenantId = user.tenantId || "inner-clarity-main"
+        token.provider = account?.provider
       }
       return token
     },
-
     async session({ session, token }) {
-      if (token && session.user) {
-        session.user.email = token.email as string
-        session.user.name = token.name as string
-        session.user.image = token.picture as string
+      if (session.user) {
+        session.user.id = token.sub || ""
         session.user.role = token.role as string
-        session.user.provider = token.provider as string
+        session.user.tenantId = token.tenantId as string
       }
       return session
     },
-
-    async redirect({ url, baseUrl }) {
-      // Handle redirects after sign in
-      if (url.startsWith("/")) {
-        return `${baseUrl}${url}`
-      }
-
-      // Allow callback URLs on same origin
-      if (new URL(url).origin === baseUrl) {
-        return url
-      }
-
-      // Default redirect to admin dashboard
-      return `${baseUrl}/admin/dashboard`
-    },
   },
-  events: {
-    async signIn({ user, account, isNewUser }) {
-      console.log(`✅ User signed in: ${user.email} via ${account?.provider} (Role: ${user.role})`)
-    },
-    async signOut({ session, token }) {
-      console.log(`👋 User signed out: ${session?.user?.email || token?.email}`)
-    },
+  session: {
+    strategy: "jwt",
   },
-  secret: process.env.NEXTAUTH_SECRET!,
-  debug: false, // Disabled for production
+  secret: process.env.NEXTAUTH_SECRET,
 }
 
 const handler = NextAuth(authOptions)

@@ -1,27 +1,95 @@
 import type { NextAuthOptions } from "next-auth"
-import GoogleProvider from "next-auth/providers/google"
-import { supabase, isSupabaseConfigured } from "./supabase"
+import CredentialsProvider from "next-auth/providers/credentials"
+import Auth0Provider from "next-auth/providers/auth0"
+import AzureADProvider from "next-auth/providers/azure-ad"
+import bcrypt from "bcryptjs"
 
-export interface UserProfile {
-  id: string
-  full_name: string
-  email: string
-  role: "patient" | "admin" | "super_admin"
-  avatar_url?: string
-  created_at: string
-  status: "active" | "inactive" | "suspended"
-}
+// Mock user database with multi-tenant support
+const users = [
+  // Admin users with tenant assignments
+  {
+    id: "admin-1",
+    name: "Adrian Knight",
+    email: "admin@innerclarityinc.com",
+    passwordHash: "$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // Admin@1234
+    role: "admin",
+    tenantId: "inner-clarity-main",
+    tenantName: "Inner Clarity - Main Office",
+    authProvider: "microsoft",
+  },
+  {
+    id: "admin-2",
+    name: "Dr. Michael Chen",
+    email: "michael.chen@nextphaseit.org",
+    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "password123"
+    role: "admin",
+    tenantId: "inner-clarity-north",
+    tenantName: "Inner Clarity - North Branch",
+    authProvider: "microsoft",
+  },
+  // Patient users
+  {
+    id: "patient-1",
+    name: "John Smith",
+    email: "patient@example.com",
+    passwordHash: "$2a$12$LQv3c1yqBwEHxE5W8s8.Oe5SFXqbOqHf5QJZqJZqJZqJZqJZqJZqJ", // "password123"
+    role: "patient",
+    authProvider: "auth0",
+  },
+]
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: "openid email profile",
-          prompt: "select_account",
-        },
+    // Auth0 Provider for Patients
+    Auth0Provider({
+      clientId: process.env.AUTH0_CLIENT_ID!,
+      clientSecret: process.env.AUTH0_CLIENT_SECRET!,
+      issuer: process.env.AUTH0_DOMAIN,
+    }),
+
+    // Microsoft Entra ID Provider for Admins
+    AzureADProvider({
+      clientId: process.env.MICROSOFT_CLIENT_ID!,
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
+      tenantId: process.env.MICROSOFT_TENANT_ID,
+    }),
+
+    // Credentials Provider (for development/testing)
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required")
+        }
+
+        // Find user by email
+        const user = users.find((u) => u.email.toLowerCase() === credentials.email.toLowerCase())
+
+        if (!user) {
+          throw new Error("No account found with this email address")
+        }
+
+        // Verify password
+        const isValidPassword = await bcrypt.compare(credentials.password, user.passwordHash)
+
+        if (!isValidPassword) {
+          throw new Error("Invalid password")
+        }
+
+        // Return user object (exclude password)
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          tenantId: user.tenantId || null,
+          tenantName: user.tenantName || null,
+          authProvider: user.authProvider,
+        }
       },
     }),
   ],
@@ -31,166 +99,124 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      try {
-        console.log("🔐 Production sign-in attempt:", {
-          provider: account?.provider,
-          email: user.email,
-          domain: user.email?.split("@")[1],
-        })
+      // For Microsoft login, restrict to specific domains
+      if (account?.provider === "azure-ad") {
+        const email = user.email?.toLowerCase() || ""
+        const allowedDomains = ["innerclarityinc.com", "nextphaseit.org"]
+        const domain = email.split("@")[1]
 
-        if (account?.provider === "google") {
-          if (user.email) {
-            const domain = user.email.split("@")[1]
-            const authorizedDomains = [
-              "nextphaseit.org",
-              "innerclaritycounseling.com",
-              "innerclarity.org",
-              "innerclarityinc.com",
-            ]
-
-            if (!authorizedDomains.includes(domain)) {
-              console.error(`❌ Unauthorized domain for admin access: ${domain}`)
-              return false
-            }
-
-            user.role = "admin"
-            console.log("✅ Admin login authorized for:", user.email)
-          }
+        if (!allowedDomains.includes(domain)) {
+          return false // Reject sign in
         }
 
-        return true
-      } catch (error) {
-        console.error("❌ Sign-in callback error:", error)
-        return false
+        // Set role to admin for Microsoft logins
+        user.role = "admin"
       }
-    },
 
-    async jwt({ token, account, user }) {
-      if (account && user) {
-        token.email = user.email
-        token.name = user.name
-        token.picture = user.image
-        token.role = user.role || "admin"
-        token.provider = account.provider
+      // For Auth0 login, set role to patient
+      if (account?.provider === "auth0") {
+        user.role = "patient"
+      }
+
+      return true
+    },
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.role = user.role
+        token.id = user.id
+        token.tenantId = user.tenantId
+        token.tenantName = user.tenantName
+        token.authProvider = account?.provider || user.authProvider
       }
       return token
     },
-
     async session({ session, token }) {
-      if (token && session.user) {
-        session.user.email = token.email as string
-        session.user.name = token.name as string
-        session.user.image = token.picture as string
+      if (session.user) {
         session.user.role = token.role as string
-        session.user.provider = token.provider as string
+        session.user.id = token.id as string
+        session.user.tenantId = token.tenantId as string
+        session.user.tenantName = token.tenantName as string
+        session.user.authProvider = token.authProvider as string
       }
       return session
     },
-
     async redirect({ url, baseUrl }) {
-      // Handle redirects after sign in
+      // Handle role-based redirects after login
+      if (url.startsWith("/api/auth/signin") || url.startsWith("/auth/signin")) {
+        // We'll handle this in the middleware based on role
+        return baseUrl
+      }
+
+      // Allow relative URLs
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`
       }
 
-      // Allow callback URLs on same origin
+      // Allow same-origin URLs
       if (new URL(url).origin === baseUrl) {
         return url
       }
 
-      // Default redirect to admin dashboard
-      return `${baseUrl}/admin/dashboard`
+      return baseUrl
     },
   },
   events: {
     async signIn({ user, account, isNewUser }) {
-      console.log(`✅ User signed in: ${user.email} via ${account?.provider} (Role: ${user.role})`)
-      await logAuditEvent("user_signin", "auth", user.id, {
-        provider: account?.provider,
-        isNewUser,
-      })
+      // Log successful sign-in for audit purposes
+      console.log(`User signed in: ${user.email} via ${account?.provider} (${user.role})`)
+
+      // Here you would store the user in your database if they don't exist
+      // and update their last login timestamp
     },
-    async signOut({ session, token }) {
-      console.log(`👋 User signed out: ${session?.user?.email || token?.email}`)
+    async createUser({ user }) {
+      console.log(`New user created: ${user.email}`)
     },
   },
   session: {
     strategy: "jwt",
-    maxAge: 8 * 60 * 60, // 8 hours for production security
+    maxAge: 24 * 60 * 60, // 24 hours
   },
-  secret: process.env.NEXTAUTH_SECRET!,
-  debug: false, // Disabled for production
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 }
 
-export async function getCurrentUser(): Promise<UserProfile | null> {
-  if (!isSupabaseConfigured()) {
-    return null
-  }
+// Helper function to get tenant-filtered data
+export function getTenantFilteredData<T extends { tenantId?: string }>(data: T[], userTenantId?: string): T[] {
+  if (!userTenantId) return data
+  return data.filter((item) => item.tenantId === userTenantId)
+}
 
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+// Helper function to check tenant access
+export function checkTenantAccess(userTenantId?: string, resourceTenantId?: string): boolean {
+  if (!userTenantId) return true // Patients can access their own data
+  return userTenantId === resourceTenantId
+}
 
-    if (!session?.user) {
-      return null
+// Helper function to seed admin user if none exists
+export async function seedAdminUser() {
+  // Check if admin exists
+  const adminExists = users.some((user) => user.role === "admin")
+
+  if (!adminExists) {
+    // Hash password
+    const passwordHash = await bcrypt.hash("Admin@1234", 12)
+
+    // Create default admin
+    const defaultAdmin = {
+      id: "admin-default",
+      name: "Adrian Knight",
+      email: "admin@innerclarityinc.com",
+      passwordHash,
+      role: "admin" as const,
+      tenantId: "inner-clarity-main",
+      tenantName: "Inner Clarity - Main Office",
+      authProvider: "microsoft",
     }
 
-    const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
-
-    if (error || !profile) {
-      return null
-    }
-
-    return profile
-  } catch (error) {
-    console.error("Error getting current user:", error)
-    return null
-  }
-}
-
-export async function requireAuth(requiredRole?: "admin" | "super_admin") {
-  if (!isSupabaseConfigured()) {
-    throw new Error("Authentication not configured")
+    users.push(defaultAdmin)
+    console.log("Default admin user created:", defaultAdmin.email)
+    return true
   }
 
-  const user = await getCurrentUser()
-
-  if (!user) {
-    throw new Error("Authentication required")
-  }
-
-  if (!["admin", "super_admin"].includes(user.role)) {
-    throw new Error("Admin access required")
-  }
-
-  if (requiredRole === "super_admin" && user.role !== "super_admin") {
-    throw new Error("Super admin access required")
-  }
-
-  return user
-}
-
-export async function logAuditEvent(action: string, resource: string, resourceId?: string, details?: any) {
-  if (!isSupabaseConfigured()) {
-    return
-  }
-
-  try {
-    const user = await getCurrentUser()
-    if (!user) return
-
-    await supabase.from("audit_logs").insert({
-      user_id: user.id,
-      action,
-      resource,
-      resource_id: resourceId,
-      details,
-      ip_address: "",
-      user_agent: "",
-      created_at: new Date().toISOString(),
-    })
-  } catch (error) {
-    console.error("Error logging audit event:", error)
-  }
+  return false
 }

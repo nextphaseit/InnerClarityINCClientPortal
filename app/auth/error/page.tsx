@@ -1,89 +1,91 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { AlertTriangle, Home, RefreshCw } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertTriangle } from "lucide-react"
 
-export default function AuthErrorPage() {
-  const [errorInfo, setErrorInfo] = useState({
-    error: "Unknown Error",
-    description: "An authentication error occurred",
-  })
+export default function AuthError() {
+  const searchParams = useSearchParams()
+  const [errorMessage, setErrorMessage] = useState<string>("An authentication error occurred")
 
   useEffect(() => {
-    try {
-      // Get URL parameters safely
-      const urlParams = new URLSearchParams(window.location.search)
-      const error = urlParams.get("error") || "Unknown Error"
-      const description = urlParams.get("error_description") || "An authentication error occurred"
-
-      setErrorInfo({
-        error: String(error),
-        description: String(description),
-      })
-    } catch (err) {
-      console.error("Error parsing URL params:", err)
-      // Keep default values
+    const error = searchParams?.get("error")
+    if (error) {
+      setErrorMessage(getErrorMessage(error))
     }
-  }, [])
-
-  const getErrorMessage = (error: string) => {
-    const errorLower = (error || "").toLowerCase()
-
-    if (errorLower.includes("configuration")) {
-      return "There's an issue with the authentication configuration."
-    }
-    if (errorLower.includes("access") || errorLower.includes("denied")) {
-      return "Access was denied. You may not have permission to sign in."
-    }
-    if (errorLower.includes("verification")) {
-      return "The verification link is invalid or has expired."
-    }
-    return "An unexpected authentication error occurred."
-  }
+  }, [searchParams])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="bg-white shadow-lg rounded-xl p-8 max-w-md w-full text-center">
-        <div className="text-red-600 mb-6">
-          <AlertTriangle className="h-12 w-12 mx-auto" />
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-clarity-blue-50 to-clarity-green-50 dark:from-gray-900 dark:to-gray-800 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-4 text-center">
+          <div className="flex justify-center">
+            <Image
+              src="/placeholder.svg?height=80&width=80&text=IC"
+              alt="Inner Clarity Inc."
+              width={80}
+              height={80}
+              className="h-20 w-auto"
+            />
+          </div>
+          <div>
+            <CardTitle className="text-2xl font-bold">Authentication Error</CardTitle>
+            <CardDescription className="text-base mt-2">
+              We encountered an issue with your sign-in attempt
+            </CardDescription>
+          </div>
+        </CardHeader>
 
-        <h1 className="text-2xl font-semibold mb-2 text-gray-900">Authentication Error</h1>
-        <p className="text-gray-600 mb-6">{getErrorMessage(errorInfo.error)}</p>
+        <CardContent className="space-y-6">
+          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-900/30">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              <p className="text-red-600 dark:text-red-400 font-medium">{errorMessage}</p>
+            </div>
+          </div>
 
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <h2 className="text-lg font-semibold text-red-800 mb-2">Error Details</h2>
-          <p className="text-sm text-red-700 mb-2">
-            <strong>Error:</strong> {errorInfo.error}
-          </p>
-          <p className="text-sm text-red-700">
-            <strong>Description:</strong> {errorInfo.description}
-          </p>
-        </div>
+          <div className="space-y-3">
+            <Button asChild className="w-full">
+              <Link href="/auth/signin">Try Again</Link>
+            </Button>
 
-        <div className="space-y-3">
-          <Button asChild className="w-full bg-gray-900 hover:bg-gray-800">
-            <Link href="/auth/signin">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Try signing in again
-            </Link>
-          </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/">Return to Home</Link>
+            </Button>
+          </div>
 
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/">
-              <Home className="mr-2 h-4 w-4" />
-              Return to home page
-            </Link>
-          </Button>
-        </div>
-
-        <div className="mt-6 text-xs text-gray-500">
-          <p>If this problem persists, please contact support at:</p>
-          <p className="font-medium">support@nextphaseit.org</p>
-        </div>
-      </div>
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground">
+              <span>🔒</span>
+              <span>HIPAA Secure Portal</span>
+            </div>
+            <p className="text-xs text-center text-muted-foreground mt-1">
+              Need help? Contact support at support@innerclarity.inc
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
+}
+
+function getErrorMessage(error: string): string {
+  const errorMessages: Record<string, string> = {
+    Configuration: "There is a problem with the server configuration.",
+    AccessDenied: "Access denied. You do not have permission to sign in.",
+    Verification: "The verification token has expired or has already been used.",
+    CredentialsSignin: "Invalid email or password. Please check your credentials and try again.",
+    OAuthSignin: "Error occurred during sign in.",
+    OAuthCallback: "Error occurred during authentication callback.",
+    OAuthCreateAccount: "Could not create account.",
+    EmailSignin: "Unable to send sign-in email. Please try again later.",
+    SessionRequired: "Please sign in to access this page.",
+    Default: "An unexpected authentication error occurred. Please try again.",
+  }
+
+  return errorMessages[error] || errorMessages.Default
 }

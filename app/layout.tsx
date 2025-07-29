@@ -4,14 +4,19 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import { ErrorBoundary } from "@/components/error-boundary"
+import { AuthProvider } from "@/components/auth-provider"
+import ErrorBoundary from "@/components/error-boundary"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Inner Clarity Portal",
-  description: "Secure patient portal for Inner Clarity INC",
-    generator: 'v0.dev'
+  title: "Inner Clarity Inc. - Mental Health Portal",
+  description: "Secure HIPAA-compliant mental health portal for clients and providers",
+  icons: {
+    icon: "/images/inner-clarity-logo.png",
+    apple: "/images/inner-clarity-logo.png",
+  },
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -23,10 +28,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ErrorBoundary>
-          <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-            {children}
-            <Toaster />
-          </ThemeProvider>
+          <AuthProvider>
+            <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+              {children}
+              <Toaster />
+            </ThemeProvider>
+          </AuthProvider>
         </ErrorBoundary>
       </body>
     </html>

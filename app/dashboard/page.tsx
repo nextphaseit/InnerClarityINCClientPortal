@@ -1,121 +1,260 @@
 "use client"
 
-export const dynamic = "force-dynamic"
-
-import { useSession, signOut } from "next-auth/react"
-import { Button } from "@/components/ui/button"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import ProtectedRoute from "@/components/protected-route"
-import { LogOut, User, Mail, Calendar } from "lucide-react"
+import { Navigation } from "@/components/navigation"
+import { useAuth } from "@/components/auth-provider"
+import {
+  Calendar,
+  MessageSquare,
+  CreditCard,
+  FileText,
+  Clock,
+  DollarSign,
+  Bell,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react"
+import Link from "next/link"
 
-export default function DashboardPage() {
-  // Use safer destructuring pattern to prevent build errors
-  const session = useSession()
-  const sessionData = session?.data
-  const status = session?.status || "loading"
+export default function ClientDashboard() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
 
-  // Handle loading state
-  if (status === "loading") {
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/signin")
+      return
+    }
+
+    if (user?.role === "admin") {
+      router.push("/admin")
+      return
+    }
+  }, [user, loading, router])
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-clarity-blue-500"></div>
       </div>
     )
   }
 
-  // Handle unauthenticated state
-  if (!sessionData) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle>Authentication Required</CardTitle>
-            <CardDescription>Please sign in to access your dashboard</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Button onClick={() => (window.location.href = "/auth/signin")} className="w-full">
-              Sign In
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  if (!user) {
+    return null
   }
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: "/" })
+  // Mock data - in a real app, this would come from your API
+  const upcomingAppointment = {
+    date: new Date("2024-01-15T14:00:00"),
+    provider: "Dr. Sarah Johnson",
+    type: "Therapy Session",
   }
+
+  const paymentDue = {
+    amount: 150,
+    dueDate: new Date("2024-01-20"),
+    description: "Therapy Session - January 8, 2024",
+  }
+
+  const unreadMessages = 2
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-            <Button onClick={handleSignOut} variant="outline">
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </Button>
-          </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Navigation />
 
-          {/* User Profile Card */}
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome back, {user.name.split(" ")[0]}</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            Here's what's happening with your mental health journey today.
+          </p>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="h-5 w-5" />
-                <span>Profile Information</span>
-              </CardTitle>
-              <CardDescription>Your account details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={sessionData.user?.image || ""} />
-                  <AvatarFallback>{sessionData.user?.name?.charAt(0)?.toUpperCase() || "U"}</AvatarFallback>
-                </Avatar>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-semibold">{sessionData.user?.name || "Unknown User"}</h3>
-                  <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
-                    <Mail className="h-4 w-4" />
-                    <span>{sessionData.user?.email || "No email"}</span>
-                  </div>
-                  <Badge variant="secondary">{sessionData.user?.role || "User"}</Badge>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Calendar className="h-8 w-8 text-clarity-blue-500" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Next Appointment</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {upcomingAppointment ? "Jan 15" : "None"}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Session Information */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <MessageSquare className="h-8 w-8 text-clarity-green-500" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Unread Messages</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{unreadMessages}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <DollarSign className="h-8 w-8 text-yellow-500" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Payment Due</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">${paymentDue.amount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <FileText className="h-8 w-8 text-purple-500" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Forms</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">1</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Upcoming Appointment */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Calendar className="h-5 w-5" />
-                <span>Session Information</span>
+              <CardTitle className="flex items-center">
+                <Calendar className="mr-2 h-5 w-5" />
+                Next Appointment
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">User ID:</span>
-                  <p className="text-gray-600 dark:text-gray-400 break-all">{sessionData.user?.id || "N/A"}</p>
+            <CardContent>
+              {upcomingAppointment ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-lg">{upcomingAppointment.type}</p>
+                      <p className="text-gray-600 dark:text-gray-400">with {upcomingAppointment.provider}</p>
+                    </div>
+                    <Badge variant="outline" className="bg-clarity-blue-50 text-clarity-blue-700">
+                      <Clock className="mr-1 h-3 w-3" />
+                      {upcomingAppointment.date.toLocaleDateString()} at{" "}
+                      {upcomingAppointment.date.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Badge>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button asChild size="sm">
+                      <Link href="/appointments">View Details</Link>
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      Reschedule
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium">Provider:</span>
-                  <p className="text-gray-600 dark:text-gray-400">{sessionData.user?.provider || "N/A"}</p>
+              ) : (
+                <div className="text-center py-8">
+                  <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-2 text-gray-600 dark:text-gray-400">No upcoming appointments</p>
+                  <Button asChild className="mt-4">
+                    <Link href="/appointments">Book Appointment</Link>
+                  </Button>
                 </div>
-                <div>
-                  <span className="font-medium">Role:</span>
-                  <p className="text-gray-600 dark:text-gray-400">{sessionData.user?.role || "N/A"}</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Messages */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <MessageSquare className="mr-2 h-5 w-5" />
+                  Recent Messages
                 </div>
-                <div>
-                  <span className="font-medium">Status:</span>
-                  <p className="text-green-600 dark:text-green-400">Active</p>
+                {unreadMessages > 0 && <Badge variant="destructive">{unreadMessages} new</Badge>}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-start space-x-3 p-3 rounded-lg bg-clarity-blue-50 dark:bg-clarity-blue-950/20">
+                  <div className="flex-shrink-0">
+                    <div className="h-8 w-8 rounded-full bg-clarity-blue-500 flex items-center justify-center">
+                      <span className="text-white text-sm font-medium">SJ</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Dr. Sarah Johnson</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Thank you for completing your homework assignment. Let's discuss...
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">2 hours ago</p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <div className="h-2 w-2 bg-clarity-blue-500 rounded-full"></div>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3 p-3 rounded-lg">
+                  <div className="flex-shrink-0">
+                    <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                      <span className="text-gray-600 text-sm font-medium">IC</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Inner Clarity Admin</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Your insurance verification has been completed successfully.
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">1 day ago</p>
+                  </div>
+                </div>
+
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/messages">View All Messages</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Due */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <CreditCard className="mr-2 h-5 w-5" />
+                Payment Due
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-lg">${paymentDue.amount}</p>
+                    <p className="text-gray-600 dark:text-gray-400">{paymentDue.description}</p>
+                  </div>
+                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
+                    <AlertCircle className="mr-1 h-3 w-3" />
+                    Due {paymentDue.dueDate.toLocaleDateString()}
+                  </Badge>
+                </div>
+                <div className="flex space-x-2">
+                  <Button asChild>
+                    <Link href="/billing">Pay Now</Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link href="/billing">View Invoice</Link>
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -125,37 +264,58 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common tasks and navigation</CardDescription>
+              <CardDescription>Common tasks you might want to complete</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button
-                variant="outline"
-                className="h-20 flex flex-col space-y-2"
-                onClick={() => (window.location.href = "/admin/dashboard")}
-              >
-                <User className="h-6 w-6" />
-                <span>Admin Portal</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-20 flex flex-col space-y-2"
-                onClick={() => (window.location.href = "/portal/dashboard")}
-              >
-                <Calendar className="h-6 w-6" />
-                <span>Patient Portal</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-20 flex flex-col space-y-2"
-                onClick={() => (window.location.href = "/profile")}
-              >
-                <Mail className="h-6 w-6" />
-                <span>Profile Settings</span>
-              </Button>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <Button asChild variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
+                  <Link href="/appointments">
+                    <Calendar className="h-6 w-6" />
+                    <span className="text-sm">Book Appointment</span>
+                  </Link>
+                </Button>
+
+                <Button asChild variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
+                  <Link href="/documents">
+                    <FileText className="h-6 w-6" />
+                    <span className="text-sm">Upload Documents</span>
+                  </Link>
+                </Button>
+
+                <Button asChild variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
+                  <Link href="/messages">
+                    <MessageSquare className="h-6 w-6" />
+                    <span className="text-sm">Send Message</span>
+                  </Link>
+                </Button>
+
+                <Button asChild variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
+                  <Link href="/forms">
+                    <CheckCircle className="h-6 w-6" />
+                    <span className="text-sm">Complete Forms</span>
+                  </Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
-      </div>
-    </ProtectedRoute>
+
+        {/* HIPAA Notice */}
+        <Card className="mt-8 hipaa-secure">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Bell className="h-5 w-5 text-clarity-blue-600" />
+              <div>
+                <p className="text-sm font-medium">HIPAA Privacy Notice</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Your health information is protected under HIPAA regulations. All communications and data are
+                  encrypted and secure.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+    </div>
   )
 }

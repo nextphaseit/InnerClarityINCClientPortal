@@ -1,48 +1,112 @@
 "use client"
 
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Shield, ArrowLeft } from "lucide-react"
-import Link from "next/link"
+import { AlertTriangle, Home, LogIn } from "lucide-react"
+import Image from "next/image"
+import { useAuth } from "@/components/auth-provider"
 
 export default function UnauthorizedPage() {
+  const { user, status } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    // Redirect authenticated users to appropriate dashboard
+    if (status === "authenticated" && user) {
+      if (user.role === "admin") {
+        router.push("/admin")
+      } else if (user.role === "patient") {
+        router.push("/dashboard")
+      }
+    }
+  }, [user, status, router])
+
+  const handleSignIn = () => {
+    router.push("/auth/signin")
+  }
+
+  const handleGoHome = () => {
+    router.push("/")
+  }
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-2xl border-0 backdrop-blur-sm bg-white/95">
-        <CardHeader className="space-y-4 text-center pb-6">
-          <div className="flex justify-center mb-2">
-            <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-orange-700 rounded-2xl flex items-center justify-center shadow-lg">
-              <Shield className="h-8 w-8 text-white" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/images/inner-clarity-logo.png"
+              alt="Inner Clarity Inc."
+              width={200}
+              height={80}
+              className="h-16 w-auto"
+            />
+          </div>
+          <div className="flex justify-center mb-4">
+            <div className="rounded-full bg-red-100 p-3">
+              <AlertTriangle className="h-8 w-8 text-red-600" />
             </div>
           </div>
-          <div className="space-y-2">
-            <CardTitle className="text-2xl font-bold text-slate-800">Access Denied</CardTitle>
-            <CardDescription className="text-slate-600">
-              You don't have permission to access this resource
-            </CardDescription>
-          </div>
+          <CardTitle className="text-2xl font-bold text-gray-900">Access Denied</CardTitle>
+          <CardDescription className="text-gray-600">You do not have permission to view this page.</CardDescription>
         </CardHeader>
-
-        <CardContent className="space-y-6 pb-8 text-center">
-          <div className="space-y-2">
-            <p className="text-sm text-gray-600">
-              This area is restricted to administrators only. If you believe you should have access, please contact your
-              system administrator.
-            </p>
+        <CardContent className="space-y-4">
+          <div className="text-center text-sm text-gray-500">
+            {status === "unauthenticated" ? (
+              <p>Please sign in with the appropriate account to access this resource.</p>
+            ) : (
+              <p>Your current account ({user?.email}) does not have the required permissions for this page.</p>
+            )}
           </div>
 
           <div className="space-y-3">
-            <Button asChild className="w-full">
-              <Link href="/auth/signin">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Sign In
-              </Link>
+            {status === "unauthenticated" ? (
+              <Button onClick={handleSignIn} className="w-full" size="lg">
+                <LogIn className="mr-2 h-4 w-4" />
+                Sign In
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <Button onClick={handleSignIn} variant="outline" className="w-full" size="lg">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Sign In with Different Account
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (user?.role === "admin") {
+                      router.push("/admin")
+                    } else if (user?.role === "patient") {
+                      router.push("/dashboard")
+                    } else {
+                      router.push("/")
+                    }
+                  }}
+                  className="w-full"
+                  size="lg"
+                >
+                  Go to Dashboard
+                </Button>
+              </div>
+            )}
+
+            <Button onClick={handleGoHome} variant="ghost" className="w-full" size="lg">
+              <Home className="mr-2 h-4 w-4" />
+              Return Home
             </Button>
           </div>
 
-          <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
-            <p className="font-medium mb-1">Need Help?</p>
-            <p>Contact support@nextphaseit.org</p>
+          <div className="text-xs text-center text-gray-400 mt-6">
+            <p>Need help? Contact support at support@innerclarity.org</p>
           </div>
         </CardContent>
       </Card>

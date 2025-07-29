@@ -32,7 +32,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 
-export function Navigation() {
+const Navigation = () => {
   const { data: session, status } = useSession()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const pathname = usePathname()

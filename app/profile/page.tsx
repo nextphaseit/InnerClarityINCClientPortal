@@ -1,7 +1,5 @@
 "use client"
 
-export const dynamic = "force-dynamic"
-
 import type React from "react"
 
 import { useRouter } from "next/navigation"
@@ -13,11 +11,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Navigation } from "@/components/navigation"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/components/auth-provider"
 import { User, Phone, Shield, Save } from "lucide-react"
 
 export default function ProfilePage() {
-  const { data: session, status } = useSession()
+  const { user, loading } = useAuth()
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({
@@ -32,10 +30,15 @@ export default function ProfilePage() {
   })
 
   useEffect(() => {
-    if (session?.user) {
+    if (!loading && !user) {
+      router.push("/auth/signin")
+      return
+    }
+
+    if (user) {
       setFormData({
-        name: session.user.name || "",
-        email: session.user.email || "",
+        name: user.name,
+        email: user.email,
         phone: "(555) 123-4567",
         address: "123 Main St, Anytown, ST 12345",
         dateOfBirth: "1990-01-01",
@@ -44,28 +47,12 @@ export default function ProfilePage() {
         notes: "No known allergies. Prefers morning appointments.",
       })
     }
-  }, [session])
+  }, [user, loading, router])
 
-  if (status === "loading") {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-clarity-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <User className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Sign In Required</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to view your profile.</p>
-          <Button onClick={() => router.push("/auth/signin")}>Sign In</Button>
-        </div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-clarity-blue-500"></div>
       </div>
     )
   }
@@ -97,14 +84,14 @@ export default function ProfilePage() {
             <CardContent className="p-6">
               <div className="flex items-center space-x-6">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src="/placeholder.svg" alt={session?.user?.name} />
-                  <AvatarFallback className="text-2xl">{session?.user?.name?.charAt(0)}</AvatarFallback>
+                  <AvatarImage src="/placeholder.svg" alt={user?.name} />
+                  <AvatarFallback className="text-2xl">{user?.name?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{session?.user?.name}</h2>
-                  <p className="text-gray-600 dark:text-gray-400">{session?.user?.email}</p>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{user?.name}</h2>
+                  <p className="text-gray-600 dark:text-gray-400">{user?.email}</p>
                   <p className="text-sm text-clarity-blue-600 dark:text-clarity-blue-400 capitalize">
-                    {session?.user?.role} Account
+                    {user?.role} Account
                   </p>
                 </div>
                 <div className="flex space-x-2">

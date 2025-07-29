@@ -1,8 +1,5 @@
 "use client"
 
-// Mark as dynamic to prevent static rendering issues
-export const dynamic = "force-dynamic"
-
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
